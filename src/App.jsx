@@ -27,6 +27,7 @@ export default function Home() {
   const [users, setUsers] = useState({});
   const [nickname, setNickname] = useState("");
   const [markers, setMarkers] = useState([]);
+  const [nicknameSubmitted, setNicknameSubmitted] = useState(false);
 
   useEffect(() => {
     signInAnonymously(auth).then((userCredential) => {
@@ -116,21 +117,25 @@ export default function Home() {
     if (userId) {
       const userRef = ref(db, `users/${userId}/name`);
       set(userRef, nickname);
+      setNicknameSubmitted(true);
     }
   };
 
   return (
     <div>
-      <div style={{ position: "absolute", top: 10, left: 10, zIndex: 1, background: "white", padding: 10, borderRadius: 5 }}>
-        <input
-          type="text"
-          value={nickname}
-          placeholder="Zadej jméno"
-          onChange={(e) => setNickname(e.target.value)}
-        />
-        <button onClick={handleNicknameSubmit}>Uložit</button>
-      </div>
+      {!nicknameSubmitted && (
+        <div style={{ position: "absolute", top: 10, left: 10, zIndex: 1, background: "white", padding: 10, borderRadius: 5 }}>
+          <input
+            type="text"
+            value={nickname}
+            placeholder="Zadej jméno"
+            onChange={(e) => setNickname(e.target.value)}
+          />
+          <button onClick={handleNicknameSubmit}>Uložit</button>
+        </div>
+      )}
       <div id="map" style={{ width: "100vw", height: "100vh" }}></div>
     </div>
   );
 }
+
