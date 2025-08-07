@@ -26,6 +26,7 @@ export default function Home() {
   const [userId, setUserId] = useState(null);
   const [users, setUsers] = useState({});
   const [nickname, setNickname] = useState("");
+  const [markers, setMarkers] = useState([]);
 
   useEffect(() => {
     signInAnonymously(auth).then((userCredential) => {
@@ -87,14 +88,11 @@ export default function Home() {
 
   useEffect(() => {
     if (map) {
-      map.eachLayer((layer) => {
-        if (layer.id !== "background" && layer.id !== "water") {
-          try {
-            map.removeLayer(layer.id);
-            map.removeSource(layer.id);
-          } catch {}
-        }
-      });
+      // Odstranit předchozí markery z mapy
+      markers.forEach(marker => marker.remove());
+
+      const newMarkers = [];
+
       Object.entries(users).forEach(([uid, user]) => {
         if (user.location) {
           const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
@@ -106,8 +104,11 @@ export default function Home() {
           );
 
           marker.setPopup(popup).addTo(map);
+          newMarkers.push(marker);
         }
       });
+
+      setMarkers(newMarkers);
     }
   }, [map, users, userId]);
 
