@@ -101,15 +101,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [users]);
 
-  const sendPing = (targetId) => {
-    const pingRef = ref(db, `pings/${targetId}`);
-    push(pingRef, {
-      from: userId,
-      timestamp: Date.now()
-    });
-  };
-
-  // ✅ PŘIJÍMÁNÍ PINGŮ
   useEffect(() => {
     if (!userId) return;
 
@@ -127,6 +118,15 @@ export default function Home() {
     return () => unsubscribe();
   }, [userId]);
 
+  const sendPing = (targetId) => {
+    const pingRef = ref(db, `pings/${targetId}`);
+    push(pingRef, {
+      from: userId,
+      timestamp: Date.now()
+    });
+    console.log("Ping odeslán:", targetId);
+  };
+
   useEffect(() => {
     if (map) {
       markers.forEach(marker => marker.remove());
@@ -141,15 +141,26 @@ export default function Home() {
 
             const isOnline = Date.now() - user.lastActive < 30000;
 
-            const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-              `<strong>${user.name || "Uživatel"}</strong><br/>` +
-              `${isOnline ? "<em>Online právě teď</em><br/>" : ""}` +
-              `${uid !== userId ? `Vzdálenost: ${Math.round(distance)} m<br/><button onclick=\"window.sendPingTo('${uid}')\">📨 Poslat ping</button>` : ""}` +
-              `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
-            );
+            const popupDiv = document.createElement("div");
+            popupDiv.innerHTML = `
+              <strong>${user.name || "Uživatel"}</strong><br/>
+              ${isOnline ? "<em>Online právě teď</em><br/>" : ""}
+              ${uid !== userId ? `Vzdálenost: ${Math.round(distance)} m<br/>` : ""}
+              ${uid !== userId ? `<button id="ping-${uid}">📨 Poslat ping</button>` : ""}
+              Aktivní: ${new Date(user.lastActive).toLocaleString()}
+            `;
 
+            const popup = new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupDiv);
             marker.setPopup(popup).addTo(map);
             newMarkers.push(marker);
+
+            // Přidání listeneru až po přidání popupu
+            popup.on('open', () => {
+              const button = document.getElementById(`ping-${uid}`);
+              if (button) {
+                button.addEventListener("click", () => sendPing(uid));
+              }
+            });
           }
         }
       });
@@ -157,10 +168,6 @@ export default function Home() {
       setMarkers(newMarkers);
     }
   }, [map, users, userId]);
-
-  useEffect(() => {
-    window.sendPingTo = sendPing;
-  }, [userId]);
 
   const getDistance = (lat, lng) => {
     const R = 6371e3;
@@ -206,13 +213,3 @@ export default function Home() {
     </div>
   );
 }
-
-2. Deployni znovu přes Netlify.
-
-
-3. Otevři ve dvou oknech/mobilech – klikni na „📨 Poslat ping“ → druhému se zobrazí alert("📨 Dostal jsi ping!").
-
-
-
-Chceš další funkci (např. historie pingů, jiný zvuk nebo animaci)?
-
