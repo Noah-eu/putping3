@@ -25,6 +25,7 @@ export default function Home() {
   const [map, setMap] = useState(null);
   const [userId, setUserId] = useState(null);
   const [users, setUsers] = useState({});
+  const [nickname, setNickname] = useState("");
 
   useEffect(() => {
     signInAnonymously(auth).then((userCredential) => {
@@ -56,7 +57,7 @@ export default function Home() {
             },
             status: "active",
             lastActive: Date.now(),
-            name: "Anonymní uživatel"
+            name: nickname || "Anonymní uživatel"
           });
         },
         (error) => {
@@ -73,7 +74,7 @@ export default function Home() {
         }
       );
     }
-  }, [userId]);
+  }, [userId, nickname]);
 
   useEffect(() => {
     const usersRef = ref(db, "users");
@@ -86,6 +87,14 @@ export default function Home() {
 
   useEffect(() => {
     if (map) {
+      map.eachLayer((layer) => {
+        if (layer.id !== "background" && layer.id !== "water") {
+          try {
+            map.removeLayer(layer.id);
+            map.removeSource(layer.id);
+          } catch {}
+        }
+      });
       Object.entries(users).forEach(([uid, user]) => {
         if (user.location) {
           const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
@@ -102,10 +111,25 @@ export default function Home() {
     }
   }, [map, users, userId]);
 
+  const handleNicknameSubmit = () => {
+    if (userId) {
+      const userRef = ref(db, `users/${userId}/name`);
+      set(userRef, nickname);
+    }
+  };
+
   return (
     <div>
+      <div style={{ position: "absolute", top: 10, left: 10, zIndex: 1, background: "white", padding: 10, borderRadius: 5 }}>
+        <input
+          type="text"
+          value={nickname}
+          placeholder="Zadej jméno"
+          onChange={(e) => setNickname(e.target.value)}
+        />
+        <button onClick={handleNicknameSubmit}>Uložit</button>
+      </div>
       <div id="map" style={{ width: "100vw", height: "100vh" }}></div>
     </div>
   );
 }
-
