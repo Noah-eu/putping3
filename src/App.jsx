@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue, remove } from "firebase/database";
+import { getDatabase, ref, set, onValue, remove, push } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import mapboxgl from "mapbox-gl";
 
@@ -47,7 +47,6 @@ export default function Home() {
     }
   }, [map]);
 
-  // Aktualizace polohy každých 10 sekund
   useEffect(() => {
     const updateLocation = () => {
       if (userId && navigator.geolocation) {
@@ -90,7 +89,6 @@ export default function Home() {
     return () => unsubscribe();
   }, []);
 
-  // Odstranit neaktivní uživatele (starší než 1 minuta)
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
@@ -102,6 +100,14 @@ export default function Home() {
     }, 30000);
     return () => clearInterval(interval);
   }, [users]);
+
+  const sendPing = (targetId) => {
+    const pingRef = ref(db, `pings/${targetId}`);
+    push(pingRef, {
+      from: userId,
+      timestamp: Date.now()
+    });
+  };
 
   useEffect(() => {
     if (map) {
@@ -120,7 +126,7 @@ export default function Home() {
             const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
               `<strong>${user.name || "Uživatel"}</strong><br/>` +
               `${isOnline ? "<em>Online právě teď</em><br/>" : ""}` +
-              `${uid !== userId ? `Vzdálenost: ${Math.round(distance)} m<br/>` : ""}` +
+              `${uid !== userId ? `Vzdálenost: ${Math.round(distance)} m<br/><button onclick=\"window.sendPingTo('${uid}')\">📨 Poslat ping</button>` : ""}` +
               `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
             );
 
@@ -133,6 +139,10 @@ export default function Home() {
       setMarkers(newMarkers);
     }
   }, [map, users, userId]);
+
+  useEffect(() => {
+    window.sendPingTo = sendPing;
+  }, [userId]);
 
   const getDistance = (lat, lng) => {
     const R = 6371e3;
