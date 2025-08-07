@@ -109,6 +109,24 @@ export default function Home() {
     });
   };
 
+  // ✅ PŘIJÍMÁNÍ PINGŮ
+  useEffect(() => {
+    if (!userId) return;
+
+    const pingRef = ref(db, `pings/${userId}`);
+    const unsubscribe = onValue(pingRef, (snapshot) => {
+      const pings = snapshot.val();
+      if (pings) {
+        Object.entries(pings).forEach(([pingId, pingData]) => {
+          alert("📨 Dostal jsi ping!");
+          remove(ref(db, `pings/${userId}/${pingId}`));
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
   useEffect(() => {
     if (map) {
       markers.forEach(marker => marker.remove());
@@ -188,3 +206,13 @@ export default function Home() {
     </div>
   );
 }
+
+2. Deployni znovu přes Netlify.
+
+
+3. Otevři ve dvou oknech/mobilech – klikni na „📨 Poslat ping“ → druhému se zobrazí alert("📨 Dostal jsi ping!").
+
+
+
+Chceš další funkci (např. historie pingů, jiný zvuk nebo animaci)?
+
