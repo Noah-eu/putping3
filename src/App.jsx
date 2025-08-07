@@ -7,6 +7,7 @@ import mapboxgl from "mapbox-gl";
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
+  databaseURL: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
   storageBucket: "putping-dc57e.appspot.com",
   messagingSenderId: "244045363394",
@@ -32,19 +33,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!map && document.getElementById('map')) {
-      const initializeMap = new mapboxgl.Map({
+    if (!map && document.getElementById("map")) {
+      const newMap = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v11",
         center: [14.42076, 50.08804],
         zoom: 13
       });
-      setMap(initializeMap);
+      setMap(newMap);
     }
   }, [map]);
 
   useEffect(() => {
-    if (userId && "geolocation" in navigator) {
+    if (userId && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userRef = ref(db, `users/${userId}`);
@@ -55,7 +56,7 @@ export default function Home() {
             },
             status: "active",
             lastActive: Date.now(),
-            username: "Ty"
+            name: "Anonymní uživatel"
           });
         },
         (error) => {
@@ -71,8 +72,6 @@ export default function Home() {
           maximumAge: 0
         }
       );
-    } else if (!("geolocation" in navigator)) {
-      console.error("Geolocation not supported by this browser.");
     }
   }, [userId]);
 
@@ -87,24 +86,17 @@ export default function Home() {
 
   useEffect(() => {
     if (map) {
-      // Odstranit staré markery
-      map.eachLayer?.((layer) => {
-        if (layer.type === 'symbol') map.removeLayer(layer);
-      });
-
       Object.entries(users).forEach(([uid, user]) => {
         if (user.location) {
           const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
-            .setLngLat([user.location.lng, user.location.lat])
-            .addTo(map);
+            .setLngLat([user.location.lng, user.location.lat]);
 
-          // Popis uživatele (jméno + čas)
-          const timeAgo = Date.now() - (user.lastActive || 0);
-          const minutesAgo = Math.floor(timeAgo / 60000);
-          const popupText = `${user.username || 'Uživatel'}\nAktivní před ${minutesAgo} min.`;
+          const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<strong>${user.name || "Uživatel"}</strong><br/>` +
+            `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
+          );
 
-          const popup = new mapboxgl.Popup({ offset: 25 }).setText(popupText);
-          marker.setPopup(popup);
+          marker.setPopup(popup).addTo(map);
         }
       });
     }
@@ -116,3 +108,4 @@ export default function Home() {
     </div>
   );
 }
+
