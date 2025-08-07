@@ -28,6 +28,7 @@ export default function Home() {
   const [nickname, setNickname] = useState("");
   const [markers, setMarkers] = useState([]);
   const [nicknameSubmitted, setNicknameSubmitted] = useState(false);
+  const [pingMessage, setPingMessage] = useState("");
 
   useEffect(() => {
     signInAnonymously(auth).then((userCredential) => {
@@ -109,8 +110,9 @@ export default function Home() {
       const pings = snapshot.val();
       if (pings) {
         Object.entries(pings).forEach(([pingId, pingData]) => {
-          alert("📨 Dostal jsi ping!");
+          setPingMessage("📨 Dostal jsi ping!");
           remove(ref(db, `pings/${userId}/${pingId}`));
+          setTimeout(() => setPingMessage(""), 4000);
         });
       }
     });
@@ -154,7 +156,6 @@ export default function Home() {
             marker.setPopup(popup).addTo(map);
             newMarkers.push(marker);
 
-            // Přidání listeneru až po přidání popupu
             popup.on('open', () => {
               const button = document.getElementById(`ping-${uid}`);
               if (button) {
@@ -207,6 +208,22 @@ export default function Home() {
             onChange={(e) => setNickname(e.target.value)}
           />
           <button onClick={handleNicknameSubmit}>Uložit</button>
+        </div>
+      )}
+      {pingMessage && (
+        <div style={{
+          position: "absolute",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#333",
+          color: "#fff",
+          padding: "10px 20px",
+          borderRadius: "8px",
+          zIndex: 2,
+          boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
+        }}>
+          {pingMessage}
         </div>
       )}
       <div id="map" style={{ width: "100vw", height: "100vh" }}></div>
