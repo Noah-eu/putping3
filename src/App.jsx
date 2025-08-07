@@ -1,4 +1,4 @@
-""import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue, remove } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
