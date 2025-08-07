@@ -99,7 +99,7 @@ export default function Home() {
           remove(ref(db, `users/${uid}`));
         }
       });
-    }, 30000); // kontrola každých 30 sekund
+    }, 30000);
     return () => clearInterval(interval);
   }, [users]);
 
@@ -112,11 +112,15 @@ export default function Home() {
         if (user.location) {
           const distance = getDistance(user.location.lat, user.location.lng);
           if (distance <= 5000) {
-            const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
+            const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : distance < 500 ? "green" : "blue" })
               .setLngLat([user.location.lng, user.location.lat]);
+
+            const isOnline = Date.now() - user.lastActive < 30000;
 
             const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
               `<strong>${user.name || "Uživatel"}</strong><br/>` +
+              `${isOnline ? "<em>Online právě teď</em><br/>" : ""}` +
+              `${uid !== userId ? `Vzdálenost: ${Math.round(distance)} m<br/>` : ""}` +
               `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
             );
 
@@ -174,4 +178,3 @@ export default function Home() {
     </div>
   );
 }
-
