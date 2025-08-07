@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+""import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue } from "firebase/database";
+import { getDatabase, ref, set, onValue, remove } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import mapboxgl from "mapbox-gl";
 
@@ -89,6 +89,19 @@ export default function Home() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Odstranit neaktivní uživatele (starší než 1 minuta)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      Object.entries(users).forEach(([uid, user]) => {
+        if (user.lastActive && now - user.lastActive > 60 * 1000) {
+          remove(ref(db, `users/${uid}`));
+        }
+      });
+    }, 30000); // kontrola každých 30 sekund
+    return () => clearInterval(interval);
+  }, [users]);
 
   useEffect(() => {
     if (map) {
