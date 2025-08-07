@@ -21,6 +21,8 @@ const auth = getAuth();
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w';
 
+const pingSound = new Audio("https://notificationsounds.com/notification-sounds/event-538/download/mp3");
+
 export default function Home() {
   const [map, setMap] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -111,6 +113,7 @@ export default function Home() {
       if (pings) {
         Object.entries(pings).forEach(([pingId, pingData]) => {
           setPingMessage("📨 Dostal jsi ping!");
+          pingSound.play();
           remove(ref(db, `pings/${userId}/${pingId}`));
           setTimeout(() => setPingMessage(""), 4000);
         });
