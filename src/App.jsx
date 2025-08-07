@@ -47,35 +47,38 @@ export default function Home() {
     }
   }, [map]);
 
+  // Aktualizace polohy každých 10 sekund
   useEffect(() => {
-    if (userId && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userRef = ref(db, `users/${userId}`);
-          set(userRef, {
-            location: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            },
-            status: "active",
-            lastActive: Date.now(),
-            name: nickname || "Anonymní uživatel"
-          });
-        },
-        (error) => {
-          if (error.code === error.PERMISSION_DENIED) {
-            alert("Musíš povolit sdílení polohy, aby ses zobrazil na mapě.");
-          } else {
-            alert("Nepodařilo se získat polohu.");
+    const updateLocation = () => {
+      if (userId && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const userRef = ref(db, `users/${userId}`);
+            set(userRef, {
+              location: {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              },
+              status: "active",
+              lastActive: Date.now(),
+              name: nickname || "Anonymní uživatel"
+            });
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
           }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    }
+        );
+      }
+    };
+
+    updateLocation();
+    const interval = setInterval(updateLocation, 10000);
+    return () => clearInterval(interval);
   }, [userId, nickname]);
 
   useEffect(() => {
@@ -89,29 +92,49 @@ export default function Home() {
 
   useEffect(() => {
     if (map) {
-      // Odstranit předchozí markery z mapy
       markers.forEach(marker => marker.remove());
-
       const newMarkers = [];
 
       Object.entries(users).forEach(([uid, user]) => {
         if (user.location) {
-          const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
-            .setLngLat([user.location.lng, user.location.lat]);
+          const distance = getDistance(user.location.lat, user.location.lng);
+          if (distance <= 5000) {
+            const marker = new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
+              .setLngLat([user.location.lng, user.location.lat]);
 
-          const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<strong>${user.name || "Uživatel"}</strong><br/>` +
-            `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
-          );
+            const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<strong>${user.name || "Uživatel"}</strong><br/>` +
+              `Aktivní: ${new Date(user.lastActive).toLocaleString()}`
+            );
 
-          marker.setPopup(popup).addTo(map);
-          newMarkers.push(marker);
+            marker.setPopup(popup).addTo(map);
+            newMarkers.push(marker);
+          }
         }
       });
 
       setMarkers(newMarkers);
     }
   }, [map, users, userId]);
+
+  const getDistance = (lat, lng) => {
+    const R = 6371e3;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const user = users[userId];
+    if (!user || !user.location) return Infinity;
+
+    const φ1 = toRad(user.location.lat);
+    const φ2 = toRad(lat);
+    const Δφ = toRad(lat - user.location.lat);
+    const Δλ = toRad(lng - user.location.lng);
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
 
   const handleNicknameSubmit = () => {
     if (userId) {
