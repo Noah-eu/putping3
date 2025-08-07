@@ -33,6 +33,12 @@ export default function Home() {
   const [pingMessage, setPingMessage] = useState("");
 
   useEffect(() => {
+    Notification.requestPermission().then(permission => {
+      console.log("Notification permission:", permission);
+    });
+  }, []);
+
+  useEffect(() => {
     signInAnonymously(auth).then((userCredential) => {
       setUserId(userCredential.user.uid);
     });
@@ -113,7 +119,12 @@ export default function Home() {
       if (pings) {
         Object.entries(pings).forEach(([pingId, pingData]) => {
           setPingMessage("📨 Dostal jsi ping!");
-          pingSound.play();
+          if (Notification.permission === "granted") {
+            new Notification("📨 Dostal jsi ping!");
+          }
+          pingSound.play().catch((e) => {
+            console.warn("Zvuk se nepodařilo přehrát:", e);
+          });
           remove(ref(db, `pings/${userId}/${pingId}`));
           setTimeout(() => setPingMessage(""), 4000);
         });
@@ -233,3 +244,4 @@ export default function Home() {
     </div>
   );
 }
+
