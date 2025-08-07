@@ -1,23 +1,8 @@
-
 import { useEffect, useState } from "react";
-import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue } from "firebase/database";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { ref, set, onValue } from "firebase/database";
+import { signInAnonymously } from "firebase/auth";
+import { db, auth } from "./firebase";
 import mapboxgl from "mapbox-gl";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
-  authDomain: "putping-dc57e.firebaseapp.com",
-  projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.appspot.com",
-  messagingSenderId: "244045363394",
-  appId: "1:244045363394:web:64e93b0ff17a816549635b",
-  measurementId: "G-RL6MGM46M6X"
-};
-
-initializeApp(firebaseConfig);
-const db = getDatabase();
-const auth = getAuth();
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w';
 
@@ -33,7 +18,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!map && document.getElementById('map')) {
+    if (!map && document.getElementById("map")) {
       const initializeMap = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v11",
@@ -84,10 +69,9 @@ export default function Home() {
     });
     return () => unsubscribe();
   }, []);
-  
+
   useEffect(() => {
     if (map) {
-      // Přidáme nové markery
       Object.entries(users).forEach(([uid, user]) => {
         if (user.location) {
           new mapboxgl.Marker({ color: uid === userId ? "red" : "blue" })
