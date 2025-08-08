@@ -12,7 +12,7 @@ import {
 } from "firebase/database";
 
 /* TODO: doplň vlastní token */
-mapboxgl.accessToken = "TVŮJ_MAPBOX_TOKEN";
+mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
 /* TODO: doplň vlastní Firebase config (hlavně databaseURL) */
 const firebaseConfig = {
