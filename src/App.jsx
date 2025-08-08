@@ -1,4 +1,4 @@
-mport React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
 import {
