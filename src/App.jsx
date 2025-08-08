@@ -157,7 +157,7 @@ export default function App() {
   useEffect(() => {
     if (!map) return;
 
-    const meRef = ref(db, users/${userId});
+    const meRef = ref(db, `users/${userId}`);
 
     // vlastní marker
     if (!selfMarkerRef.current) {
