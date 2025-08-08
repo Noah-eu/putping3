@@ -16,13 +16,13 @@ mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3b
 
 /* TODO: doplň vlastní Firebase config (hlavně databaseURL) */
 const firebaseConfig = {
-  apiKey: "TVŮJ_API_KEY",
-  authDomain: "xxx.firebaseapp.com",
+  apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
+  authDomain: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app/",
   databaseURL: "https://xxx-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "xxx",
-  storageBucket: "xxx.appspot.com",
-  messagingSenderId: "xxx",
-  appId: "xxx",
+  projectId: "putping-dc57e",
+  storageBucket: "putping-dc57e.appspot.com",
+  messagingSenderId: "244045363394",
+  appId: "1:244045363394:web:64e930bff17a816549635b",
 };
 
 initializeApp(firebaseConfig);
@@ -157,7 +157,7 @@ export default function App() {
   useEffect(() => {
     if (!map) return;
 
-    const meRef = ref(db, `users/${userId}`);
+    const meRef = ref(db, users/${userId});
 
     // vlastní marker
     if (!selfMarkerRef.current) {
@@ -165,7 +165,7 @@ export default function App() {
         .setLngLat([positionRef.current.lng, positionRef.current.lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<b>${name || "Anonymní uživatel"}</b><br>${new Date().toLocaleTimeString()}`
+            <b>${name || "Anonymní uživatel"}</b><br>${new Date().toLocaleTimeString()}
           )
         )
         .addTo(map);
@@ -210,7 +210,7 @@ export default function App() {
       </div>
       <div style="display:flex; gap:6px;">
         <input id="pp_msg" type="text" placeholder="Napsat zprávu…" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px"/>
-        <button id="pp_send" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fff">➡️</button>
+        <button id="pp_send" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fff">➡</button>
       </div>
     `;
 
@@ -290,7 +290,7 @@ export default function App() {
   /* Odeslat ping /pings/{targetId}/{pingId} */
   const sendPingTo = (targetId) => {
     const pingId = Math.random().toString(36).slice(2, 10);
-    set(ref(db, `pings/${targetId}/${pingId}`), {
+    set(ref(db, pings/${targetId}/${pingId}), {
       kind: "ping",
       fromId: userId,
       fromName: name || "Anonym",
@@ -302,7 +302,7 @@ export default function App() {
   /* Odeslat textovou zprávu */
   const sendMessageTo = (targetId, text) => {
     const msgId = Math.random().toString(36).slice(2, 10);
-    set(ref(db, `pings/${targetId}/${msgId}`), {
+    set(ref(db, pings/${targetId}/${msgId}), {
       kind: "message",
       fromId: userId,
       fromName: name || "Anonym",
@@ -314,7 +314,7 @@ export default function App() {
 
   /* Příjem pingů / zpráv pro mě */
   useEffect(() => {
-    const myPingsRef = ref(db, `pings/${userId}`);
+    const myPingsRef = ref(db, pings/${userId});
     const unsub = onValue(myPingsRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -328,7 +328,7 @@ export default function App() {
               .play()
               .catch(() => console.warn("Zvuk se nepodařilo přehrát."));
           }
-          showToast(`📩 Ping od: ${payload.fromName || "neznámý"}`, 9000);
+          showToast(📩 Ping od: ${payload.fromName || "neznámý"}, 9000);
         } else if (payload.kind === "message") {
           if (soundEnabled) {
             pingSound.current
@@ -336,11 +336,11 @@ export default function App() {
               .catch(() => console.warn("Zvuk se nepodařilo přehrát."));
           }
           const text = (payload.text || "").slice(0, 140);
-          showToast(`💬 Zpráva od ${payload.fromName || "neznámý"}: ${text}`, 12000);
+          showToast(💬 Zpráva od ${payload.fromName || "neznámý"}: ${text}, 12000);
         }
 
         // uklidit přečtený ping/zprávu
-        remove(ref(db, `pings/${userId}/${id}`));
+        remove(ref(db, pings/${userId}/${id}));
       });
     });
 
@@ -350,7 +350,7 @@ export default function App() {
   /* Ovládací prvky */
   const saveName = () => {
     localStorage.setItem("userName", name);
-    update(ref(db, `users/${userId}`), { name });
+    update(ref(db, users/${userId}), { name });
     showToast("✅ Jméno uloženo");
   };
 
@@ -401,6 +401,6 @@ export default function App() {
       </div>
 
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
-    </div>
-  );
+    </div>
+  );
 }
