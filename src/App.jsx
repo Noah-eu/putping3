@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
 import {
@@ -12,7 +12,6 @@ import {
   push,
 } from "firebase/database";
 
-/* ===== TODO: doplň svoje údaje ===== */
 mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
 const firebaseConfig = {
@@ -20,11 +19,10 @@ const firebaseConfig = {
   authDomain: "putping-dc57e.firebaseapp.com",
   databaseURL: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.firebasestorage.app",
+  storageBucket: "putping-dc57e.appspot.com",
   messagingSenderId: "244045363394",
   appId: "1:244045363394:web:64e930bff17a816549635b",
 };
-/* =================================== */
 
 initializeApp(firebaseConfig);
 const db = getDatabase();
@@ -58,6 +56,7 @@ export default function App() {
   );
   const [name, setName] = useState(localStorage.getItem("userName") || "");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [pingMessage, setPingMessage] = useState("");
 
   const markersRef = useRef({});
   const myMarkerRef = useRef(null);
@@ -120,8 +119,6 @@ export default function App() {
             });
             if (myMarkerRef.current) {
               myMarkerRef.current.marker.setLngLat([lng, lat]);
-              // POZOR: popup HTML už nepřepisujeme při každém ticku,
-              // jen čas od času (nebo vůbec není nutné)
             }
           },
           () => {},
@@ -171,12 +168,10 @@ export default function App() {
         const p = all[pid];
         const who = p.fromName ? ` od ${p.fromName}` : "";
         const textPart = p.text ? `\n„${p.text}“` : "";
-        alert(`📩 Ping${who}!${textPart}`);
+        setPingMessage(`📩 Ping${who}!${textPart}`);
 
         if (soundEnabled) {
           try {
-            // WebAudio odemknout na gesta – tlačítkem „Povolit zvuk“
-            // a přehrávat klony, ať to neblokuje další zvuky
             const a = new Audio(pingUrl);
             a.preload = "auto";
             a.play().catch(() => {});
@@ -189,7 +184,7 @@ export default function App() {
     return () => unsub();
   }, [userId, soundEnabled]);
 
-  // ostatní uživatelé – už NEpřepisuju popup HTML při každé změně!
+  // ostatní uživatelé
   useEffect(() => {
     if (!map) return;
 
@@ -198,7 +193,6 @@ export default function App() {
       const now = Date.now();
       const data = snap.val() || {};
 
-      // přidání/aktualizace
       Object.entries(data).forEach(([uid, u]) => {
         if (uid === userId) return;
         if (!u.lastActive || now - u.lastActive > TTL) {
@@ -210,7 +204,6 @@ export default function App() {
         }
 
         const ensureHandlers = (uid) => {
-          // při otevření popupu napojíme listeners
           const pingBtn = document.getElementById(`ping-${uid}`);
           const msgInput = document.getElementById(`msg-${uid}`);
           const sendBtn = document.getElementById(`sendmsg-${uid}`);
@@ -233,7 +226,6 @@ export default function App() {
         };
 
         if (!markersRef.current[uid]) {
-          // vytvoříme popup jen jednou
           const popupHtml = `
             <div style="min-width:170px">
               <b>${u.name || "Anonymní uživatel"}</b><br>
@@ -256,10 +248,7 @@ export default function App() {
           popup.on("open", () => ensureHandlers(uid));
           markersRef.current[uid] = { marker, popup, lastName: u.name || "" };
         } else {
-          // jen pohneme markerem, HTML nesahejte => input nezmizí
           markersRef.current[uid].marker.setLngLat([u.lng, u.lat]);
-
-          // pokud se změnilo jméno, popup přegenerujeme (vzácně)
           const lastName = markersRef.current[uid].lastName || "";
           const newName = u.name || "";
           if (newName !== lastName) {
@@ -278,15 +267,10 @@ export default function App() {
               </div>
             `;
             markersRef.current[uid].popup.setHTML(popupHtml);
-            markersRef.current[uid].popup.on("open", () => {
-              const i = document.getElementById(`msg-${uid}`);
-              if (i) i.value = "";
-            });
           }
         }
       });
 
-      // cleanup markerů co už nejsou
       Object.keys(markersRef.current).forEach((uid) => {
         if (!data[uid]) {
           markersRef.current[uid].marker.remove();
@@ -300,7 +284,7 @@ export default function App() {
 
   return (
     <div>
-      {/* horní lišta – je vždy viditelná */}
+      {/* horní lišta */}
       <div
         style={{
           position: "absolute",
@@ -329,12 +313,6 @@ export default function App() {
         <button
           onClick={async () => {
             await unlock(); // odemkne AudioContext
-            try {
-              // „test“ přehrání – tím si prohlížeč zapamatuje gesta
-              const a = new Audio(pingUrl);
-              a.preload = "auto";
-              await a.play();
-            } catch {}
             setSoundEnabled(true);
           }}
           style={{ padding: "6px 10px" }}
