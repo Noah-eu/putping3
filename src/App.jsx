@@ -1,177 +1,257 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
-import {
-  initializeApp
-} from "firebase/app";
+import { initializeApp } from "firebase/app";
 import {
   getDatabase,
   ref,
   set,
   update,
   onValue,
-  onDisconnect,
-  serverTimestamp,
   remove,
-  push
+  onDisconnect,
 } from "firebase/database";
-import {
-  getAuth,
-  signInAnonymously
-} from "firebase/auth";
 
-// ===== Mapbox token =====
-mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
+/* TODO: doplň vlastní token */
+mapboxgl.accessToken = "TVŮJ_MAPBOX_TOKEN";
 
-// ===== Firebase config =====
+/* TODO: doplň vlastní Firebase config (hlavně databaseURL) */
 const firebaseConfig = {
-  apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
-  authDomain: "putping-dc57e.firebaseapp.com",
-  databaseURL: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.firebasestorage.app",
-  messagingSenderId: "244045363394",
-  appId: "1:244045363394:web:64e930bff17a816549635b",
-  measurementId: "G-RLMGM46M6X"
+  apiKey: "TVŮJ_API_KEY",
+  authDomain: "xxx.firebaseapp.com",
+  databaseURL: "https://xxx-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "xxx",
+  storageBucket: "xxx.appspot.com",
+  messagingSenderId: "xxx",
+  appId: "xxx",
 };
 
 initializeApp(firebaseConfig);
 const db = getDatabase();
-const auth = getAuth();
 
-// drobný a spolehlivý zvuk (krátké „ding“)
-const DING_URL =
-  "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg";
+/* Konst / nastavení */
+const TTL_MS = 5 * 60 * 1000;      // zobrazuj jen uživatele aktivní posledních 5 min
+const HEARTBEAT_MS = 20_000;       // update do DB každých 20 s
+
+/* Jednoduchý toast overlay */
+const Toast = ({ message }) => (
+  <div
+    style={{
+      position: "fixed",
+      top: 12,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(0,0,0,0.85)",
+      color: "white",
+      padding: "10px 14px",
+      borderRadius: 10,
+      zIndex: 9999,
+      maxWidth: 360,
+      boxShadow: "0 4px 16px rgba(0,0,0,.3)",
+      fontSize: 14,
+      lineHeight: 1.35,
+      textAlign: "center",
+    }}
+  >
+    {message}
+  </div>
+);
 
 export default function App() {
+  /* Identita a stav */
   const [map, setMap] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState("Anonymní uživatel");
-  const [pingMessage, setPingMessage] = useState("");
+  const [userId] = useState(
+    localStorage.getItem("userId") || Math.random().toString(36).slice(2, 11)
+  );
+  const [name, setName] = useState(localStorage.getItem("userName") || "Anonym");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [toastText, setToastText] = useState(""); // text aktuálního toastu
 
-  const meRef = useRef(null);
-  const watchIdRef = useRef(null);
-  const markersById = useRef({}); // { [uid]: mapboxgl.Marker }
+  /* Markery */
+  const selfMarkerRef = useRef(null);
+  const markersById = useRef({});
 
-  // odemčený Audio element (po kliknutí na „Povolit zvuk“)
-  const audioRef = useRef(null);
+  const positionRef = useRef({ lat: 50.08804, lng: 14.42076 }); // default Praha
+  const pingSound = useRef(
+    new Audio(
+      "https://notificationsounds.com/storage/sounds/file-sounds-1150-event.mp3"
+    )
+  );
 
-  // ===== 1) Auth (anonymně) =====
+  /* Ulož si userId */
   useEffect(() => {
-    signInAnonymously(auth).then((cred) => {
-      setUserId(cred.user.uid);
-    });
-  }, []);
+    localStorage.setItem("userId", userId);
+  }, [userId]);
 
-  // ===== 2) Inicializace mapy =====
-  useEffect(() => {
-    if (map || !document.getElementById("map")) return;
-
-    const m = new mapboxgl.Map({
-      container: "map",
-      style: "mapbox://styles/mapbox/streets-v11",
-      center: [14.42076, 50.08804],
-      zoom: 13
-    });
-
-    setMap(m);
-    return () => m.remove();
-  }, [map]);
-
-  // ===== 3) Získání / sledování polohy a zápis do DB =====
-  useEffect(() => {
-    if (!userId || !map) return;
-
-    meRef.current = ref(db, users/${userId});
-
-    // úklid po odpojení
-    onDisconnect(meRef.current).remove();
-
-    // inicializační získání polohy + zápis
-    const writePosition = (coords) => {
-      const { latitude, longitude } = coords;
-      set(meRef.current, {
-        name: userName,
-        lat: latitude,
-        lng: longitude,
-        lastActive: serverTimestamp()
-      });
-
-      // zaměř mapu lehce na začátku
-      map.setCenter([longitude, latitude]);
-    };
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => writePosition(pos.coords),
-        () => {
-          // fallback – nic
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-
-      // průběžný update pozice (živě)
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          update(meRef.current, {
-            lat: latitude,
-            lng: longitude,
-            lastActive: serverTimestamp(),
-            name: userName
-          });
-        },
-        () => {},
-        { enableHighAccuracy: true }
-      );
-    }
-
-    // průběžné obnovování lastActive i bez pohybu
-    const heart = setInterval(() => {
-      update(meRef.current, { lastActive: serverTimestamp(), name: userName });
-    }, 20000);
-
-    return () => {
-      clearInterval(heart);
-      if (watchIdRef.current) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-      // při unmountu markerů se postará cleanup posluchač níže
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, map]);
-
-  // ===== 4) Změna jména – uložit do DB =====
-  const saveName = async () => {
-    if (meRef.current) {
-      await update(meRef.current, { name: userName, lastActive: serverTimestamp() });
+  /* Toast helper */
+  const showToast = (text, ms = 7000) => {
+    setToastText(text);
+    if (ms > 0) {
+      setTimeout(() => setToastText(""), ms);
     }
   };
 
-  // ===== 5) Zobrazování ostatních (jen aktivních) bez duplicit =====
+  /* Inicializace mapy + získání polohy */
   useEffect(() => {
-    if (!map || !userId) return;
+    let watchId;
 
-    const TTL_MS = 5 * 60 * 1000; // 5 min
+    const init = () => {
+      if (!navigator.geolocation) {
+        const m = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/streets-v11",
+          center: [positionRef.current.lng, positionRef.current.lat],
+          zoom: 13,
+        });
+        setMap(m);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          positionRef.current = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          };
+          const m = new mapboxgl.Map({
+            container: "map",
+            style: "mapbox://styles/mapbox/streets-v11",
+            center: [positionRef.current.lng, positionRef.current.lat],
+            zoom: 15,
+          });
+          setMap(m);
+        },
+        () => {
+          const m = new mapboxgl.Map({
+            container: "map",
+            style: "mapbox://styles/mapbox/streets-v11",
+            center: [positionRef.current.lng, positionRef.current.lat],
+            zoom: 13,
+          });
+          setMap(m);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+
+      // průběžné sledování polohy
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          positionRef.current = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          };
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 5000 }
+      );
+    };
+
+    init();
+    return () => {
+      if (watchId && navigator.geolocation.clearWatch) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []);
+
+  /* Registrace v DB + heartbeat + onDisconnect */
+  useEffect(() => {
+    if (!map) return;
+
+    const meRef = ref(db, `users/${userId}`);
+
+    // vlastní marker
+    if (!selfMarkerRef.current) {
+      selfMarkerRef.current = new mapboxgl.Marker({ color: "red" })
+        .setLngLat([positionRef.current.lng, positionRef.current.lat])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<b>${name || "Anonymní uživatel"}</b><br>${new Date().toLocaleTimeString()}`
+          )
+        )
+        .addTo(map);
+    }
+
+    // prvotní zápis
+    set(meRef, {
+      name: name || "Anonym",
+      lat: positionRef.current.lat,
+      lng: positionRef.current.lng,
+      lastActive: Date.now(),
+    });
+    onDisconnect(meRef).remove();
+
+    // heartbeat — posílej lastActive + polohu a hýbej markerem
+    const hb = setInterval(() => {
+      if (selfMarkerRef.current) {
+        selfMarkerRef.current.setLngLat([
+          positionRef.current.lng,
+          positionRef.current.lat,
+        ]);
+      }
+      update(meRef, {
+        name: name || "Anonym",
+        lat: positionRef.current.lat,
+        lng: positionRef.current.lng,
+        lastActive: Date.now(),
+      });
+    }, HEARTBEAT_MS);
+
+    return () => clearInterval(hb);
+  }, [map, userId, name]);
+
+  /* Popup DOM pro uživatele: Ping + Zpráva */
+  const buildPopupDOM = (targetId, targetName) => {
+    const wrap = document.createElement("div");
+    wrap.style.minWidth = "200px";
+    wrap.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px">${targetName || "Anonym"}</div>
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <button id="pp_ping" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;background:#f2f6ff">📩 Ping</button>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input id="pp_msg" type="text" placeholder="Napsat zprávu…" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px"/>
+        <button id="pp_send" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fff">➡️</button>
+      </div>
+    `;
+
+    // events
+    setTimeout(() => {
+      const btnPing = wrap.querySelector("#pp_ping");
+      const inputMsg = wrap.querySelector("#pp_msg");
+      const btnSend = wrap.querySelector("#pp_send");
+
+      if (btnPing) {
+        btnPing.addEventListener("click", () => {
+          sendPingTo(targetId);
+        });
+      }
+      if (btnSend && inputMsg) {
+        btnSend.addEventListener("click", () => {
+          const text = inputMsg.value.trim();
+          if (text.length === 0) return;
+          sendMessageTo(targetId, text);
+          inputMsg.value = "";
+        });
+      }
+    }, 0);
+
+    return wrap;
+  };
+
+  /* Poslouchej ostatní uživatele – zobrazuj markery */
+  useEffect(() => {
+    if (!map) return;
+
     const usersRef = ref(db, "users");
-
     const unsub = onValue(usersRef, (snap) => {
-      const data = snap.val() || {};
+      const all = snap.val() || {};
       const now = Date.now();
 
-      // přidat/aktualizovat markery
-      Object.entries(data).forEach(([id, u]) => {
-        if (id === userId) return; // sebe modře nezobrazuj
-        if (!u || typeof u.lat !== "number" || typeof u.lng !== "number") return;
-
-        // poslední aktivita (serverTimestamp může být objekt, proto fallback)
-        const lastNum =
-          typeof u.lastActive === "number"
-            ? u.lastActive
-            : (u.lastActive && u.lastActive.toMillis && u.lastActive.toMillis()) || 0;
-
-        if (!lastNum || now - lastNum > TTL_MS) {
-          // starý – odstranit případný existující marker
+      // vytvořit / aktualizovat markery
+      Object.entries(all).forEach(([id, u]) => {
+        if (id === userId) return;
+        if (!u || !u.lastActive || now - u.lastActive > TTL_MS) {
+          // neaktivní → odstranit
           if (markersById.current[id]) {
             markersById.current[id].remove();
             delete markersById.current[id];
@@ -179,221 +259,148 @@ export default function App() {
           return;
         }
 
-        // vytvořit/aktualizovat
         if (!markersById.current[id]) {
-          const mk = new mapboxgl.Marker({ color: "blue" })
+          const popupEl = buildPopupDOM(id, u.name);
+          const popup = new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupEl);
+
+          markersById.current[id] = new mapboxgl.Marker({ color: "blue" })
             .setLngLat([u.lng, u.lat])
-            .setPopup(
-              new mapboxgl.Popup({ offset: 18 }).setHTML(`
-                <div style="font-size:14px;">
-                  <strong>${u.name || "Anonym"}</strong><br/>
-                </div>
-              `)
-            )
+            .setPopup(popup)
             .addTo(map);
-          markersById.current[id] = mk;
         } else {
           markersById.current[id].setLngLat([u.lng, u.lat]);
-          // popup text aktualizujeme vytvořením nového popupu (jednoduché a spolehlivé)
-          markersById.current[id].setPopup(
-            new mapboxgl.Popup({ offset: 18 }).setHTML(`
-              <div style="font-size:14px;">
-                <strong>${u.name || "Anonym"}</strong><br/>
-              </div>
-            `)
-          );
+          // pro jistotu zaktualizuj jméno v popupu (vytvoříme novou DOM)
+          const popupEl = buildPopupDOM(id, u.name);
+          markersById.current[id].getPopup()?.setDOMContent(popupEl);
         }
       });
 
-      // smazat markery, které už v DB nejsou
+      // odstranit markery už neexistujících
       Object.keys(markersById.current).forEach((id) => {
-        if (!data[id]) {
+        if (!all[id]) {
           markersById.current[id].remove();
           delete markersById.current[id];
         }
       });
     });
 
-    return () => {
-      unsub();
-      // vyčistíme markery
-      Object.values(markersById.current).forEach((m) => m.remove());
-      markersById.current = {};
-    };
+    return () => unsub();
   }, [map, userId]);
 
-  // ===== 6) PING: poslat všem ostatním =====
-  const sendPing = async () => {
-    if (!userId) return;
-    // načti aktuální seznam uživatelů a rozdej ping každému jinému
-    const usersRef = ref(db, "users");
-    onValue(
-      usersRef,
-      (snap) => {
-        const all = snap.val() || {};
-        Object.keys(all)
-          .filter((id) => id !== userId)
-          .forEach((targetId) => {
-            const inboxRef = ref(db, pings/${targetId});
-            const msg = {
-              from: userId,
-              name: userName,
-              ts: Date.now()
-            };
-            push(inboxRef, msg);
-          });
-      },
-      { onlyOnce: true }
-    );
+  /* Odeslat ping /pings/{targetId}/{pingId} */
+  const sendPingTo = (targetId) => {
+    const pingId = Math.random().toString(36).slice(2, 10);
+    set(ref(db, `pings/${targetId}/${pingId}`), {
+      kind: "ping",
+      fromId: userId,
+      fromName: name || "Anonym",
+      time: Date.now(),
+    });
+    showToast("📩 Ping odeslán");
   };
 
-  // ===== 7) Příjem pingů pro mě + zvuk/oznámení =====
+  /* Odeslat textovou zprávu */
+  const sendMessageTo = (targetId, text) => {
+    const msgId = Math.random().toString(36).slice(2, 10);
+    set(ref(db, `pings/${targetId}/${msgId}`), {
+      kind: "message",
+      fromId: userId,
+      fromName: name || "Anonym",
+      text,
+      time: Date.now(),
+    });
+    showToast("💬 Zpráva odeslána");
+  };
+
+  /* Příjem pingů / zpráv pro mě */
   useEffect(() => {
-    if (!userId) return;
-    const myPingsRef = ref(db, pings/${userId});
-
+    const myPingsRef = ref(db, `pings/${userId}`);
     const unsub = onValue(myPingsRef, (snap) => {
-      const pings = snap.val();
-      if (!pings) return;
+      const data = snap.val();
+      if (!data) return;
 
-      Object.entries(pings).forEach(([pingId, pingData]) => {
-        setPingMessage("📩 Dostal jsi ping!");
+      Object.entries(data).forEach(([id, payload]) => {
+        if (!payload) return;
 
-        // HTML5 Notification (pokud je povolená)
-        if (Notification?.permission === "granted") {
-          // malá notifikace (bez zvuku)
-          new Notification("📩 Dostal jsi ping!");
+        if (payload.kind === "ping") {
+          if (soundEnabled) {
+            pingSound.current
+              .play()
+              .catch(() => console.warn("Zvuk se nepodařilo přehrát."));
+          }
+          showToast(`📩 Ping od: ${payload.fromName || "neznámý"}`, 9000);
+        } else if (payload.kind === "message") {
+          if (soundEnabled) {
+            pingSound.current
+              .play()
+              .catch(() => console.warn("Zvuk se nepodařilo přehrát."));
+          }
+          const text = (payload.text || "").slice(0, 140);
+          showToast(`💬 Zpráva od ${payload.fromName || "neznámý"}: ${text}`, 12000);
         }
 
-        // zvuk – přehraj, pokud je odemčený
-        if (soundEnabled && audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(() => {});
-        }
-
-        // vymazat ping, ať se nezobrazuje znovu
-        remove(ref(db, pings/${userId}/${pingId}));
-
-        // toast schovat po 4 s
-        setTimeout(() => setPingMessage(""), 4000);
+        // uklidit přečtený ping/zprávu
+        remove(ref(db, `pings/${userId}/${id}`));
       });
     });
 
     return () => unsub();
   }, [userId, soundEnabled]);
 
-  // ===== 8) Odemknout zvuk (nutné kvůli mobilním autoplay politikám) =====
-  const enableSound = async () => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(DING_URL);
-      audioRef.current.preload = "auto";
-    }
-    try {
-      await audioRef.current.play(); // první klik přehraje (odemkne)
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setSoundEnabled(true);
-    } catch (e) {
-      // když prohlížeč stále blokuje
-      setSoundEnabled(false);
-      alert("Nepodařilo se povolit zvuk. Zkus kliknout znovu.");
-    }
-    // zároveň si vyžádej povolení pro Notification (není povinné)
-    if (Notification && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
+  /* Ovládací prvky */
+  const saveName = () => {
+    localStorage.setItem("userName", name);
+    update(ref(db, `users/${userId}`), { name });
+    showToast("✅ Jméno uloženo");
+  };
+
+  const enableSound = () => {
+    pingSound.current
+      .play()
+      .then(() => {
+        pingSound.current.pause();
+        pingSound.current.currentTime = 0;
+        setSoundEnabled(true);
+        showToast("🔊 Zvuk povolen (může být ztlumen v systému)");
+      })
+      .catch(() => {
+        setSoundEnabled(true);
+        showToast("🔊 Pokus o povolení zvuku – zkontroluj hlasitost systému.");
+      });
   };
 
   return (
     <div>
-      {/* ovládací panel */}
+      {toastText && <Toast message={toastText} />}
+
       <div
         style={{
           position: "absolute",
-          zIndex: 5,
-          left: 12,
-          top: 12,
+          top: 10,
+          left: 10,
+          zIndex: 10,
           background: "white",
-          padding: 10,
-          borderRadius: 10,
-          boxShadow: "0 6px 18px rgba(0,0,0,.15)",
+          padding: 8,
+          borderRadius: 8,
+          boxShadow: "0 2px 8px rgba(0,0,0,.15)",
           display: "flex",
           gap: 8,
           alignItems: "center",
-          flexWrap: "wrap",
-          maxWidth: 640
         }}
       >
         <input
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="Zadej jméno"
-          style={{
-            height: 36,
-            padding: "0 10px",
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            minWidth: 160
-          }}
+          style={{ padding: 6, borderRadius: 6, border: "1px solid #ddd" }}
         />
-        <button
-          onClick={saveName}
-          style={{
-            height: 36,
-            padding: "0 12px",
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            background: "#f8f8f8",
-            cursor: "pointer"
-          }}
-        >
-          Uložit
-        </button>
-        <button
-          onClick={sendPing}
-          style={{
-            height: 36,
-            padding: "0 12px",
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            background: "#f0f7ff",
-            cursor: "pointer"
-          }}
-        >
-          📤 Send ping
-        </button>
-        <button
-          onClick={enableSound}
-          style={{
-            height: 36,
-            padding: "0 12px",
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            background: soundEnabled ? "#eaffea" : "#fff8e6",
-            cursor: "pointer"
-          }}
-        >
+        <button onClick={saveName}>Uložit</button>
+        <button onClick={enableSound} disabled={soundEnabled}>
           🔊 {soundEnabled ? "Zvuk povolen" : "Povolit zvuk"}
         </button>
-
-        {pingMessage && (
-          <div
-            style={{
-              marginLeft: 6,
-              padding: "6px 10px",
-              borderRadius: 8,
-              background: "#ffe9a6",
-              border: "1px solid #f0d27a",
-              color: "#6b4d00",
-              fontWeight: 600
-            }}
-          >
-            {pingMessage}
-          </div>
-        )}
       </div>
 
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
-    </div>
-  );
+    </div>
+  );
 }
