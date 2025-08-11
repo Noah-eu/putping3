@@ -27,7 +27,7 @@ const db = getDatabase(app);
 const storage = getStorage(app);
 
 /* helpers */
-function timeAgo(ts) {
+const timeAgo = (ts) => {
   if (!ts) return "neznámo";
   const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (diff < 60) return `před ${diff} s`;
@@ -36,6 +36,47 @@ function timeAgo(ts) {
   const h = Math.floor(m / 60);
   if (h < 24) return `před ${h} h`;
   return `před ${Math.floor(h / 24)} dny`;
+};
+
+/* WebAudio – spolehlivý beep na mobilech po klepnutí */
+function makeBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  return () =>
+    new Promise((resolve, reject) => {
+      try {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+        o.connect(g).connect(ctx.destination);
+        o.start();
+        o.stop(ctx.currentTime + 0.2);
+        o.onended = resolve;
+      } catch (e) {
+        reject(e);
+      }
+    });
+}
+const playBeep = makeBeep();
+
+/* zmenšení fotky na max 512 px (dlouhá strana) */
+async function downscaleImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 512;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  return new Promise((res) =>
+    canvas.toBlob((b) => res(b), "image/jpeg", 0.8)
+  );
 }
 
 export default function App() {
@@ -54,13 +95,12 @@ export default function App() {
   const myPopupRef = useRef(null);
   const myPhotoURLRef = useRef("");
   const others = useRef({}); // id -> Marker
-
   const fileRef = useRef(null);
-  const ding = useRef(new Audio("https://cdn.jsdelivr.net/gh/napars/tones@main/click.mp3"));
 
   const showToast = (t) => {
     setToast(t);
-    setTimeout(() => setToast(""), 1800);
+    window.clearTimeout((showToast).tid);
+    (showToast).tid = window.setTimeout(() => setToast(""), 1800);
   };
 
   /* auth */
@@ -69,7 +109,6 @@ export default function App() {
       if (u) {
         setUid(u.uid);
         localStorage.setItem("uid", u.uid);
-        // jistota: nikdy neuchovávat „others“ marker pro sebe
         if (others.current[u.uid]) {
           others.current[u.uid].remove();
           delete others.current[u.uid];
@@ -81,7 +120,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  /* map init */
+  /* map */
   useEffect(() => {
     if (mapRef.current) return;
     const map = new mapboxgl.Map({
@@ -95,10 +134,9 @@ export default function App() {
       setSettingsOpen(false);
       setChatsOpen(false);
     });
-    mapRef.current = map;
-
     const onKey = (e) => e.key === "Escape" && (setSettingsOpen(false), setChatsOpen(false));
     window.addEventListener("keydown", onKey);
+    mapRef.current = map;
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
@@ -158,26 +196,29 @@ export default function App() {
     }
   }, [uid, name]);
 
-  /* others */
+  /* others + anti-ghost */
   useEffect(() => {
     if (!mapRef.current) return;
     const TTL = 5 * 60 * 1000;
+
+    const purgeSelfGhost = () => {
+      if (uid && others.current[uid]) {
+        others.current[uid].remove();
+        delete others.current[uid];
+      }
+    };
+
+    purgeSelfGhost();
 
     const unsub = onValue(ref(db, "users"), (snap) => {
       const data = snap.val() || {};
       const now = Date.now();
 
-      // jistota proti self-ghost: vždy odstranit případný others marker s mým uid
-      if (uid && others.current[uid]) {
-        others.current[uid].remove();
-        delete others.current[uid];
-      }
+      purgeSelfGhost();
 
       Object.entries(data).forEach(([id, u]) => {
         if (!u || !u.lat || !u.lng) return;
-
         if (id === uid) {
-          // refresh mé fotky
           if (u.photoURL && myMarkerRef.current) {
             if (u.photoURL !== myPhotoURLRef.current) {
               myPhotoURLRef.current = u.photoURL;
@@ -251,18 +292,20 @@ export default function App() {
         }
       });
     });
-    return () => unsub();
+
+    const t = setInterval(purgeSelfGhost, 4000);
+    return () => {
+      clearInterval(t);
+      unsub();
+    };
   }, [uid, showOffline]);
 
-  /* pings -> ding (zatím jen test) */
+  /* pings -> beep (zatím demo) */
   useEffect(() => {
     if (!uid) return;
     const unsub = onValue(ref(db, `pings/${uid}`), (snap) => {
       if (!snap.exists()) return;
-      if (soundOn) {
-        ding.current.currentTime = 0;
-        ding.current.play().catch(() => {});
-      }
+      if (soundOn) playBeep().catch(() => {});
     });
     return () => unsub();
   }, [uid, soundOn]);
@@ -275,15 +318,19 @@ export default function App() {
   };
 
   const uploadPhoto = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) return showToast("Vyber fotku");
     try {
+      const file = fileRef.current?.files?.[0];
+      if (!file) return showToast("Vyber fotku");
       setUploading(true);
+
+      const blob = await downscaleImage(file); // zmenšení
       const r = sref(storage, `profiles/${uid}.jpg`);
-      await uploadBytes(r, file);
+      await uploadBytes(r, blob, { contentType: "image/jpeg" });
       const url = await getDownloadURL(r);
+
       myPhotoURLRef.current = url;
       await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now() });
+
       if (myMarkerRef.current) {
         const el = myMarkerRef.current.getElement();
         el.style.backgroundImage = `url("${url}")`;
@@ -291,9 +338,12 @@ export default function App() {
         el.style.backgroundPosition = "center";
       }
       showToast("Fotka nahrána");
+      // vyčistit výběr
+      if (fileRef.current) fileRef.current.value = "";
     } catch (e) {
       console.error(e);
       showToast("Nahrání selhalo");
+      alert("Nahrání fotky selhalo: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
@@ -301,8 +351,7 @@ export default function App() {
 
   const enableSound = async () => {
     try {
-      ding.current.currentTime = 0;
-      await ding.current.play(); // odemčení během kliknutí
+      await playBeep();        // odemknout WebAudio v rámci kliknutí
       setSoundOn(true);
       localStorage.setItem("soundOn", "true");
       showToast("Zvuk povolen");
@@ -314,10 +363,8 @@ export default function App() {
   };
 
   const testSound = () => {
-    ding.current.currentTime = 0;
-    ding.current
-      .play()
-      .then(() => showToast("Připraveno"))
+    playBeep()
+      .then(() => showToast("Píp!"))
       .catch(() => alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu."));
   };
 
@@ -325,6 +372,7 @@ export default function App() {
     const v = !showOffline;
     setShowOffline(v);
     localStorage.setItem("showOffline", String(v));
+    // hned smaž případný zbytkový „self ghost“
     if (uid && others.current[uid]) {
       others.current[uid].remove();
       delete others.current[uid];
@@ -418,7 +466,7 @@ export default function App() {
         />
       </div>
 
-      {/* SETTINGS drawer */}
+      {/* SETTINGS */}
       {settingsOpen && (
         <div
           onClick={() => setSettingsOpen(false)}
@@ -478,7 +526,6 @@ export default function App() {
               </label>
             </div>
 
-            {/* sticky spodní lišta – nic se neschová */}
             <div
               style={{
                 padding: 12,
@@ -495,7 +542,7 @@ export default function App() {
                   flex: 1,
                   borderRadius: 10,
                   padding: "12px 14px",
-                  background: uploading ? "#9ca3af" : "#111827",
+                  background: uploading ? "#9ca3af" : "#0f172a",
                   color: "#fff",
                   border: "none",
                 }}
