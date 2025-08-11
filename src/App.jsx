@@ -1,7 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
-
-// Firebase
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -11,10 +9,8 @@ import {
 import {
   getDatabase,
   ref,
-  set,
   update,
   onValue,
-  serverTimestamp,
 } from "firebase/database";
 import {
   getStorage,
@@ -23,7 +19,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-/* ====== TVÉ TOKENY / KONFIG ====== */
+/* ====== TOKENS / CONFIG ====== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
@@ -45,48 +41,42 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-// Pomoc: “x času zpět”
+// helper
 function timeAgo(ts) {
   if (!ts) return "neznámo";
-  const now = Date.now();
-  const diff = Math.max(0, Math.floor((now - ts) / 1000));
+  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (diff < 60) return `před ${diff} s`;
-  const min = Math.floor(diff / 60);
-  if (min < 60) return `před ${min} min`;
-  const h = Math.floor(min / 60);
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `před ${m} min`;
+  const h = Math.floor(m / 60);
   if (h < 24) return `před ${h} h`;
   const d = Math.floor(h / 24);
   return `před ${d} dny`;
 }
 
 export default function App() {
-  // Auth / identita
+  // identity
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
-  const [soundOn, setSoundOn] = useState(
-    localStorage.getItem("soundOn") === "true"
-  );
-  const [showOffline, setShowOffline] = useState(
-    localStorage.getItem("showOffline") !== "false"
-  );
+  const [soundOn, setSoundOn] = useState(localStorage.getItem("soundOn") === "true");
+  const [showOffline, setShowOffline] = useState(localStorage.getItem("showOffline") !== "false");
 
-  // UI
+  // UI state
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Mapbox
+  // map refs
   const mapRef = useRef(null);
   const myMarkerRef = useRef(null);
-  const markersRef = useRef({}); // ostatní uživatelé podle ID
+  const myPopupRef = useRef(null);
+  const myPhotoURLRef = useRef(""); // pro pře-styling
+  const others = useRef({}); // id -> Marker
 
-  // zvuk (malé nenápadné „ding“)
-  const ding = useRef(
-    new Audio(
-      "https://cdn.pixabay.com/download/audio/2022/03/15/audio_0e4e4b7f05.mp3?filename=click-124467.mp3"
-    )
-  );
+  // sound
+  const ding = useRef(new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_0e4e4b7f05.mp3?filename=click-124467.mp3"));
 
-  // ====== AUTH (anon) ======
+  /* AUTH */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) {
@@ -98,7 +88,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ====== MAPA ======
+  /* MAP INIT */
   useEffect(() => {
     if (mapRef.current) return;
     const map = new mapboxgl.Map({
@@ -107,21 +97,18 @@ export default function App() {
       center: [14.42076, 50.08804],
       zoom: 6,
     });
+    map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
     mapRef.current = map;
-
-    // ovládání
-    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
   }, []);
 
-  // ====== VLASTNÍ POLOHA – pouze geolokace, ne z feedu ======
+  /* MY LOCATION (only geolocation drives it) */
   useEffect(() => {
     if (!uid || !mapRef.current) return;
 
-    let watchId = null;
-
+    // ensure my marker + popup exists
     const ensureMyMarker = () => {
       if (myMarkerRef.current) return;
-      // element pro marker
+
       const el = document.createElement("div");
       Object.assign(el.style, {
         width: "28px",
@@ -131,7 +118,10 @@ export default function App() {
         border: "4px solid #e74c3c",
         boxShadow: "0 0 0 3px rgba(231,76,60,.25)",
       });
-      myMarkerRef.current = new mapboxgl.Marker({ element: el });
+      const m = new mapboxgl.Marker({ element: el });
+      const p = new mapboxgl.Popup({ offset: 18 }).setHTML(`<b>${name}</b>`);
+      myPopupRef.current = p;
+      myMarkerRef.current = m.setPopup(p);
     };
 
     const onPos = (pos) => {
@@ -139,21 +129,22 @@ export default function App() {
       ensureMyMarker();
       myMarkerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
 
-      // napíšu do DB (ať ostatní vidí)
-      const uref = ref(db, `users/${uid}`);
-      update(uref, {
+      // update popup text (jméno)
+      myPopupRef.current?.setHTML(`<b>${name || "Anonym"}</b>`);
+
+      // push to DB for others
+      update(ref(db, `users/${uid}`), {
         name: name || "Anonym",
         lat,
         lng,
         lastActive: Date.now(),
+        photoURL: myPhotoURLRef.current || null,
       }).catch(() => {});
     };
 
-    const onErr = () => {
-      // nic dramatického
-    };
+    const onErr = () => {};
 
-    // první jednorázový dotaz – ať se mapa posune
+    // first shot and follow
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -164,108 +155,111 @@ export default function App() {
         onErr,
         { enableHighAccuracy: true, timeout: 10000 }
       );
-      // kontinuální sledování
-      watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+      const id = navigator.geolocation.watchPosition(onPos, onErr, {
         enableHighAccuracy: true,
         maximumAge: 5000,
         timeout: 20000,
       });
+      return () => navigator.geolocation.clearWatch(id);
     }
-
-    return () => {
-      if (watchId != null) navigator.geolocation.clearWatch(watchId);
-    };
   }, [uid, name]);
 
-  // ====== FEED OSTATNÍCH UŽIVATELŮ ======
+  /* OTHERS FEED */
   useEffect(() => {
     if (!mapRef.current) return;
-    const TTL = 5 * 60 * 1000; // 5 min = online
+    const TTL = 5 * 60 * 1000;
 
-    const usersRef = ref(db, "users");
-    const unsub = onValue(usersRef, (snap) => {
+    const unsub = onValue(ref(db, "users"), (snap) => {
       const data = snap.val() || {};
       const now = Date.now();
 
-      // přidej/aktualizuj markery
-      Object.entries(data).forEach(([id, u]) => {
-        if (!u || !u.lat || !u.lng) return;
-
-        // můj marker si kreslím sám => přeskoč
-        if (id === uid) return;
-
-        const offline = now - (u.lastActive || 0) > TTL;
-        if (!showOffline && offline) {
-          // offline nezobrazuj
-          if (markersRef.current[id]) {
-            markersRef.current[id].remove();
-            delete markersRef.current[id];
+      // create/update
+      Object.entries(data).forEach(([id, user]) => {
+        if (!user || !user.lat || !user.lng) return;
+        if (id === uid) {
+          // můj marker – jen popup update jména/fotky (pozici ne!)
+          if (myMarkerRef.current) {
+            myPopupRef.current?.setHTML(`<b>${user.name || "Anonym"}</b>`);
+            if (user.photoURL && myPhotoURLRef.current !== user.photoURL) {
+              myPhotoURLRef.current = user.photoURL;
+              const el = myMarkerRef.current.getElement();
+              el.style.backgroundImage = `url("${user.photoURL}")`;
+              el.style.backgroundSize = "cover";
+              el.style.backgroundPosition = "center";
+              el.style.border = "3px solid #e74c3c";
+              el.style.boxShadow = "0 0 0 3px rgba(231,76,60,.25)";
+            }
           }
           return;
         }
 
-        // vytvoř nebo updatuj
-        const existing = markersRef.current[id];
-        const el = existing
-          ? existing.getElement()
-          : (() => {
-              const d = document.createElement("div");
-              // pokud má fotku, použij ji jako background
-              if (u.photoURL) {
-                Object.assign(d.style, {
-                  width: "44px",
-                  height: "44px",
-                  borderRadius: "50%",
-                  backgroundImage: `url("${u.photoURL}")`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  border: "3px solid #fff",
-                  boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
-                });
-              } else {
-                // šedý bublík
-                Object.assign(d.style, {
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  background: offline ? "#bdbdbd" : "#3498db",
-                  border: "3px solid #fff",
-                  boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
-                });
-              }
-              return d;
-            })();
+        const offline = now - (user.lastActive || 0) > TTL;
+        if (!showOffline && offline) {
+          if (others.current[id]) {
+            others.current[id].remove();
+            delete others.current[id];
+          }
+          return;
+        }
 
-        if (!existing) {
-          const m = new mapboxgl.Marker({ element: el })
-            .setLngLat([u.lng, u.lat])
+        // build marker element
+        const buildEl = () => {
+          const el = document.createElement("div");
+          if (user.photoURL) {
+            Object.assign(el.style, {
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              backgroundImage: `url("${user.photoURL}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              border: "3px solid #fff",
+              boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
+            });
+          } else {
+            Object.assign(el.style, {
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              background: offline ? "#bdbdbd" : "#3498db",
+              border: "3px solid #fff",
+              boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
+            });
+          }
+          return el;
+        };
+
+        if (!others.current[id]) {
+          const marker = new mapboxgl.Marker({ element: buildEl() })
+            .setLngLat([user.lng, user.lat])
             .setPopup(
               new mapboxgl.Popup({ offset: 20 }).setHTML(
                 `<div style="font-size:14px">
-                   <b>${u.name || "Uživatel"}</b><br/>
-                   ${offline ? "offline" : "online"} • ${timeAgo(
-                  u.lastActive
-                )}
+                   <b>${user.name || "Uživatel"}</b><br/>
+                   ${offline ? "offline" : "online"} • ${timeAgo(user.lastActive)}
                  </div>`
               )
             )
             .addTo(mapRef.current);
-          markersRef.current[id] = m;
+
+          // pro jistotu: toggle popup na tap
+          marker.getElement().addEventListener("click", () => {
+            marker.togglePopup();
+          });
+
+          others.current[id] = marker;
         } else {
-          existing.setLngLat([u.lng, u.lat]);
-          // jednoduchá indikace offline barvou okraje (pokud není fotka)
-          const el2 = existing.getElement();
-          if (!u.photoURL) {
-            el2.style.background = offline ? "#bdbdbd" : "#3498db";
-          }
+          others.current[id].setLngLat([user.lng, user.lat]);
+          const el = others.current[id].getElement();
+          if (!user.photoURL) el.style.background = offline ? "#bdbdbd" : "#3498db";
         }
       });
 
-      // odstraň ty, co v DB nejsou
-      Object.keys(markersRef.current).forEach((id) => {
+      // remove deleted
+      Object.keys(others.current).forEach((id) => {
         if (!data[id]) {
-          markersRef.current[id].remove();
-          delete markersRef.current[id];
+          others.current[id].remove();
+          delete others.current[id];
         }
       });
     });
@@ -273,71 +267,69 @@ export default function App() {
     return () => unsub();
   }, [uid, showOffline]);
 
-  // ====== PING / MESSAGE HOOKY (zatím jen zvuková reakce) ======
+  /* SIMPLE PINGS -> sound (hook) */
   useEffect(() => {
     if (!uid) return;
-    const pingRef = ref(db, `pings/${uid}`);
-    const unsub = onValue(pingRef, (snap) => {
+    const unsub = onValue(ref(db, `pings/${uid}`), (snap) => {
       if (!snap.exists()) return;
-      // “příchozí ping” => zvuk
       if (soundOn) {
         ding.current.currentTime = 0;
-        ding.current
-          .play()
-          .catch(() => {/* některé prohlížeče vyžadují interakci */});
+        ding.current.play().catch(() => {});
       }
     });
     return () => unsub();
   }, [uid, soundOn]);
 
-  // ====== ULOŽENÍ JMÉNA ======
+  /* save name */
   const saveName = async () => {
-    if (!uid) return;
     localStorage.setItem("name", name);
-    await update(ref(db, `users/${uid}`), {
-      name: name || "Anonym",
-      lastActive: Date.now(),
-    });
+    if (uid) {
+      await update(ref(db, `users/${uid}`), {
+        name: name || "Anonym",
+        lastActive: Date.now(),
+      });
+    }
     alert("Jméno uloženo.");
   };
 
-  // ====== UPLOAD PROFILOVKY ======
-  const fileInputRef = useRef(null);
+  /* photo upload */
+  const fileRef = useRef(null);
   const uploadPhoto = async () => {
     try {
-      if (!uid) return;
-      const file = fileInputRef.current?.files?.[0];
-      if (!file) {
-        alert("Nejdřív vyber fotku.");
-        return;
-      }
+      const file = fileRef.current?.files?.[0];
+      if (!file) return alert("Vyber fotku.");
       setUploading(true);
-
-      // zabalení do JPEG + rozumný název
       const path = `profiles/${uid}.jpg`;
       const r = sref(storage, path);
       await uploadBytes(r, file);
       const url = await getDownloadURL(r);
+      myPhotoURLRef.current = url;
       await update(ref(db, `users/${uid}`), {
         photoURL: url,
         lastActive: Date.now(),
       });
+      // uprav rovnou i můj marker
+      if (myMarkerRef.current) {
+        const el = myMarkerRef.current.getElement();
+        el.style.backgroundImage = `url("${url}")`;
+        el.style.backgroundSize = "cover";
+        el.style.backgroundPosition = "center";
+        el.style.border = "3px solid #e74c3c";
+      }
       alert("Profilová fotka nahrána.");
-      setUploading(false);
     } catch (e) {
       console.error(e);
-      setUploading(false);
       alert("Nahrání se nepodařilo.");
+    } finally {
+      setUploading(false);
     }
   };
 
-  // ====== PŘEPÍNAČE ======
   const toggleSound = () => {
     const v = !soundOn;
     setSoundOn(v);
     localStorage.setItem("soundOn", String(v));
     if (v) {
-      // malé pípnutí jako potvrzení
       ding.current.currentTime = 0;
       ding.current.play().catch(() => {});
     }
@@ -349,27 +341,59 @@ export default function App() {
   };
 
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
+    <div style={{ width: "100vw", height: "100dvh", position: "relative" }}>
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {/* FAB – nastavení */}
+      {/* CHAT FAB */}
+      <div
+        onClick={() => setChatsOpen(true)}
+        title="Chaty"
+        style={{
+          position: "fixed",
+          right: "calc(16px + env(safe-area-inset-right))",
+          bottom: "calc(96px + env(safe-area-inset-bottom))",
+          width: 64,
+          height: 64,
+          borderRadius: "50%",
+          background: "#e11d48",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 10px 24px rgba(0,0,0,.25)",
+          cursor: "pointer",
+          zIndex: 50,
+        }}
+      >
+        <span
+          style={{
+            display: "block",
+            width: 28,
+            height: 28,
+            background:
+              "url('https://icons.getbootstrap.com/assets/icons/chat-dots-fill.svg') center/contain no-repeat",
+            filter: "invert(100%)",
+          }}
+        />
+      </div>
+
+      {/* SETTINGS FAB */}
       <div
         onClick={() => setSettingsOpen(true)}
         title="Nastavení"
         style={{
-          position: "absolute",
-          right: 16,
-          bottom: 16,
+          position: "fixed",
+          right: "calc(16px + env(safe-area-inset-right))",
+          bottom: "calc(16px + env(safe-area-inset-bottom))",
           width: 64,
           height: 64,
           borderRadius: "50%",
-          background: "#222",
+          background: "#111827",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 8px 20px rgba(0,0,0,.25)",
+          boxShadow: "0 10px 24px rgba(0,0,0,.25)",
           cursor: "pointer",
-          zIndex: 10,
+          zIndex: 50,
         }}
       >
         <span
@@ -384,40 +408,39 @@ export default function App() {
         />
       </div>
 
-      {/* Bottom sheet – nastavení */}
+      {/* SETTINGS SHEET */}
       {settingsOpen && (
         <div
           onClick={() => setSettingsOpen(false)}
           style={{
-            position: "absolute",
+            position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,.25)",
-            zIndex: 20,
+            zIndex: 60,
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute",
-              left: 16,
-              right: 16,
-              bottom: 16,
+              position: "fixed",
+              left: "calc(16px + env(safe-area-inset-left))",
+              right: "calc(16px + env(safe-area-inset-right))",
+              bottom: "calc(16px + env(safe-area-inset-bottom))",
               background: "#fff",
               borderRadius: 16,
               padding: 16,
-              boxShadow: "0 10px 30px rgba(0,0,0,.2)",
+              maxHeight: "70vh",
+              overflow: "auto",
+              boxShadow: "0 16px 36px rgba(0,0,0,.3)",
             }}
           >
-            <h3 style={{ marginTop: 0, marginBottom: 12 }}>Nastavení</h3>
+            <h3 style={{ marginTop: 0 }}>Nastavení</h3>
 
-            <label style={{ display: "block", fontSize: 13, opacity: 0.7 }}>
-              Jméno
-            </label>
+            <label style={{ fontSize: 13, opacity: 0.7 }}>Jméno</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Tvoje přezdívka"
                 style={{
                   flex: 1,
                   padding: "10px 12px",
@@ -433,22 +456,16 @@ export default function App() {
                   background: "#111827",
                   color: "#fff",
                   border: "none",
+                  whiteSpace: "nowrap",
                 }}
               >
                 Uložit
               </button>
             </div>
 
-            <label style={{ display: "block", fontSize: 13, opacity: 0.7 }}>
-              Profilová fotka
-            </label>
+            <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ flex: 1 }}
-              />
+              <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
               <button
                 onClick={uploadPhoto}
                 disabled={uploading}
@@ -458,6 +475,7 @@ export default function App() {
                   background: uploading ? "#9ca3af" : "#111827",
                   color: "#fff",
                   border: "none",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {uploading ? "Nahrávám…" : "Nahrát"}
@@ -481,13 +499,41 @@ export default function App() {
             </div>
 
             <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input
-                type="checkbox"
-                checked={showOffline}
-                onChange={toggleOffline}
-              />
+              <input type="checkbox" checked={showOffline} onChange={toggleOffline} />
               Zobrazit offline uživatele (šedě)
             </label>
+          </div>
+        </div>
+      )}
+
+      {/* CHATS SHEET (placeholder) */}
+      {chatsOpen && (
+        <div
+          onClick={() => setChatsOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.25)",
+            zIndex: 60,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              left: "calc(16px + env(safe-area-inset-left))",
+              right: "calc(16px + env(safe-area-inset-right))",
+              bottom: "calc(16px + env(safe-area-inset-bottom))",
+              background: "#fff",
+              borderRadius: 16,
+              padding: 16,
+              maxHeight: "70vh",
+              overflow: "auto",
+              boxShadow: "0 16px 36px rgba(0,0,0,.3)",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Chaty</h3>
+            <div style={{ color: "#6b7280" }}>Zatím žádné konverzace.</div>
           </div>
         </div>
       )}
