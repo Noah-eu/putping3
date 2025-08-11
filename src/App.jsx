@@ -11,6 +11,7 @@ import {
   ref,
   update,
   onValue,
+  remove,
 } from "firebase/database";
 import {
   getStorage,
@@ -19,7 +20,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-/* ====== TOKENS / CONFIG ====== */
+/* ====== Mapbox + Firebase ====== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
@@ -41,7 +42,7 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-// helper
+/* ===== helpers ===== */
 function timeAgo(ts) {
   if (!ts) return "neznámo";
   const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -54,34 +55,38 @@ function timeAgo(ts) {
   return `před ${d} dny`;
 }
 
+/* ===== component ===== */
 export default function App() {
-  // identity
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
   const [soundOn, setSoundOn] = useState(localStorage.getItem("soundOn") === "true");
   const [showOffline, setShowOffline] = useState(localStorage.getItem("showOffline") !== "false");
 
-  // UI state
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // map refs
+  const ding = useRef(new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_0e4e4b7f05.mp3?filename=click-124467.mp3"));
+
   const mapRef = useRef(null);
   const myMarkerRef = useRef(null);
   const myPopupRef = useRef(null);
-  const myPhotoURLRef = useRef(""); // pro pře-styling
-  const others = useRef({}); // id -> Marker
-
-  // sound
-  const ding = useRef(new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_0e4e4b7f05.mp3?filename=click-124467.mp3"));
+  const myPhotoURLRef = useRef("");
+  const others = useRef({}); // id -> mapboxgl.Marker
 
   /* AUTH */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUid(u.uid);
         localStorage.setItem("uid", u.uid);
+        // při startu smaž případný starý ghost vlastníka v "others"
+        if (others.current[u.uid]) {
+          others.current[u.uid].remove();
+          delete others.current[u.uid];
+        }
+        // jemné pročištění staré vlastní stopy (pokud by existovala z dřívějška a byla šedá)
+        await update(ref(db, `users/${u.uid}`), { lastActive: Date.now() }).catch(() => {});
       }
     });
     if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
@@ -101,14 +106,12 @@ export default function App() {
     mapRef.current = map;
   }, []);
 
-  /* MY LOCATION (only geolocation drives it) */
+  /* MOJE POLOHA – ŘÍZENÁ JEN GEOLOKACÍ */
   useEffect(() => {
     if (!uid || !mapRef.current) return;
 
-    // ensure my marker + popup exists
     const ensureMyMarker = () => {
       if (myMarkerRef.current) return;
-
       const el = document.createElement("div");
       Object.assign(el.style, {
         width: "28px",
@@ -124,16 +127,12 @@ export default function App() {
       myMarkerRef.current = m.setPopup(p);
     };
 
-    const onPos = (pos) => {
+    const onPos = async (pos) => {
       const { latitude: lat, longitude: lng } = pos.coords;
       ensureMyMarker();
       myMarkerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
-
-      // update popup text (jméno)
       myPopupRef.current?.setHTML(`<b>${name || "Anonym"}</b>`);
-
-      // push to DB for others
-      update(ref(db, `users/${uid}`), {
+      await update(ref(db, `users/${uid}`), {
         name: name || "Anonym",
         lat,
         lng,
@@ -144,7 +143,6 @@ export default function App() {
 
     const onErr = () => {};
 
-    // first shot and follow
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -164,7 +162,7 @@ export default function App() {
     }
   }, [uid, name]);
 
-  /* OTHERS FEED */
+  /* OSTATNÍ UŽIVATELÉ */
   useEffect(() => {
     if (!mapRef.current) return;
     const TTL = 5 * 60 * 1000;
@@ -173,14 +171,20 @@ export default function App() {
       const data = snap.val() || {};
       const now = Date.now();
 
-      // create/update
+      // CREATE/UPDATE
       Object.entries(data).forEach(([id, user]) => {
         if (!user || !user.lat || !user.lng) return;
+
+        // nikdy nepřidávej vlastníka do "others"
         if (id === uid) {
-          // můj marker – jen popup update jména/fotky (pozici ne!)
-          if (myMarkerRef.current) {
-            myPopupRef.current?.setHTML(`<b>${user.name || "Anonym"}</b>`);
-            if (user.photoURL && myPhotoURLRef.current !== user.photoURL) {
+          // kdyby tu z dřívějška ghost byl, smaž
+          if (others.current[id]) {
+            others.current[id].remove();
+            delete others.current[id];
+          }
+          // a aktualizuj můj marker vzhledem k fotce
+          if (user.photoURL && myMarkerRef.current) {
+            if (myPhotoURLRef.current !== user.photoURL) {
               myPhotoURLRef.current = user.photoURL;
               const el = myMarkerRef.current.getElement();
               el.style.backgroundImage = `url("${user.photoURL}")`;
@@ -202,7 +206,6 @@ export default function App() {
           return;
         }
 
-        // build marker element
         const buildEl = () => {
           const el = document.createElement("div");
           if (user.photoURL) {
@@ -215,6 +218,8 @@ export default function App() {
               backgroundPosition: "center",
               border: "3px solid #fff",
               boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
+              filter: offline ? "grayscale(100%)" : "none",
+              opacity: offline ? "0.8" : "1",
             });
           } else {
             Object.assign(el.style, {
@@ -242,32 +247,25 @@ export default function App() {
             )
             .addTo(mapRef.current);
 
-          // pro jistotu: toggle popup na tap
-          marker.getElement().addEventListener("click", () => {
-            marker.togglePopup();
-          });
-
+          marker.getElement().addEventListener("click", () => marker.togglePopup());
           others.current[id] = marker;
         } else {
           others.current[id].setLngLat([user.lng, user.lat]);
-          const el = others.current[id].getElement();
-          if (!user.photoURL) el.style.background = offline ? "#bdbdbd" : "#3498db";
         }
       });
 
-      // remove deleted
+      // REMOVE
       Object.keys(others.current).forEach((id) => {
-        if (!data[id]) {
+        if (!data[id] || id === uid) {
           others.current[id].remove();
           delete others.current[id];
         }
       });
     });
-
     return () => unsub();
   }, [uid, showOffline]);
 
-  /* SIMPLE PINGS -> sound (hook) */
+  /* PINGS -> zvuk (zatím jen test) */
   useEffect(() => {
     if (!uid) return;
     const unsub = onValue(ref(db, `pings/${uid}`), (snap) => {
@@ -280,41 +278,33 @@ export default function App() {
     return () => unsub();
   }, [uid, soundOn]);
 
-  /* save name */
+  /* Handlery */
   const saveName = async () => {
     localStorage.setItem("name", name);
-    if (uid) {
-      await update(ref(db, `users/${uid}`), {
-        name: name || "Anonym",
-        lastActive: Date.now(),
-      });
-    }
+    if (uid) await update(ref(db, `users/${uid}`), { name: name || "Anonym", lastActive: Date.now() }).catch(()=>{});
     alert("Jméno uloženo.");
   };
 
-  /* photo upload */
   const fileRef = useRef(null);
   const uploadPhoto = async () => {
     try {
       const file = fileRef.current?.files?.[0];
       if (!file) return alert("Vyber fotku.");
       setUploading(true);
-      const path = `profiles/${uid}.jpg`;
-      const r = sref(storage, path);
+      const r = sref(storage, `profiles/${uid}.jpg`);
       await uploadBytes(r, file);
       const url = await getDownloadURL(r);
       myPhotoURLRef.current = url;
-      await update(ref(db, `users/${uid}`), {
-        photoURL: url,
-        lastActive: Date.now(),
-      });
-      // uprav rovnou i můj marker
+      await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now() });
+
+      // okamžitý repaint mého markeru
       if (myMarkerRef.current) {
         const el = myMarkerRef.current.getElement();
         el.style.backgroundImage = `url("${url}")`;
         el.style.backgroundSize = "cover";
         el.style.backgroundPosition = "center";
         el.style.border = "3px solid #e74c3c";
+        el.style.boxShadow = "0 0 0 3px rgba(231,76,60,.25)";
       }
       alert("Profilová fotka nahrána.");
     } catch (e) {
@@ -329,11 +319,13 @@ export default function App() {
     const v = !soundOn;
     setSoundOn(v);
     localStorage.setItem("soundOn", String(v));
-    if (v) {
-      ding.current.currentTime = 0;
-      ding.current.play().catch(() => {});
-    }
   };
+
+  const testSound = () => {
+    ding.current.currentTime = 0;
+    ding.current.play().catch(() => alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu."));
+  };
+
   const toggleOffline = () => {
     const v = !showOffline;
     setShowOffline(v);
@@ -426,10 +418,12 @@ export default function App() {
               left: "calc(16px + env(safe-area-inset-left))",
               right: "calc(16px + env(safe-area-inset-right))",
               bottom: "calc(16px + env(safe-area-inset-bottom))",
+              top: "calc(16px + env(safe-area-inset-top))",
               background: "#fff",
               borderRadius: 16,
               padding: 16,
-              maxHeight: "70vh",
+              display: "flex",
+              flexDirection: "column",
               overflow: "auto",
               boxShadow: "0 16px 36px rgba(0,0,0,.3)",
             }}
@@ -496,12 +490,28 @@ export default function App() {
               >
                 {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
               </button>
+              <button
+                onClick={testSound}
+                style={{
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  background: "#374151",
+                  color: "#fff",
+                  border: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Test zvuku
+              </button>
             </div>
 
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
               <input type="checkbox" checked={showOffline} onChange={toggleOffline} />
               Zobrazit offline uživatele (šedě)
             </label>
+
+            {/* spacer aby poslední tlačítka nebyla pod okrajem */}
+            <div style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }} />
           </div>
         </div>
       )}
@@ -524,10 +534,10 @@ export default function App() {
               left: "calc(16px + env(safe-area-inset-left))",
               right: "calc(16px + env(safe-area-inset-right))",
               bottom: "calc(16px + env(safe-area-inset-bottom))",
+              top: "calc(16px + env(safe-area-inset-top))",
               background: "#fff",
               borderRadius: 16,
               padding: 16,
-              maxHeight: "70vh",
               overflow: "auto",
               boxShadow: "0 16px 36px rgba(0,0,0,.3)",
             }}
