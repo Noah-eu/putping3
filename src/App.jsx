@@ -1,773 +1,356 @@
+// App.jsx
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { getDatabase, ref, update, onValue, onDisconnect, set, push } from "firebase/database";
 import {
-  getStorage,
-  ref as sref,
-  uploadBytesResumable,
-  getDownloadURL,
+  getDatabase, ref, set, update, onValue, onDisconnect, push, remove
+} from "firebase/database";
+import {
+  getStorage, ref as sref,
+  uploadBytes, uploadBytesResumable, getDownloadURL
 } from "firebase/storage";
 
-/* ===== Mapbox + Firebase ===== */
-mapboxgl.accessToken =
-  "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
+// ==== MAPBOX TOKEN (tvůj) ====
+mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
+// ==== FIREBASE CONFIG (oprav. bucket) ====
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
   databaseURL: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.appspot.com",
+  storageBucket: "putping-dc57e.appspot.com",    // <<< DŮLEŽITÉ
   messagingSenderId: "244045363394",
   appId: "1:244045363394:web:64e930bff17a816549635b",
-  measurementId: "G-RLMGM46M6X",
+  measurementId: "G-RLMGM46M6X"
 };
-/* ============================ */
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-/* helpers */
-const timeAgo = (ts) => {
-  if (!ts) return "neznámo";
-  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (diff < 60) return `před ${diff} s`;
-  const m = Math.floor(diff / 60);
-  if (m < 60) return `před ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `před ${h} h`;
-  return `před ${Math.floor(h / 24)} dny`;
-};
-
-/** Jednodušší, stabilní zmenšení přes <img> + canvas (max 1024 px) */
-function shrinkImage(file, maxSide = 1024) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onerror = () => reject(new Error("Čtení souboru selhalo"));
-    fr.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("Konverze do JPEG selhala"))),
-          "image/jpeg",
-          0.8
-        );
-      };
-      img.onerror = () => reject(new Error("Načtení obrázku selhalo"));
-      img.src = fr.result;
-    };
-    fr.readAsDataURL(file);
+// util: mini-komprese obrázku (max 1024px) -> Blob JPEG ~0.8
+async function downscaleImage(file, maxSize = 1024) {
+  if (!/^image\//.test(file.type)) return file;
+  const img = document.createElement("img");
+  const reader = new FileReader();
+  const loaded = new Promise((res, rej) => {
+    reader.onload = () => { img.src = String(reader.result); };
+    img.onload = () => res();
+    img.onerror = rej;
   });
+  reader.readAsDataURL(file);
+  await loaded;
+
+  const w = img.width, h = img.height;
+  const scale = Math.min(1, maxSize / Math.max(w, h));
+  if (scale === 1) return file;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.8));
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
 }
 
 export default function App() {
-  const [deviceId] = useState(() => {
-    const ex = localStorage.getItem("deviceId");
-    if (ex) return ex;
-    const id = "dev_" + Math.random().toString(36).slice(2);
-    localStorage.setItem("deviceId", id);
-    return id;
-  });
-
-  const [uid, setUid] = useState(localStorage.getItem("uid") || "");
-  const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
+  const [map, setMap] = useState(null);
+  const [name, setName] = useState(localStorage.getItem("userName") || "David");
   const [photoURL, setPhotoURL] = useState(localStorage.getItem("photoURL") || "");
-  const [soundOn, setSoundOn] = useState(localStorage.getItem("soundOn") === "true");
+  const [soundOn, setSoundOn] = useState(localStorage.getItem("soundEnabled") === "true");
+  const [showSettings, setShowSettings] = useState(false);
+  const [showChats, setShowChats] = useState(false);
   const [showOffline, setShowOffline] = useState(localStorage.getItem("showOffline") !== "false");
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [chatsOpen, setChatsOpen] = useState(false);
+  const uidRef = useRef(localStorage.getItem("userId") || Math.random().toString(36).slice(2));
+  const myMarkerRef = useRef(null);
+  const markers = useRef({}); // id -> marker
+  const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [toast, setToast] = useState("");
+  const pingSound = useRef(new Audio("https://cdn.pixabay.com/audio/2022/03/15/audio_1b2a1f7a45.mp3"));
 
-  const mapRef = useRef(null);
-  const myMarkerRef = useRef(null);
-  const myPopupRef = useRef(null);
-  const others = useRef({});
-  const fileRef = useRef(null);
-  const myPosRef = useRef(null);
+  // persist basics
+  useEffect(() => { localStorage.setItem("userId", uidRef.current); }, []);
+  useEffect(() => { localStorage.setItem("userName", name); }, [name]);
+  useEffect(() => { localStorage.setItem("soundEnabled", String(soundOn)); }, [soundOn]);
+  useEffect(() => { localStorage.setItem("photoURL", photoURL); }, [photoURL]);
+  useEffect(() => { localStorage.setItem("showOffline", String(showOffline)); }, [showOffline]);
 
-  const beep = () => {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-    o.connect(g).connect(ctx.destination);
-    o.start();
-    o.stop(ctx.currentTime + 0.2);
-  };
-
-  const showToast = (t) => {
-    setToast(t);
-    clearTimeout((showToast)._t);
-    (showToast)._t = setTimeout(() => setToast(""), 1800);
-  };
-
-  /* AUTH */
+  // init map + position + publish me
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        setUid(u.uid);
-        localStorage.setItem("uid", u.uid);
-        update(ref(db, `users/${u.uid}`), { deviceId, lastActive: Date.now() }).catch(() => {});
-        if (others.current[u.uid]) {
-          others.current[u.uid].remove();
-          delete others.current[u.uid];
-        }
-      }
-    });
-    if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
-    return () => unsub();
-  }, [deviceId]);
-
-  /* MAP INIT */
-  useEffect(() => {
-    if (mapRef.current) return;
-    const map = new mapboxgl.Map({
-      container: "map",
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [14.42076, 50.08804],
-      zoom: 6,
-    });
-    map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
-    map.on("click", () => {
-      setSettingsOpen(false);
-      setChatsOpen(false);
-    });
-    const onKey = (e) => e.key === "Escape" && (setSettingsOpen(false), setChatsOpen(false));
-    window.addEventListener("keydown", onKey);
-    mapRef.current = map;
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  /* SLEDOVÁNÍ VLASTNÍHO ZÁZNAMU (kvůli změně foto) */
-  useEffect(() => {
-    if (!uid) return;
-    const unsub = onValue(ref(db, `users/${uid}`), (s) => {
-      const me = s.val() || {};
-      if (me.photoURL && me.photoURL !== photoURL) {
-        setPhotoURL(me.photoURL);
-        localStorage.setItem("photoURL", me.photoURL);
-        if (myMarkerRef.current) {
-          const el = myMarkerRef.current.getElement();
-          el.style.backgroundImage = `url("${me.photoURL}")`;
-          el.style.backgroundSize = "cover";
-          el.style.backgroundPosition = "center";
-        }
-      }
-    });
-    return () => unsub();
-  }, [uid, photoURL]);
-
-  /* MOJE POLOHA + MARKER */
-  useEffect(() => {
-    if (!uid || !mapRef.current) return;
-
-    const ensureMyMarker = () => {
-      if (myMarkerRef.current) return;
-      const el = document.createElement("div");
-      Object.assign(el.style, {
-        width: "28px",
-        height: "28px",
-        borderRadius: "50%",
-        background: "#fff",
-        border: "4px solid #e11d48",
-        boxShadow: "0 0 0 3px rgba(225,17,72,.25)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      });
-      if (photoURL) el.style.backgroundImage = `url("${photoURL}")`;
-      const marker = new mapboxgl.Marker({ element: el });
-      const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(`<b>${name}</b>`);
-      myMarkerRef.current = marker.setPopup(popup);
-      myPopupRef.current = popup;
-    };
-
-    const onPos = async (pos) => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      myPosRef.current = { lat, lng };
-      ensureMyMarker();
-      myMarkerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
-      myPopupRef.current?.setHTML(`<b>${name || "Anonym"}</b>`);
-      await update(ref(db, `users/${uid}`), {
-        name: name || "Anonym",
-        lat,
-        lng,
-        lastActive: Date.now(),
-        deviceId,
-        photoURL: photoURL || null,
-      }).catch(() => {});
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude: lat, longitude: lng } = pos.coords;
-          myPosRef.current = { lat, lng };
-          mapRef.current.jumpTo({ center: [lng, lat], zoom: 14 });
-          onPos(pos);
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-      const id = navigator.geolocation.watchPosition(onPos, () => {}, {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 20000,
-      });
-      const alive = setInterval(() => {
-        update(ref(db, `users/${uid}`), {
-          lastActive: Date.now(),
-          name: name || "Anonym",
-          photoURL: photoURL || null,
-          deviceId,
-        }).catch(() => {});
-      }, 20000);
-      onDisconnect(ref(db, `users/${uid}`)).remove();
-      return () => {
-        navigator.geolocation.clearWatch(id);
-        clearInterval(alive);
-      };
-    }
-  }, [uid, name, photoURL, deviceId]);
-
-  /* OSTATNÍ UŽIVATELÉ */
-  useEffect(() => {
-    if (!mapRef.current) return;
-    const TTL = 5 * 60 * 1000; // 5 min
-
-    const unsub = onValue(ref(db, "users"), (snap) => {
-      const data = snap.val() || {};
-      const now = Date.now();
-      const present = new Set(Object.keys(data));
-
-      Object.entries(data).forEach(([id, u]) => {
-        if (!u || !u.lat || !u.lng) return;
-        if (u.deviceId && u.deviceId === deviceId) {
-          if (others.current[id]) {
-            others.current[id].remove();
-            delete others.current[id];
-          }
-          return;
-        }
-        if (id === uid) {
-          if (others.current[id]) {
-            others.current[id].remove();
-            delete others.current[id];
-          }
-          return;
-        }
-
-        const offline = now - (u.lastActive || 0) > TTL;
-        if (!showOffline && offline) {
-          if (others.current[id]) {
-            others.current[id].remove();
-            delete others.current[id];
-          }
-          return;
-        }
-
-        const buildEl = () => {
-          const el = document.createElement("div");
-          if (u.photoURL) {
-            Object.assign(el.style, {
-              width: "44px",
-              height: "44px",
-              borderRadius: "50%",
-              backgroundImage: `url("${u.photoURL}")`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              border: "3px solid #fff",
-              boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
-              filter: offline ? "grayscale(100%)" : "none",
-              opacity: offline ? "0.85" : "1",
-            });
-          } else {
-            Object.assign(el.style, {
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              background: offline ? "#bdbdbd" : "#3498db",
-              border: "3px solid #fff",
-              boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
-            });
-          }
-          return el;
-        };
-
-        const popupContent = `
-          <div style="text-align:center">
-            ${u.photoURL ? `<img src="${u.photoURL}" style="width:50px;height:50px;border-radius:50%;object-fit:cover" />` : ""}
-            <p style="margin:6px 0 10px"><b>${u.name || "Uživatel"}</b><br/>${offline ? "offline" : "online"} • ${timeAgo(u.lastActive)}</p>
-            <button onclick="window.__sendPing && window.__sendPing('${id}')" style="margin-right:6px">📩 Ping</button>
-            <button onclick="window.__openQuickChat && window.__openQuickChat('${id}','${(u.name || "")
-              .replace(/["'<>]/g, "")}')">💬 Chat</button>
-          </div>
-        `;
-
-        if (!others.current[id]) {
-          const marker = new mapboxgl.Marker({ element: buildEl() })
-            .setLngLat([u.lng, u.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 20 }).setHTML(popupContent))
-            .addTo(mapRef.current);
-          marker.getElement().addEventListener("click", () => marker.togglePopup());
-          others.current[id] = marker;
-        } else {
-          others.current[id].setLngLat([u.lng, u.lat]);
-          others.current[id].getPopup()?.setHTML(popupContent);
-        }
-      });
-
-      Object.keys(others.current).forEach((id) => {
-        if (!present.has(id) || id === uid) {
-          others.current[id].remove();
-          delete others.current[id];
-        }
-      });
-    });
-
-    return () => unsub();
-  }, [uid, showOffline, deviceId]);
-
-  /* Globální pro popup */
-  useEffect(() => {
-    window.__sendPing = (targetId) => {
-      set(ref(db, `pings/${targetId}`), { fromId: uid, from: name || "Anonym", time: Date.now() });
-      showToast("Ping odeslán");
-    };
-    window.__openQuickChat = (targetId, targetName) => {
-      const txt = prompt(`Zpráva pro ${targetName || targetId}:`);
-      if (txt) {
-        const msgRef = ref(db, `messages/${targetId}/${uid}`);
-        push(msgRef, { fromId: uid, from: name || "Anonym", text: txt, time: Date.now() });
-        showToast("Zpráva odeslána");
-      }
-    };
-    return () => {
-      delete window.__sendPing;
-      delete window.__openQuickChat;
-    };
-  }, [uid, name]);
-
-  /* Příchozí pingy/zprávy */
-  useEffect(() => {
-    if (!uid) return;
-    const pUnsub = onValue(ref(db, `pings/${uid}`), (snap) => {
-      if (!snap.exists()) return;
-      const p = snap.val();
-      if (soundOn) beep();
-      showToast(`📩 Ping od ${p.from || "uživatele"}`);
-    });
-    const mUnsub = onValue(ref(db, `messages/${uid}`), (snap) => {
-      if (!snap.exists()) return;
-      let last = null;
-      Object.values(snap.val()).forEach((bySender) => {
-        Object.values(bySender).forEach((m) => {
-          if (!last || m.time > last.time) last = m;
+    let watchId = null;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        const m = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/streets-v11",
+          center: [longitude, latitude],
+          zoom: 15
         });
-      });
-      if (last) {
-        if (soundOn) beep();
-        showToast(`💬 ${last.from}: ${last.text}`);
-      }
-    });
-    return () => {
-      pUnsub();
-      mUnsub();
-    };
-  }, [uid, soundOn]);
+        setMap(m);
 
-  /* Akce */
-  const saveName = async () => {
-    localStorage.setItem("name", name);
-    if (uid)
-      await update(ref(db, `users/${uid}`), { name: name || "Anonym", lastActive: Date.now(), deviceId });
-    showToast("Jméno uloženo");
-  };
+        // můj marker (kruh, později fotka)
+        const el = document.createElement("div");
+        el.style.width = "36px";
+        el.style.height = "36px";
+        el.style.borderRadius = "50%";
+        el.style.border = "4px solid #e64444";
+        el.style.background = photoURL ? `url("${photoURL}") center/cover` : "#bbb";
+        myMarkerRef.current = new mapboxgl.Marker(el).setLngLat([longitude, latitude]).addTo(m);
 
-  /** ROBUSTNÍ UPLOAD S PROGRESEM + TIMEOUTEM */
-  const uploadPhoto = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) return showToast("Vyber fotku");
+        const meRef = ref(db, `users/${uidRef.current}`);
+        set(meRef, {
+          name, lat: latitude, lng: longitude, lastActive: Date.now(), photoURL, online: true
+        });
+        onDisconnect(meRef).update({ online: false, lastActive: Date.now() });
 
-    setUploading(true);
-    setUploadPct(0);
+        // živá poloha
+        watchId = navigator.geolocation.watchPosition(
+          p => {
+            const { latitude: la, longitude: lo } = p.coords;
+            myMarkerRef.current?.setLngLat([lo, la]);
+            update(meRef, { lat: la, lng: lo, lastActive: Date.now(), name, photoURL, online: true });
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+        );
+      },
+      err => alert("Nepodařilo se získat polohu: " + err.message),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+    return () => { if (watchId != null) navigator.geolocation.clearWatch(watchId); };
+  }, []); // init once
 
-    // pokud je < 1.5 MB, pošleme originál; jinak zmenšíme
-    let toUpload = file;
-    try {
-      if (file.size > 1_500_000) {
-        toUpload = await shrinkImage(file, 1024);
-      }
-    } catch (e) {
-      // když zmenšení selže, zkusíme originál
-      toUpload = file;
-    }
+  // render ostatních uživatelů
+  useEffect(() => {
+    if (!map) return;
+    const usersRef = ref(db, "users");
+    return onValue(usersRef, snap => {
+      const data = snap.val() || {};
+      Object.entries(data).forEach(([id, u]) => {
+        if (id === uidRef.current) return;
 
-    const r = sref(storage, `profiles/${uid}.jpg`);
-    const task = uploadBytesResumable(r, toUpload, { contentType: "image/jpeg" });
-
-    const timeout = setTimeout(() => {
-      try { task.cancel(); } catch {}
-    }, 60_000); // 60 s hard timeout
-
-    return new Promise((resolve) => {
-      task.on(
-        "state_changed",
-        (snap) => {
-          const p = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-          setUploadPct(p);
-        },
-        (err) => {
-          clearTimeout(timeout);
-          alert("Nahrání fotky selhalo: " + (err?.message || err));
-          setUploading(false);
-          setUploadPct(0);
-          resolve(false);
-        },
-        async () => {
-          clearTimeout(timeout);
-          try {
-            const url = await getDownloadURL(r);
-            setPhotoURL(url);
-            localStorage.setItem("photoURL", url);
-            await update(ref(db, `users/${uid}`), {
-              photoURL: url,
-              lastActive: Date.now(),
-              deviceId,
-            });
-            if (myMarkerRef.current) {
-              const el = myMarkerRef.current.getElement();
-              el.style.backgroundImage = `url("${url}")`;
-              el.style.backgroundSize = "cover";
-              el.style.backgroundPosition = "center";
-            }
-            showToast("Fotka nahrána");
-          } catch (e) {
-            alert("Chyba po nahrání: " + (e?.message || e));
-          } finally {
-            setUploading(false);
-            setUploadPct(0);
-            if (fileRef.current) fileRef.current.value = "";
-            resolve(true);
-          }
+        // filtr offline
+        if (!showOffline && !u.online) {
+          if (markers.current[id]) { markers.current[id].remove(); delete markers.current[id]; }
+          return;
         }
-      );
+
+        const was = markers.current[id];
+        const el = was?.getElement?.() || document.createElement("div");
+        el.style.width = "36px";
+        el.style.height = "36px";
+        el.style.borderRadius = "50%";
+        el.style.border = u.online ? "4px solid #e64444" : "4px solid #aaa";
+        el.style.background = u.photoURL ? `url("${u.photoURL}") center/cover` : (u.online ? "#bbb" : "#888");
+
+        const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`
+          <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+            <div style="font-weight:600;margin-bottom:6px">${u.name || "Anonym"}</div>
+            <div style="display:flex;gap:8px">
+              <button id="pp-ping-${id}" style="padding:6px 10px;border-radius:10px;border:0;background:#111;color:#fff">📩 Ping</button>
+              <button id="pp-chat-${id}" style="padding:6px 10px;border-radius:10px;border:1px solid #111;background:#fff">💬 Chat</button>
+            </div>
+          </div>
+        `);
+
+        if (!was) {
+          markers.current[id] = new mapboxgl.Marker(el).setLngLat([u.lng, u.lat]).setPopup(popup).addTo(map);
+        } else {
+          was.setLngLat([u.lng, u.lat]).setPopup(popup);
+        }
+
+        // přivázat kliky až po otevření popupu
+        markers.current[id].getElement().onclick = () => {
+          setTimeout(() => {
+            const pingBtn = document.getElementById(`pp-ping-${id}`);
+            const chatBtn = document.getElementById(`pp-chat-${id}`);
+            if (pingBtn) pingBtn.onclick = () => sendPing(id);
+            if (chatBtn) chatBtn.onclick = () => quickMsg(id);
+          }, 0);
+        };
+      });
+
+      // odstranit markery, které už v DB nejsou
+      Object.keys(markers.current).forEach(id => {
+        if (!data[id]) { markers.current[id].remove(); delete markers.current[id]; }
+      });
     });
-  };
+  }, [map, showOffline]);
+
+  // příjem pingů & zpráv
+  useEffect(() => {
+    const pRef = ref(db, `pings/${uidRef.current}`);
+    const unsubP = onValue(pRef, s => {
+      const v = s.val();
+      if (!v) return;
+      if (soundOn) { try { pingSound.current.currentTime = 0; pingSound.current.play(); } catch {} }
+      alert(`📩 Ping od ${v.from}`);
+      remove(pRef);
+    });
+
+    const mRef = ref(db, `messages/${uidRef.current}`);
+    const unsubM = onValue(mRef, s => {
+      const v = s.val();
+      if (!v) return;
+      const last = Object.values(v).flat().slice(-1)[0];
+      if (last) {
+        if (soundOn) { try { pingSound.current.currentTime = 0; pingSound.current.play(); } catch {} }
+        alert(`💬 ${last.from}: ${last.text}`);
+      }
+      remove(mRef);
+    });
+
+    return () => { unsubP(); unsubM(); };
+  }, [soundOn]);
+
+  // ping & rychlá zpráva
+  function sendPing(targetId) {
+    set(ref(db, `pings/${targetId}`), { from: name || "Anonym", time: Date.now() });
+  }
+  function quickMsg(targetId) {
+    const txt = prompt("Zpráva:");
+    if (!txt) return;
+    push(ref(db, `messages/${targetId}/${uidRef.current}`), { from: name || "Anonym", text: txt, time: Date.now() });
+  }
+
+  // === UPLOAD FOTKY (opraveno) ===
+  async function uploadPhoto() {
+    try {
+      const file = fileRef.current?.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      setUploadPct(0);
+
+      // zmenšit pro mobilní data
+      const toUpload = await downscaleImage(file, 1024);
+      const r = sref(storage, `profiles/${uidRef.current}.jpg`);
+
+      const getUrlSmall = async () => {
+        await uploadBytes(r, toUpload, { contentType: "image/jpeg" });
+        return await getDownloadURL(r);
+      };
+
+      const getUrlResumable = () =>
+        new Promise(async (resolve, reject) => {
+          const task = uploadBytesResumable(r, toUpload, { contentType: "image/jpeg" });
+          const timer = setTimeout(() => { try { task.cancel(); } catch {} ; reject(new Error("Timeout")); }, 120000);
+
+          task.on("state_changed",
+            snap => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            err => { clearTimeout(timer); reject(err); },
+            async () => { clearTimeout(timer); resolve(await getDownloadURL(r)); }
+          );
+        });
+
+      const url = toUpload.size <= 1_000_000 ? await getUrlSmall() : await getUrlResumable();
+
+      setPhotoURL(url);
+      if (myMarkerRef.current) {
+        const el = myMarkerRef.current.getElement();
+        el.style.background = `url("${url}") center/cover`;
+      }
+      await update(ref(db, `users/${uidRef.current}`), { photoURL: url, lastActive: Date.now(), online: true });
+      alert("Fotka nahrána 👍");
+    } catch (e) {
+      alert("Nahrání fotky selhalo: " + (e?.message || e));
+    } finally {
+      setUploading(false);
+      setUploadPct(0);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   return (
-    <div style={{ width: "100vw", height: "100dvh", position: "relative" }}>
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {toast && (
-        <div
-          style={{
-            position: "fixed",
-            left: "50%",
-            transform: "translateX(-50%)",
-            bottom: "calc(90px + env(safe-area-inset-bottom))",
-            background: "#111827",
-            color: "#fff",
-            padding: "10px 14px",
-            borderRadius: 999,
-            fontSize: 14,
-            zIndex: 70,
-          }}
-        >
-          {toast}
-        </div>
-      )}
-
-      {/* FAB Chaty */}
-      <div
-        onClick={() => setChatsOpen(true)}
-        title="Chaty"
-        style={{
-          position: "fixed",
-          right: "calc(16px + env(safe-area-inset-right))",
-          bottom: "calc(96px + env(safe-area-inset-bottom))",
-          width: 64,
-          height: 64,
-          borderRadius: "50%",
-          background: "#e11d48",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 10px 24px rgba(0,0,0,.25)",
-          cursor: "pointer",
-          zIndex: 50,
-        }}
-      >
-        <span
-          style={{
-            display: "block",
-            width: 28,
-            height: 28,
-            background:
-              "url('https://icons.getbootstrap.com/assets/icons/chat-dots-fill.svg') center/contain no-repeat",
-            filter: "invert(100%)",
-          }}
-        />
+      {/* FAB */}
+      <div style={{ position: "fixed", right: 16, bottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        <button
+          onClick={() => setShowChats(true)}
+          style={{ width: 72, height: 72, borderRadius: 36, border: 0, background: "#e64444", color: "#fff", fontSize: 28, boxShadow: "0 6px 20px rgba(0,0,0,.3)" }}
+          aria-label="Chaty"
+        >💬</button>
+        <button
+          onClick={() => setShowSettings(true)}
+          style={{ width: 72, height: 72, borderRadius: 36, border: 0, background: "#111b2e", color: "#fff", fontSize: 28, boxShadow: "0 6px 20px rgba(0,0,0,.3)" }}
+          aria-label="Nastavení"
+        >⚙️</button>
       </div>
 
-      {/* FAB Nastavení */}
-      <div
-        onClick={() => setSettingsOpen(true)}
-        title="Nastavení"
-        style={{
-          position: "fixed",
-          right: "calc(16px + env(safe-area-inset-right))",
-          bottom: "calc(16px + env(safe-area-inset-bottom))",
-          width: 64,
-          height: 64,
-          borderRadius: "50%",
-          background: "#111827",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 10px 24px rgba(0,0,0,.25)",
-          cursor: "pointer",
-          zIndex: 50,
-        }}
-      >
-        <span
-          style={{
-            display: "block",
-            width: 30,
-            height: 30,
-            background:
-              "url('https://icons.getbootstrap.com/assets/icons/gear-fill.svg') center/contain no-repeat",
-            filter: "invert(100%)",
-          }}
-        />
-      </div>
+      {/* Nastavení (mobil-friendly sheet) */}
+      {showSettings && (
+        <div style={{
+          position: "fixed", left: 0, right: 0, bottom: 0, background: "#fff",
+          borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 16,
+          boxShadow: "0 -10px 30px rgba(0,0,0,.25)", maxHeight: "90vh", overflow: "auto"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h2 style={{ margin: 0 }}>Nastavení</h2>
+            <button onClick={() => setShowSettings(false)} style={{ padding: "8px 14px", borderRadius: 12, border: 0, background: "#111b2e", color: "#fff" }}>Zavřít</button>
+          </div>
 
-      {/* SETTINGS */}
-      {settingsOpen && (
-        <div
-          onClick={() => setSettingsOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", zIndex: 60 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              left: "calc(12px + env(safe-area-inset-left))",
-              right: "calc(12px + env(safe-area-inset-right))",
-              bottom: "calc(12px + env(safe-area-inset-bottom))",
-              top: "calc(12px + env(safe-area-inset-top))",
-              background: "#fff",
-              borderRadius: 16,
-              display: "flex",
-              flexDirection: "column",
-              maxHeight: "calc(100dvh - 24px)",
-              boxShadow: "0 16px 36px rgba(0,0,0,.3)",
-              overflow: "hidden",
-            }}
-          >
-            <div
+          <label style={{ display: "block", fontWeight: 600, marginTop: 8 }}>Jméno</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={name} onChange={e => setName(e.target.value)}
+              style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid #ddd" }}
+              placeholder="Tvoje jméno" />
+            <button
+              onClick={() => update(ref(db, `users/${uidRef.current}`), { name })}
+              style={{ padding: "10px 16px", borderRadius: 12, border: 0, background: "#111b2e", color: "#fff" }}
+            >Uložit</button>
+          </div>
+
+          <label style={{ display: "block", fontWeight: 600, marginTop: 16 }}>Profilová fotka</label>
+          <input ref={fileRef} type="file" accept="image/*" />
+          <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+            <button
+              disabled={uploading || !fileRef.current}
+              onClick={uploadPhoto}
               style={{
-                padding: 16,
-                display: "flex",
-                alignItems: "center",
-                borderBottom: "1px solid #eee",
+                flex: 1, padding: "12px 16px", borderRadius: 12, border: 0,
+                background: uploading ? "#888" : "#0b0f1d", color: "#fff"
               }}
             >
-              <h3 style={{ margin: 0, flex: 1 }}>Nastavení</h3>
-              <button
-                onClick={() => setSettingsOpen(false)}
-                style={{
-                  border: "none",
-                  background: "#111827",
-                  color: "#fff",
-                  borderRadius: 10,
-                  padding: "8px 12px",
-                }}
-              >
-                Zavřít
-              </button>
-            </div>
-
-            <div style={{ padding: "16px", overflow: "auto" }}>
-              <label style={{ fontSize: 13, opacity: 0.7 }}>Jméno</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb" }}
-                />
-                <button
-                  onClick={saveName}
-                  style={{
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    background: "#111827",
-                    color: "#fff",
-                    border: "none",
-                  }}
-                >
-                  Uložit
-                </button>
-              </div>
-
-              <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
-                {photoURL ? (
-                  <img
-                    src={photoURL}
-                    alt="náhled"
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      border: "1px solid #eee",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      background: "#eee",
-                      border: "1px solid #ddd",
-                    }}
-                  />
-                )}
-              </div>
-
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  margin: "10px 0 80px 0",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={showOffline}
-                  onChange={() => {
-                    const v = !showOffline;
-                    setShowOffline(v);
-                    localStorage.setItem("showOffline", String(v));
-                    if (uid && others.current[uid]) {
-                      others.current[uid].remove();
-                      delete others.current[uid];
-                    }
-                  }}
-                />
-                Zobrazit offline uživatele (šedě)
-              </label>
-            </div>
-
-            <div style={{ padding: 12, borderTop: "1px solid #eee", display: "flex", gap: 8, background: "#fff" }}>
-              <button
-                onClick={uploadPhoto}
-                disabled={uploading}
-                style={{
-                  flex: 1,
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  background: uploading ? "#9ca3af" : "#0f172a",
-                  color: "#fff",
-                  border: "none",
-                }}
-              >
-                {uploading ? `Nahrávám… ${uploadPct}%` : "Nahrát fotku"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setSoundOn(true);
-                  localStorage.setItem("soundOn", "true");
-                  beep();
-                  showToast("Zvuk povolen");
-                }}
-                style={{
-                  flex: 1,
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  background: soundOn ? "#10b981" : "#374151",
-                  color: "#fff",
-                  border: "none",
-                }}
-              >
-                {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
-              </button>
-
-              <button
-                onClick={() => {
-                  beep();
-                  showToast("Píp!");
-                }}
-                style={{
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  background: "#6b7280",
-                  color: "#fff",
-                  border: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Test
-              </button>
-            </div>
+              {uploading ? `Nahrávám… ${uploadPct}%` : "Nahrát fotku"}
+            </button>
+            <button
+              onClick={() => { setSoundOn(s => !s); }}
+              style={{ flex: 1, padding: "12px 16px", borderRadius: 12, border: 0, background: soundOn ? "#21a366" : "#111b2e", color: "#fff" }}
+            >
+              {soundOn ? "🔊 Zvuk povolen" : "🔇 Zvuk vypnut"}
+            </button>
+            <button
+              onClick={() => { try { pingSound.current.currentTime = 0; pingSound.current.play(); } catch {} }}
+              style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #111", background: "#fff" }}
+            >
+              Test
+            </button>
           </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+            <input type="checkbox" checked={showOffline} onChange={e => setShowOffline(e.target.checked)} />
+            Zobrazit offline uživatele (šedě)
+          </label>
         </div>
       )}
 
-      {/* CHATS placeholder */}
-      {chatsOpen && (
-        <div onClick={() => setChatsOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", zIndex: 60 }}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              left: "calc(12px + env(safe-area-inset-left))",
-              right: "calc(12px + env(safe-area-inset-right))",
-              bottom: "calc(12px + env(safe-area-inset-bottom))",
-              top: "calc(12px + env(safe-area-inset-top))",
-              background: "#fff",
-              borderRadius: 16,
-              padding: 16,
-              overflow: "auto",
-              boxShadow: "0 16px 36px rgba(0,0,0,.3)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-              <h3 style={{ margin: 0, flex: 1 }}>Chaty</h3>
-              <button
-                onClick={() => setChatsOpen(false)}
-                style={{ border: "none", background: "#111827", color: "#fff", borderRadius: 10, padding: "8px 12px" }}
-              >
-                Zavřít
-              </button>
-            </div>
-            <div style={{ color: "#6b7280" }}>
-              Seznam konverzací doděláme, až potvrdíš, že běží fotky + markery. 😉
+      {/* Chat list placeholder (zatím info) */}
+      {showChats && (
+        <div
+          onClick={() => setShowChats(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: "90vw", maxWidth: 520, background: "#fff", borderRadius: 16, padding: 16 }}>
+            <h2 style={{ marginTop: 0 }}>Chaty</h2>
+            <p>Zatím žádné konverzace.</p>
+            <div style={{ textAlign: "right" }}>
+              <button onClick={() => setShowChats(false)} style={{ padding: "10px 16px", borderRadius: 12, border: 0, background: "#111b2e", color: "#fff" }}>Zavřít</button>
             </div>
           </div>
         </div>
