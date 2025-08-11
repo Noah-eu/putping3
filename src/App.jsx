@@ -38,7 +38,7 @@ const timeAgo = (ts) => {
   return `před ${Math.floor(h / 24)} dny`;
 };
 
-/* WebAudio – spolehlivý beep na mobilech po klepnutí */
+/* WebAudio beep */
 function makeBeep() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   return () =>
@@ -62,7 +62,7 @@ function makeBeep() {
 }
 const playBeep = makeBeep();
 
-/* zmenšení fotky na max 512 px (dlouhá strana) */
+/* zmenšení fotky */
 async function downscaleImage(file) {
   const bitmap = await createImageBitmap(file);
   const maxSide = 512;
@@ -74,12 +74,19 @@ async function downscaleImage(file) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(bitmap, 0, 0, w, h);
-  return new Promise((res) =>
-    canvas.toBlob((b) => res(b), "image/jpeg", 0.8)
-  );
+  return new Promise((res) => canvas.toBlob((b) => res(b), "image/jpeg", 0.8));
 }
 
 export default function App() {
+  // per-device id (kvůli "šedému já")
+  const [deviceId] = useState(() => {
+    const ex = localStorage.getItem("deviceId");
+    if (ex) return ex;
+    const id = "dev_" + Math.random().toString(36).slice(2);
+    localStorage.setItem("deviceId", id);
+    return id;
+  });
+
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
   const [soundOn, setSoundOn] = useState(localStorage.getItem("soundOn") === "true");
@@ -89,11 +96,11 @@ export default function App() {
   const [chatsOpen, setChatsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState("");
+  const [photoURL, setPhotoURL] = useState("");
 
   const mapRef = useRef(null);
   const myMarkerRef = useRef(null);
   const myPopupRef = useRef(null);
-  const myPhotoURLRef = useRef("");
   const others = useRef({}); // id -> Marker
   const fileRef = useRef(null);
 
@@ -109,18 +116,20 @@ export default function App() {
       if (u) {
         setUid(u.uid);
         localStorage.setItem("uid", u.uid);
+        // uložit deviceId do profilu
+        update(ref(db, `users/${u.uid}`), { deviceId, lastActive: Date.now() }).catch(() => {});
+        // kdyby tu náhodou byl marker "others" se stejným id, smažeme
         if (others.current[u.uid]) {
           others.current[u.uid].remove();
           delete others.current[u.uid];
         }
-        update(ref(db, `users/${u.uid}`), { lastActive: Date.now() }).catch(() => {});
       }
     });
     if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
     return () => unsub();
-  }, []);
+  }, [deviceId]);
 
-  /* map */
+  /* map init */
   useEffect(() => {
     if (mapRef.current) return;
     const map = new mapboxgl.Map({
@@ -140,6 +149,16 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  /* poslouchám svůj profil – kvůli photoURL */
+  useEffect(() => {
+    if (!uid) return;
+    const unsub = onValue(ref(db, `users/${uid}`), (s) => {
+      const me = s.val() || {};
+      if (me.photoURL) setPhotoURL(me.photoURL);
+    });
+    return () => unsub();
+  }, [uid]);
+
   /* my location */
   useEffect(() => {
     if (!uid || !mapRef.current) return;
@@ -157,15 +176,29 @@ export default function App() {
         backgroundSize: "cover",
         backgroundPosition: "center",
       });
+      if (photoURL) el.style.backgroundImage = `url("${photoURL}")`;
       const m = new mapboxgl.Marker({ element: el });
       const p = new mapboxgl.Popup({ offset: 18 }).setHTML(`<b>${name}</b>`);
       myPopupRef.current = p;
       myMarkerRef.current = m.setPopup(p);
     };
 
+    const updMyPhoto = () => {
+      if (!myMarkerRef.current) return;
+      const el = myMarkerRef.current.getElement();
+      if (photoURL) {
+        el.style.backgroundImage = `url("${photoURL}")`;
+        el.style.backgroundSize = "cover";
+        el.style.backgroundPosition = "center";
+      } else {
+        el.style.backgroundImage = "";
+      }
+    };
+
     const onPos = async (pos) => {
       const { latitude: lat, longitude: lng } = pos.coords;
       ensureMyMarker();
+      updMyPhoto();
       myMarkerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
       myPopupRef.current?.setHTML(`<b>${name || "Anonym"}</b>`);
       await update(ref(db, `users/${uid}`), {
@@ -173,7 +206,8 @@ export default function App() {
         lat,
         lng,
         lastActive: Date.now(),
-        photoURL: myPhotoURLRef.current || null,
+        deviceId,
+        photoURL: photoURL || null,
       }).catch(() => {});
     };
 
@@ -194,37 +228,34 @@ export default function App() {
       });
       return () => navigator.geolocation.clearWatch(id);
     }
-  }, [uid, name]);
+  }, [uid, name, photoURL, deviceId]);
 
-  /* others + anti-ghost */
+  /* others + anti-ghost (deviceId) */
   useEffect(() => {
     if (!mapRef.current) return;
     const TTL = 5 * 60 * 1000;
-
-    const purgeSelfGhost = () => {
-      if (uid && others.current[uid]) {
-        others.current[uid].remove();
-        delete others.current[uid];
-      }
-    };
-
-    purgeSelfGhost();
 
     const unsub = onValue(ref(db, "users"), (snap) => {
       const data = snap.val() || {};
       const now = Date.now();
 
-      purgeSelfGhost();
-
       Object.entries(data).forEach(([id, u]) => {
         if (!u || !u.lat || !u.lng) return;
+
+        // nikdy nezobrazuj kohokoli ze stejného zařízení (zabije „šedého mě“)
+        if (u.deviceId && u.deviceId === deviceId) {
+          if (others.current[id]) {
+            others.current[id].remove();
+            delete others.current[id];
+          }
+          return;
+        }
+
         if (id === uid) {
-          if (u.photoURL && myMarkerRef.current) {
-            if (u.photoURL !== myPhotoURLRef.current) {
-              myPhotoURLRef.current = u.photoURL;
-              const el = myMarkerRef.current.getElement();
-              el.style.backgroundImage = `url("${u.photoURL}")`;
-            }
+          // pro jistotu – sebe mezi others nechci
+          if (others.current[id]) {
+            others.current[id].remove();
+            delete others.current[id];
           }
           return;
         }
@@ -238,7 +269,7 @@ export default function App() {
           return;
         }
 
-        const makeEl = () => {
+        const buildEl = () => {
           const el = document.createElement("div");
           if (u.photoURL) {
             Object.assign(el.style, {
@@ -267,7 +298,7 @@ export default function App() {
         };
 
         if (!others.current[id]) {
-          const marker = new mapboxgl.Marker({ element: makeEl() })
+          const marker = new mapboxgl.Marker({ element: buildEl() })
             .setLngLat([u.lng, u.lat])
             .setPopup(
               new mapboxgl.Popup({ offset: 20 }).setHTML(
@@ -285,6 +316,7 @@ export default function App() {
         }
       });
 
+      // odstraň, co v DB není
       Object.keys(others.current).forEach((id) => {
         if (!data[id] || id === uid) {
           others.current[id].remove();
@@ -293,12 +325,8 @@ export default function App() {
       });
     });
 
-    const t = setInterval(purgeSelfGhost, 4000);
-    return () => {
-      clearInterval(t);
-      unsub();
-    };
-  }, [uid, showOffline]);
+    return () => unsub();
+  }, [uid, showOffline, deviceId]);
 
   /* pings -> beep (zatím demo) */
   useEffect(() => {
@@ -313,7 +341,7 @@ export default function App() {
   /* actions */
   const saveName = async () => {
     localStorage.setItem("name", name);
-    if (uid) await update(ref(db, `users/${uid}`), { name: name || "Anonym", lastActive: Date.now() }).catch(()=>{});
+    if (uid) await update(ref(db, `users/${uid}`), { name: name || "Anonym", lastActive: Date.now(), deviceId }).catch(()=>{});
     showToast("Jméno uloženo");
   };
 
@@ -323,27 +351,21 @@ export default function App() {
       if (!file) return showToast("Vyber fotku");
       setUploading(true);
 
-      const blob = await downscaleImage(file); // zmenšení
+      const blob = await downscaleImage(file);
       const r = sref(storage, `profiles/${uid}.jpg`);
       await uploadBytes(r, blob, { contentType: "image/jpeg" });
       const url = await getDownloadURL(r);
 
-      myPhotoURLRef.current = url;
-      await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now() });
+      setPhotoURL(url); // okamžitě do UI
+      await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now(), deviceId });
 
-      if (myMarkerRef.current) {
-        const el = myMarkerRef.current.getElement();
-        el.style.backgroundImage = `url("${url}")`;
-        el.style.backgroundSize = "cover";
-        el.style.backgroundPosition = "center";
-      }
-      showToast("Fotka nahrána");
       // vyčistit výběr
-      if (fileRef.current) fileRef.current.value = "";
+      fileRef.current.value = "";
+      showToast("Fotka nahrána");
     } catch (e) {
       console.error(e);
-      showToast("Nahrání selhalo");
       alert("Nahrání fotky selhalo: " + (e?.message || e));
+      showToast("Nahrání selhalo");
     } finally {
       setUploading(false);
     }
@@ -351,7 +373,7 @@ export default function App() {
 
   const enableSound = async () => {
     try {
-      await playBeep();        // odemknout WebAudio v rámci kliknutí
+      await playBeep();
       setSoundOn(true);
       localStorage.setItem("soundOn", "true");
       showToast("Zvuk povolen");
@@ -372,7 +394,7 @@ export default function App() {
     const v = !showOffline;
     setShowOffline(v);
     localStorage.setItem("showOffline", String(v));
-    // hned smaž případný zbytkový „self ghost“
+    // nic „moje“ se kvůli deviceId stejně neukáže, ale pro jistotu smažu cokoliv s mým uid
     if (uid && others.current[uid]) {
       others.current[uid].remove();
       delete others.current[uid];
@@ -516,8 +538,17 @@ export default function App() {
               </div>
 
               <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
+                {photoURL ? (
+                  <img
+                    src={photoURL}
+                    alt="náhled"
+                    style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "1px solid #eee" }}
+                  />
+                ) : (
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#eee", border: "1px solid #ddd" }} />
+                )}
               </div>
 
               <label style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 80px 0" }}>
@@ -551,7 +582,18 @@ export default function App() {
               </button>
 
               <button
-                onClick={enableSound}
+                onClick={async () => {
+                  try {
+                    await playBeep();
+                    setSoundOn(true);
+                    localStorage.setItem("soundOn", "true");
+                    showToast("Zvuk povolen");
+                  } catch {
+                    setSoundOn(false);
+                    localStorage.setItem("soundOn", "false");
+                    alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu.");
+                  }
+                }}
                 style={{
                   flex: 1,
                   borderRadius: 10,
@@ -565,7 +607,11 @@ export default function App() {
               </button>
 
               <button
-                onClick={testSound}
+                onClick={() =>
+                  playBeep()
+                    .then(() => showToast("Píp!"))
+                    .catch(() => alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu."))
+                }
                 style={{
                   borderRadius: 10,
                   padding: "12px 14px",
