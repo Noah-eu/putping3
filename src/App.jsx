@@ -26,7 +26,7 @@ import {
 /* =========================
    KONFIGURACE
 ========================= */
-const MAPBOX_TOKEN = "SEM_VLOŽ_SVŮJ_MAPBOX_TOKEN";
+const MAPBOX_TOKEN = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
