@@ -5,7 +5,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { getDatabase, ref, update, onValue } from "firebase/database";
 import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-/* ====== Mapbox + Firebase ====== */
+/* ===== Mapbox + Firebase ===== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
@@ -19,7 +19,7 @@ const firebaseConfig = {
   appId: "1:244045363394:web:64e930bff17a816549635b",
   measurementId: "G-RLMGM46M6X",
 };
-/* ================================= */
+/* ============================ */
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -58,7 +58,6 @@ export default function App() {
   const fileRef = useRef(null);
   const ding = useRef(new Audio("https://cdn.jsdelivr.net/gh/napars/tones@main/click.mp3"));
 
-  /* tiny toast */
   const showToast = (t) => {
     setToast(t);
     setTimeout(() => setToast(""), 1800);
@@ -70,6 +69,7 @@ export default function App() {
       if (u) {
         setUid(u.uid);
         localStorage.setItem("uid", u.uid);
+        // jistota: nikdy neuchovávat „others“ marker pro sebe
         if (others.current[u.uid]) {
           others.current[u.uid].remove();
           delete others.current[u.uid];
@@ -97,7 +97,6 @@ export default function App() {
     });
     mapRef.current = map;
 
-    // ESC zavírání panelů
     const onKey = (e) => e.key === "Escape" && (setSettingsOpen(false), setChatsOpen(false));
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -140,8 +139,6 @@ export default function App() {
       }).catch(() => {});
     };
 
-    const onErr = () => {};
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -149,10 +146,10 @@ export default function App() {
           mapRef.current.jumpTo({ center: [lng, lat], zoom: 14 });
           onPos(pos);
         },
-        onErr,
+        () => {},
         { enableHighAccuracy: true, timeout: 10000 }
       );
-      const id = navigator.geolocation.watchPosition(onPos, onErr, {
+      const id = navigator.geolocation.watchPosition(onPos, () => {}, {
         enableHighAccuracy: true,
         maximumAge: 5000,
         timeout: 20000,
@@ -170,7 +167,7 @@ export default function App() {
       const data = snap.val() || {};
       const now = Date.now();
 
-      // vlastní ghost pryč
+      // jistota proti self-ghost: vždy odstranit případný others marker s mým uid
       if (uid && others.current[uid]) {
         others.current[uid].remove();
         delete others.current[uid];
@@ -180,7 +177,7 @@ export default function App() {
         if (!u || !u.lat || !u.lng) return;
 
         if (id === uid) {
-          // repaint mé fotky
+          // refresh mé fotky
           if (u.photoURL && myMarkerRef.current) {
             if (u.photoURL !== myPhotoURLRef.current) {
               myPhotoURLRef.current = u.photoURL;
@@ -200,7 +197,7 @@ export default function App() {
           return;
         }
 
-        const buildEl = () => {
+        const makeEl = () => {
           const el = document.createElement("div");
           if (u.photoURL) {
             Object.assign(el.style, {
@@ -229,7 +226,7 @@ export default function App() {
         };
 
         if (!others.current[id]) {
-          const marker = new mapboxgl.Marker({ element: buildEl() })
+          const marker = new mapboxgl.Marker({ element: makeEl() })
             .setLngLat([u.lng, u.lat])
             .setPopup(
               new mapboxgl.Popup({ offset: 20 }).setHTML(
@@ -257,7 +254,7 @@ export default function App() {
     return () => unsub();
   }, [uid, showOffline]);
 
-  /* pings -> ding (připrav.) */
+  /* pings -> ding (zatím jen test) */
   useEffect(() => {
     if (!uid) return;
     const unsub = onValue(ref(db, `pings/${uid}`), (snap) => {
@@ -287,8 +284,6 @@ export default function App() {
       const url = await getDownloadURL(r);
       myPhotoURLRef.current = url;
       await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now() });
-
-      // repaint hned
       if (myMarkerRef.current) {
         const el = myMarkerRef.current.getElement();
         el.style.backgroundImage = `url("${url}")`;
@@ -304,10 +299,18 @@ export default function App() {
     }
   };
 
-  const toggleSound = () => {
-    const v = !soundOn;
-    setSoundOn(v);
-    localStorage.setItem("soundOn", String(v));
+  const enableSound = async () => {
+    try {
+      ding.current.currentTime = 0;
+      await ding.current.play(); // odemčení během kliknutí
+      setSoundOn(true);
+      localStorage.setItem("soundOn", "true");
+      showToast("Zvuk povolen");
+    } catch {
+      setSoundOn(false);
+      localStorage.setItem("soundOn", "false");
+      alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu.");
+    }
   };
 
   const testSound = () => {
@@ -322,7 +325,6 @@ export default function App() {
     const v = !showOffline;
     setShowOffline(v);
     localStorage.setItem("showOffline", String(v));
-    // jistota proti self-ghost
     if (uid && others.current[uid]) {
       others.current[uid].remove();
       delete others.current[uid];
@@ -333,7 +335,6 @@ export default function App() {
     <div style={{ width: "100vw", height: "100dvh", position: "relative" }}>
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {/* toasty */}
       {toast && (
         <div
           style={{
@@ -353,7 +354,7 @@ export default function App() {
         </div>
       )}
 
-      {/* chat FAB */}
+      {/* Chat FAB */}
       <div
         onClick={() => setChatsOpen(true)}
         title="Chaty"
@@ -385,7 +386,7 @@ export default function App() {
         />
       </div>
 
-      {/* settings FAB */}
+      {/* Settings FAB */}
       <div
         onClick={() => setSettingsOpen(true)}
         title="Nastavení"
@@ -417,7 +418,7 @@ export default function App() {
         />
       </div>
 
-      {/* SETTINGS */}
+      {/* SETTINGS drawer */}
       {settingsOpen && (
         <div
           onClick={() => setSettingsOpen(false)}
@@ -440,25 +441,19 @@ export default function App() {
               overflow: "hidden",
             }}
           >
-            <div style={{ padding: 16, display: "flex", alignItems: "center" }}>
+            <div style={{ padding: 16, display: "flex", alignItems: "center", borderBottom: "1px solid #eee" }}>
               <h3 style={{ margin: 0, flex: 1 }}>Nastavení</h3>
               <button
                 onClick={() => setSettingsOpen(false)}
-                style={{
-                  border: "none",
-                  background: "#111827",
-                  color: "#fff",
-                  borderRadius: 10,
-                  padding: "8px 12px",
-                }}
+                style={{ border: "none", background: "#111827", color: "#fff", borderRadius: 10, padding: "8px 12px" }}
               >
                 Zavřít
               </button>
             </div>
 
-            <div style={{ padding: "0 16px", overflow: "auto" }}>
+            <div style={{ padding: "16px", overflow: "auto" }}>
               <label style={{ fontSize: 13, opacity: 0.7 }}>Jméno</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -473,58 +468,74 @@ export default function App() {
               </div>
 
               <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
-                <button
-                  onClick={uploadPhoto}
-                  disabled={uploading}
-                  style={{
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    background: uploading ? "#9ca3af" : "#111827",
-                    color: "#fff",
-                    border: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {uploading ? "Nahrávám…" : "Nahrát"}
-                </button>
               </div>
 
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <button
-                  onClick={toggleSound}
-                  style={{
-                    flex: 1,
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    background: soundOn ? "#10b981" : "#111827",
-                    color: "#fff",
-                    border: "none",
-                  }}
-                >
-                  {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
-                </button>
-                <button
-                  onClick={testSound}
-                  style={{ borderRadius: 10, padding: "10px 14px", background: "#374151", color: "#fff", border: "none" }}
-                >
-                  Test zvuku
-                </button>
-              </div>
-
-              <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 80px 0" }}>
                 <input type="checkbox" checked={showOffline} onChange={toggleOffline} />
                 Zobrazit offline uživatele (šedě)
               </label>
+            </div>
 
-              <div style={{ height: 12 }} />
+            {/* sticky spodní lišta – nic se neschová */}
+            <div
+              style={{
+                padding: 12,
+                borderTop: "1px solid #eee",
+                display: "flex",
+                gap: 8,
+                background: "#fff",
+              }}
+            >
+              <button
+                onClick={uploadPhoto}
+                disabled={uploading}
+                style={{
+                  flex: 1,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  background: uploading ? "#9ca3af" : "#111827",
+                  color: "#fff",
+                  border: "none",
+                }}
+              >
+                {uploading ? "Nahrávám…" : "Nahrát fotku"}
+              </button>
+
+              <button
+                onClick={enableSound}
+                style={{
+                  flex: 1,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  background: soundOn ? "#10b981" : "#374151",
+                  color: "#fff",
+                  border: "none",
+                }}
+              >
+                {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
+              </button>
+
+              <button
+                onClick={testSound}
+                style={{
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  background: "#6b7280",
+                  color: "#fff",
+                  border: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Test
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* CHATS (zatím placeholder, ale zavíratelné) */}
+      {/* CHATS placeholder */}
       {chatsOpen && (
         <div
           onClick={() => setChatsOpen(false)}
