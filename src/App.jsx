@@ -51,9 +51,9 @@ function timeAgo(ts) {
   const d = Date.now() - ts;
   if (d < 60_000) return "před pár sekundami";
   const m = Math.floor(d / 60_000);
-  if (m < 60) return před ${m} min;
+  if (m < 60) return `před ${m} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return před ${h} h;
+  if (h < 24) return `před ${h} h`;
   const dd = Math.floor(h / 24);
   return před ${dd} dny;
 }
