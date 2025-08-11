@@ -1,24 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-} from "firebase/auth";
-import {
-  getDatabase,
-  ref,
-  update,
-  onValue,
-  remove,
-} from "firebase/database";
-import {
-  getStorage,
-  ref as sref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getDatabase, ref, update, onValue } from "firebase/database";
+import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 /* ====== Mapbox + Firebase ====== */
 mapboxgl.accessToken =
@@ -27,8 +12,7 @@ mapboxgl.accessToken =
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
-  databaseURL:
-    "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
+  databaseURL: "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
   storageBucket: "putping-dc57e.appspot.com",
   messagingSenderId: "244045363394",
@@ -42,7 +26,7 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-/* ===== helpers ===== */
+/* helpers */
 function timeAgo(ts) {
   if (!ts) return "neznámo";
   const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -51,11 +35,9 @@ function timeAgo(ts) {
   if (m < 60) return `před ${m} min`;
   const h = Math.floor(m / 60);
   if (h < 24) return `před ${h} h`;
-  const d = Math.floor(h / 24);
-  return `před ${d} dny`;
+  return `před ${Math.floor(h / 24)} dny`;
 }
 
-/* ===== component ===== */
 export default function App() {
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
@@ -65,35 +47,41 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-
-  const ding = useRef(new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_0e4e4b7f05.mp3?filename=click-124467.mp3"));
+  const [toast, setToast] = useState("");
 
   const mapRef = useRef(null);
   const myMarkerRef = useRef(null);
   const myPopupRef = useRef(null);
   const myPhotoURLRef = useRef("");
-  const others = useRef({}); // id -> mapboxgl.Marker
+  const others = useRef({}); // id -> Marker
 
-  /* AUTH */
+  const fileRef = useRef(null);
+  const ding = useRef(new Audio("https://cdn.jsdelivr.net/gh/napars/tones@main/click.mp3"));
+
+  /* tiny toast */
+  const showToast = (t) => {
+    setToast(t);
+    setTimeout(() => setToast(""), 1800);
+  };
+
+  /* auth */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       if (u) {
         setUid(u.uid);
         localStorage.setItem("uid", u.uid);
-        // při startu smaž případný starý ghost vlastníka v "others"
         if (others.current[u.uid]) {
           others.current[u.uid].remove();
           delete others.current[u.uid];
         }
-        // jemné pročištění staré vlastní stopy (pokud by existovala z dřívějška a byla šedá)
-        await update(ref(db, `users/${u.uid}`), { lastActive: Date.now() }).catch(() => {});
+        update(ref(db, `users/${u.uid}`), { lastActive: Date.now() }).catch(() => {});
       }
     });
     if (!auth.currentUser) signInAnonymously(auth).catch(() => {});
     return () => unsub();
   }, []);
 
-  /* MAP INIT */
+  /* map init */
   useEffect(() => {
     if (mapRef.current) return;
     const map = new mapboxgl.Map({
@@ -103,10 +91,19 @@ export default function App() {
       zoom: 6,
     });
     map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
+    map.on("click", () => {
+      setSettingsOpen(false);
+      setChatsOpen(false);
+    });
     mapRef.current = map;
+
+    // ESC zavírání panelů
+    const onKey = (e) => e.key === "Escape" && (setSettingsOpen(false), setChatsOpen(false));
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /* MOJE POLOHA – ŘÍZENÁ JEN GEOLOKACÍ */
+  /* my location */
   useEffect(() => {
     if (!uid || !mapRef.current) return;
 
@@ -118,8 +115,10 @@ export default function App() {
         height: "28px",
         borderRadius: "50%",
         background: "#fff",
-        border: "4px solid #e74c3c",
-        boxShadow: "0 0 0 3px rgba(231,76,60,.25)",
+        border: "4px solid #e11d48",
+        boxShadow: "0 0 0 3px rgba(225,17,72,.25)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       });
       const m = new mapboxgl.Marker({ element: el });
       const p = new mapboxgl.Popup({ offset: 18 }).setHTML(`<b>${name}</b>`);
@@ -162,7 +161,7 @@ export default function App() {
     }
   }, [uid, name]);
 
-  /* OSTATNÍ UŽIVATELÉ */
+  /* others */
   useEffect(() => {
     if (!mapRef.current) return;
     const TTL = 5 * 60 * 1000;
@@ -171,33 +170,28 @@ export default function App() {
       const data = snap.val() || {};
       const now = Date.now();
 
-      // CREATE/UPDATE
-      Object.entries(data).forEach(([id, user]) => {
-        if (!user || !user.lat || !user.lng) return;
+      // vlastní ghost pryč
+      if (uid && others.current[uid]) {
+        others.current[uid].remove();
+        delete others.current[uid];
+      }
 
-        // nikdy nepřidávej vlastníka do "others"
+      Object.entries(data).forEach(([id, u]) => {
+        if (!u || !u.lat || !u.lng) return;
+
         if (id === uid) {
-          // kdyby tu z dřívějška ghost byl, smaž
-          if (others.current[id]) {
-            others.current[id].remove();
-            delete others.current[id];
-          }
-          // a aktualizuj můj marker vzhledem k fotce
-          if (user.photoURL && myMarkerRef.current) {
-            if (myPhotoURLRef.current !== user.photoURL) {
-              myPhotoURLRef.current = user.photoURL;
+          // repaint mé fotky
+          if (u.photoURL && myMarkerRef.current) {
+            if (u.photoURL !== myPhotoURLRef.current) {
+              myPhotoURLRef.current = u.photoURL;
               const el = myMarkerRef.current.getElement();
-              el.style.backgroundImage = `url("${user.photoURL}")`;
-              el.style.backgroundSize = "cover";
-              el.style.backgroundPosition = "center";
-              el.style.border = "3px solid #e74c3c";
-              el.style.boxShadow = "0 0 0 3px rgba(231,76,60,.25)";
+              el.style.backgroundImage = `url("${u.photoURL}")`;
             }
           }
           return;
         }
 
-        const offline = now - (user.lastActive || 0) > TTL;
+        const offline = now - (u.lastActive || 0) > TTL;
         if (!showOffline && offline) {
           if (others.current[id]) {
             others.current[id].remove();
@@ -208,18 +202,18 @@ export default function App() {
 
         const buildEl = () => {
           const el = document.createElement("div");
-          if (user.photoURL) {
+          if (u.photoURL) {
             Object.assign(el.style, {
               width: "44px",
               height: "44px",
               borderRadius: "50%",
-              backgroundImage: `url("${user.photoURL}")`,
+              backgroundImage: `url("${u.photoURL}")`,
               backgroundSize: "cover",
               backgroundPosition: "center",
               border: "3px solid #fff",
               boxShadow: "0 0 0 3px rgba(0,0,0,.15)",
               filter: offline ? "grayscale(100%)" : "none",
-              opacity: offline ? "0.8" : "1",
+              opacity: offline ? "0.85" : "1",
             });
           } else {
             Object.assign(el.style, {
@@ -236,25 +230,23 @@ export default function App() {
 
         if (!others.current[id]) {
           const marker = new mapboxgl.Marker({ element: buildEl() })
-            .setLngLat([user.lng, user.lat])
+            .setLngLat([u.lng, u.lat])
             .setPopup(
               new mapboxgl.Popup({ offset: 20 }).setHTML(
                 `<div style="font-size:14px">
-                   <b>${user.name || "Uživatel"}</b><br/>
-                   ${offline ? "offline" : "online"} • ${timeAgo(user.lastActive)}
+                   <b>${u.name || "Uživatel"}</b><br/>
+                   ${offline ? "offline" : "online"} • ${timeAgo(u.lastActive)}
                  </div>`
               )
             )
             .addTo(mapRef.current);
-
           marker.getElement().addEventListener("click", () => marker.togglePopup());
           others.current[id] = marker;
         } else {
-          others.current[id].setLngLat([user.lng, user.lat]);
+          others.current[id].setLngLat([u.lng, u.lat]);
         }
       });
 
-      // REMOVE
       Object.keys(others.current).forEach((id) => {
         if (!data[id] || id === uid) {
           others.current[id].remove();
@@ -265,7 +257,7 @@ export default function App() {
     return () => unsub();
   }, [uid, showOffline]);
 
-  /* PINGS -> zvuk (zatím jen test) */
+  /* pings -> ding (připrav.) */
   useEffect(() => {
     if (!uid) return;
     const unsub = onValue(ref(db, `pings/${uid}`), (snap) => {
@@ -278,18 +270,17 @@ export default function App() {
     return () => unsub();
   }, [uid, soundOn]);
 
-  /* Handlery */
+  /* actions */
   const saveName = async () => {
     localStorage.setItem("name", name);
     if (uid) await update(ref(db, `users/${uid}`), { name: name || "Anonym", lastActive: Date.now() }).catch(()=>{});
-    alert("Jméno uloženo.");
+    showToast("Jméno uloženo");
   };
 
-  const fileRef = useRef(null);
   const uploadPhoto = async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return showToast("Vyber fotku");
     try {
-      const file = fileRef.current?.files?.[0];
-      if (!file) return alert("Vyber fotku.");
       setUploading(true);
       const r = sref(storage, `profiles/${uid}.jpg`);
       await uploadBytes(r, file);
@@ -297,19 +288,17 @@ export default function App() {
       myPhotoURLRef.current = url;
       await update(ref(db, `users/${uid}`), { photoURL: url, lastActive: Date.now() });
 
-      // okamžitý repaint mého markeru
+      // repaint hned
       if (myMarkerRef.current) {
         const el = myMarkerRef.current.getElement();
         el.style.backgroundImage = `url("${url}")`;
         el.style.backgroundSize = "cover";
         el.style.backgroundPosition = "center";
-        el.style.border = "3px solid #e74c3c";
-        el.style.boxShadow = "0 0 0 3px rgba(231,76,60,.25)";
       }
-      alert("Profilová fotka nahrána.");
+      showToast("Fotka nahrána");
     } catch (e) {
       console.error(e);
-      alert("Nahrání se nepodařilo.");
+      showToast("Nahrání selhalo");
     } finally {
       setUploading(false);
     }
@@ -323,20 +312,48 @@ export default function App() {
 
   const testSound = () => {
     ding.current.currentTime = 0;
-    ding.current.play().catch(() => alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu."));
+    ding.current
+      .play()
+      .then(() => showToast("Připraveno"))
+      .catch(() => alert("Prohlížeč odmítl přehrát zvuk – zkuste klepnout znovu."));
   };
 
   const toggleOffline = () => {
     const v = !showOffline;
     setShowOffline(v);
     localStorage.setItem("showOffline", String(v));
+    // jistota proti self-ghost
+    if (uid && others.current[uid]) {
+      others.current[uid].remove();
+      delete others.current[uid];
+    }
   };
 
   return (
     <div style={{ width: "100vw", height: "100dvh", position: "relative" }}>
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {/* CHAT FAB */}
+      {/* toasty */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: "calc(90px + env(safe-area-inset-bottom))",
+            background: "#111827",
+            color: "#fff",
+            padding: "10px 14px",
+            borderRadius: 999,
+            fontSize: 14,
+            zIndex: 70,
+          }}
+        >
+          {toast}
+        </div>
+      )}
+
+      {/* chat FAB */}
       <div
         onClick={() => setChatsOpen(true)}
         title="Chaty"
@@ -368,7 +385,7 @@ export default function App() {
         />
       </div>
 
-      {/* SETTINGS FAB */}
+      {/* settings FAB */}
       <div
         onClick={() => setSettingsOpen(true)}
         title="Nastavení"
@@ -400,141 +417,127 @@ export default function App() {
         />
       </div>
 
-      {/* SETTINGS SHEET */}
+      {/* SETTINGS */}
       {settingsOpen && (
         <div
           onClick={() => setSettingsOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.25)",
-            zIndex: 60,
-          }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", zIndex: 60 }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
-              left: "calc(16px + env(safe-area-inset-left))",
-              right: "calc(16px + env(safe-area-inset-right))",
-              bottom: "calc(16px + env(safe-area-inset-bottom))",
-              top: "calc(16px + env(safe-area-inset-top))",
+              left: "calc(12px + env(safe-area-inset-left))",
+              right: "calc(12px + env(safe-area-inset-right))",
+              bottom: "calc(12px + env(safe-area-inset-bottom))",
+              top: "calc(12px + env(safe-area-inset-top))",
               background: "#fff",
               borderRadius: 16,
-              padding: 16,
               display: "flex",
               flexDirection: "column",
-              overflow: "auto",
+              maxHeight: "calc(100dvh - 24px)",
               boxShadow: "0 16px 36px rgba(0,0,0,.3)",
+              overflow: "hidden",
             }}
           >
-            <h3 style={{ marginTop: 0 }}>Nastavení</h3>
-
-            <label style={{ fontSize: 13, opacity: 0.7 }}>Jméno</label>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #e5e7eb",
-                }}
-              />
+            <div style={{ padding: 16, display: "flex", alignItems: "center" }}>
+              <h3 style={{ margin: 0, flex: 1 }}>Nastavení</h3>
               <button
-                onClick={saveName}
+                onClick={() => setSettingsOpen(false)}
                 style={{
-                  borderRadius: 10,
-                  padding: "10px 14px",
+                  border: "none",
                   background: "#111827",
                   color: "#fff",
-                  border: "none",
-                  whiteSpace: "nowrap",
+                  borderRadius: 10,
+                  padding: "8px 12px",
                 }}
               >
-                Uložit
+                Zavřít
               </button>
             </div>
 
-            <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
-              <button
-                onClick={uploadPhoto}
-                disabled={uploading}
-                style={{
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  background: uploading ? "#9ca3af" : "#111827",
-                  color: "#fff",
-                  border: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {uploading ? "Nahrávám…" : "Nahrát"}
-              </button>
+            <div style={{ padding: "0 16px", overflow: "auto" }}>
+              <label style={{ fontSize: 13, opacity: 0.7 }}>Jméno</label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb" }}
+                />
+                <button
+                  onClick={saveName}
+                  style={{ borderRadius: 10, padding: "10px 14px", background: "#111827", color: "#fff", border: "none" }}
+                >
+                  Uložit
+                </button>
+              </div>
+
+              <label style={{ fontSize: 13, opacity: 0.7 }}>Profilová fotka</label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input ref={fileRef} type="file" accept="image/*" style={{ flex: 1 }} />
+                <button
+                  onClick={uploadPhoto}
+                  disabled={uploading}
+                  style={{
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    background: uploading ? "#9ca3af" : "#111827",
+                    color: "#fff",
+                    border: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {uploading ? "Nahrávám…" : "Nahrát"}
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <button
+                  onClick={toggleSound}
+                  style={{
+                    flex: 1,
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    background: soundOn ? "#10b981" : "#111827",
+                    color: "#fff",
+                    border: "none",
+                  }}
+                >
+                  {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
+                </button>
+                <button
+                  onClick={testSound}
+                  style={{ borderRadius: 10, padding: "10px 14px", background: "#374151", color: "#fff", border: "none" }}
+                >
+                  Test zvuku
+                </button>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+                <input type="checkbox" checked={showOffline} onChange={toggleOffline} />
+                Zobrazit offline uživatele (šedě)
+              </label>
+
+              <div style={{ height: 12 }} />
             </div>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <button
-                onClick={toggleSound}
-                style={{
-                  flex: 1,
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  background: soundOn ? "#10b981" : "#111827",
-                  color: "#fff",
-                  border: "none",
-                }}
-              >
-                {soundOn ? "🔊 Zvuk povolen" : "🔇 Povolit zvuk"}
-              </button>
-              <button
-                onClick={testSound}
-                style={{
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  background: "#374151",
-                  color: "#fff",
-                  border: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Test zvuku
-              </button>
-            </div>
-
-            <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-              <input type="checkbox" checked={showOffline} onChange={toggleOffline} />
-              Zobrazit offline uživatele (šedě)
-            </label>
-
-            {/* spacer aby poslední tlačítka nebyla pod okrajem */}
-            <div style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }} />
           </div>
         </div>
       )}
 
-      {/* CHATS SHEET (placeholder) */}
+      {/* CHATS (zatím placeholder, ale zavíratelné) */}
       {chatsOpen && (
         <div
           onClick={() => setChatsOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.25)",
-            zIndex: 60,
-          }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.25)", zIndex: 60 }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
-              left: "calc(16px + env(safe-area-inset-left))",
-              right: "calc(16px + env(safe-area-inset-right))",
-              bottom: "calc(16px + env(safe-area-inset-bottom))",
-              top: "calc(16px + env(safe-area-inset-top))",
+              left: "calc(12px + env(safe-area-inset-left))",
+              right: "calc(12px + env(safe-area-inset-right))",
+              bottom: "calc(12px + env(safe-area-inset-bottom))",
+              top: "calc(12px + env(safe-area-inset-top))",
               background: "#fff",
               borderRadius: 16,
               padding: 16,
@@ -542,7 +545,15 @@ export default function App() {
               boxShadow: "0 16px 36px rgba(0,0,0,.3)",
             }}
           >
-            <h3 style={{ marginTop: 0 }}>Chaty</h3>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+              <h3 style={{ margin: 0, flex: 1 }}>Chaty</h3>
+              <button
+                onClick={() => setChatsOpen(false)}
+                style={{ border: "none", background: "#111827", color: "#fff", borderRadius: 10, padding: "8px 12px" }}
+              >
+                Zavřít
+              </button>
+            </div>
             <div style={{ color: "#6b7280" }}>Zatím žádné konverzace.</div>
           </div>
         </div>
