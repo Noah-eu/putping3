@@ -1,44 +1,24 @@
-// App.jsx – test upload fotky + přihlášení s retry + galerie i foťák
+// src/App.jsx — dočasná verze BEZ Firebase Auth (pro rychlý test uploadu)
 import React, { useEffect, useState } from "react";
-import { auth, db, storage } from "./firebase";
-
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import { ref as dbref, set } from "firebase/database";
+import { storage } from "./firebase";
 import { ref as sref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function App() {
+  // ===== STATE =====
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploadErr, setUploadErr] = useState("");
   const [photoURL, setPhotoURL] = useState("");
 
-  // ===== AUTH (anon) =====
+  // ===== Pseudo-UID (bez Auth) =====
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user?.uid) {
-        setUid(user.uid);
-        localStorage.setItem("uid", user.uid);
-      }
-    });
-
-    const signInAnonWithRetry = async (attempt = 1) => {
-      if (auth.currentUser?.uid) return; // už přihlášen
-      try {
-        await signInAnonymously(auth);
-      } catch (e) {
-        if (e?.code === "auth/network-request-failed" && attempt < 4) {
-          // retry po 1s, 2s, 4s
-          setTimeout(() => signInAnonWithRetry(attempt + 1), 1000 * Math.pow(2, attempt - 1));
-        } else {
-          setUploadErr(`Auth error: ${e?.code || e?.message || e}`);
-        }
-      }
-    };
-
-    signInAnonWithRetry();
-    return () => unsub();
-  }, []);
+    if (!uid) {
+      const tmp = "guest_" + Math.random().toString(36).slice(2);
+      setUid(tmp);
+      localStorage.setItem("uid", tmp);
+    }
+  }, [uid]);
 
   // ===== UPLOAD =====
   const onPickPhoto = (e) => {
@@ -48,16 +28,13 @@ export default function App() {
   };
 
   const startPhotoUpload = (file) => {
-    if (!uid) {
-      alert("Nejste přihlášen.");
-      return;
-    }
     setUploading(true);
     setUploadPct(0);
     setUploadErr("");
 
     const safeName = file.name.replace(/\s+/g, "_");
-    const r = sref(storage, `user_uploads/${uid}/${Date.now()}-${safeName}`);
+    const path = `user_uploads/${uid || "guest"}/${Date.now()}-${safeName}`;
+    const r = sref(storage, path);
     const task = uploadBytesResumable(r, file, { contentType: file.type });
 
     task.on(
@@ -77,33 +54,26 @@ export default function App() {
         setUploading(false);
         setUploadPct(100);
         setPhotoURL(url);
-        try {
-          await set(dbref(db, `debug_uploads/${uid}/${Date.now()}`), {
-            url,
-            at: Date.now(),
-          });
-        } catch (_) {}
         alert("Fotka nahrána ✅");
         console.log("Photo URL:", url);
       }
     );
   };
 
+  // ===== TEST: zápis malého blobu =====
   const testStorageWrite = async () => {
     try {
-      if (!uid) throw new Error("Chybí UID (nejste přihlášen).");
-      const r = sref(storage, `user_uploads/${uid}/__test_${Date.now()}.txt`);
+      const r = sref(storage, `user_uploads/${uid || "guest"}/__test_${Date.now()}.txt`);
       const blob = new Blob(["hello from putping"], { type: "text/plain" });
       const task = uploadBytesResumable(r, blob, { contentType: "text/plain" });
-      await new Promise((res, rej) => {
-        task.on("state_changed", null, rej, res);
-      });
+      await new Promise((res, rej) => task.on("state_changed", null, rej, res));
       alert("Test zápisu do Storage: ✅ OK");
     } catch (e) {
       alert("Test zápisu do Storage: ❌ " + (e?.message || e));
     }
   };
 
+  // ===== UI =====
   return (
     <div style={{
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
@@ -112,7 +82,7 @@ export default function App() {
       <h2 style={{ marginBottom: 8 }}>PutPing – Upload test</h2>
 
       <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 16 }}>
-        {uid ? <>UID: <code>{uid}</code></> : "Přihlašuji anonymně..."}
+        UID: <code>{uid || "…"}</code>
       </div>
 
       <div style={{ marginBottom: 16 }}>
@@ -180,7 +150,8 @@ export default function App() {
 
       <hr style={{ margin: "24px 0", opacity: 0.2 }} />
       <div style={{ fontSize: 13, opacity: 0.75 }}>
-        Tohle je dočasná test stránka. Až potvrdíme, že upload jede, vložím to do tvé sekce Nastavení u mapy.
+        Dočasná verze bez Auth – po ověření, že upload funguje, Auth znovu zapneme a vrátíme
+        původní pravidla Storage.
       </div>
     </div>
   );
