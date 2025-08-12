@@ -2,6 +2,11 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
+
+const storage = getStorage(app); // přidáme storage inicializaci
+
+export { db, auth, storage };	
 
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
@@ -19,3 +24,4 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 
 export { db, auth };
+
