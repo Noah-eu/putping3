@@ -20,11 +20,12 @@ import {
   remove,
 } from "firebase/database";
 import {
-  getStorage,
   ref as sref,
   uploadBytesResumable,
   getDownloadURL,
 } from "firebase/storage";
+
+import { storage } from " ./ firebase";
 
 /* ===== Mapbox token (tvůj) ===== */
 mapboxgl.accessToken =
