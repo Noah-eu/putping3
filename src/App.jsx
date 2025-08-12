@@ -1,4 +1,4 @@
-// App.jsx
+// App.jsx (Debug Safe Mode)
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -24,11 +24,11 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-/* ===== Mapbox token (tvůj) ===== */
+/* ===== Mapbox token ===== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
-/* ===== Firebase config (tvůj) ===== */
+/* ===== Firebase config ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
@@ -38,7 +38,7 @@ const firebaseConfig = {
   storageBucket: "putping-dc57e.appspot.com",
   messagingSenderId: "244045363394",
   appId: "1:244045363394:web:64e93b0ff17a816549635b",
-  measurementId: "G-RL6MGM46M6X",
+  measurementId: "G-RLMGM46M6X",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -46,55 +46,42 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-/* ===== Pomocné utily ===== */
 const now = () => Date.now();
 
-/** Zmenší JPEG/PNG na maxWidth px (zachová poměr), kvalita 0..1. Vrací Blob (image/jpeg). */
-async function downscaleImage(file, maxWidth = 800, quality = 0.85) {
-  try {
-    const img = document.createElement("img");
-    const reader = new FileReader();
-    const data = await new Promise((res, rej) => {
-      reader.onload = () => res(reader.result);
-      reader.onerror = rej;
-      reader.readAsDataURL(file);
-    });
-    await new Promise((res, rej) => {
-      img.onload = res;
-      img.onerror = rej;
-      img.src = data;
-    });
+/* ===== WebAudio „beep“ (spolehlivý test) ===== */
+function useWebAudio() {
+  const ctxRef = useRef(null);
+  const unlockedRef = useRef(false);
 
-    const scale = Math.min(1, maxWidth / (img.width || maxWidth));
-    const w = Math.max(1, Math.round((img.width || maxWidth) * scale));
-    const h = Math.max(1, Math.round((img.height || maxWidth) * scale));
-
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext("2d");
-    ctx.drawImage(img, 0, 0, w, h);
-
-    // Fallback pro prohlížeče bez toBlob (nebo když vrátí null)
-    const blob = await new Promise((resolve) => {
-      if (c.toBlob) {
-        c.toBlob((b) => resolve(b || null), "image/jpeg", quality);
-      } else {
-        const dataURL = c.toDataURL("image/jpeg", quality);
-        const byteString = atob(dataURL.split(",")[1]);
-        const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-        resolve(new Blob([ab], { type: mimeString }));
+  const ensure = async () => {
+    try {
+      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctxRef.current.state === "suspended") {
+        await ctxRef.current.resume();
       }
-    });
+      unlockedRef.current = true;
+      return true;
+    } catch {
+      unlockedRef.current = false;
+      return false;
+    }
+  };
 
-    return blob;
-  } catch (e) {
-    console.warn("downscaleImage failed, using original file", e);
-    return null; // volající použije původní soubor
-  }
+  const beep = async (ms = 160, freq = 880) => {
+    const ok = await ensure();
+    if (!ok) throw new Error("audio-locked");
+    const ctx = ctxRef.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.2;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    await new Promise((r) => setTimeout(r, ms));
+    osc.stop();
+  };
+
+  return { beep, ensure, unlockedRef };
 }
 
 export default function App() {
@@ -109,41 +96,21 @@ export default function App() {
   );
 
   const [photoURL, setPhotoURL] = useState(localStorage.getItem("photoURL") || "");
-  const [photos, setPhotos] = useState(
-    JSON.parse(localStorage.getItem("photos") || "[]")
-  ); // galerie (max 8)
+  const [photos, setPhotos] = useState(JSON.parse(localStorage.getItem("photos") || "[]"));
 
   const [map, setMap] = useState(null);
   const meMarker = useRef(null);
-  const others = useRef({}); // id -> marker
+  const others = useRef({});
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // fronta uploadů (když ještě není uid)
-  const [pendingMain, setPendingMain] = useState(null);
-  const [pendingGallery, setPendingGallery] = useState(null);
 
   // upload stav
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [uploadLabel, setUploadLabel] = useState(""); // "profil" | "galerie"
+  const [uploadLabel, setUploadLabel] = useState(""); // "profil" | "galerie" | "diagnostic"
+  const [lastUploadError, setLastUploadError] = useState("");
 
-  // audio odemčení
-  const audioUnlockedRef = useRef(false);
-  const testSoundRef = useRef(null);
-  async function ensureAudioUnlocked() {
-    const silentDataUri =
-      "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
-    return new Promise((resolve) => {
-      if (audioUnlockedRef.current) return resolve(true);
-      const a = new Audio(silentDataUri);
-      a.play()
-        .then(() => {
-          audioUnlockedRef.current = true;
-          resolve(true);
-        })
-        .catch(() => resolve(false));
-    });
-  }
+  // audio
+  const { beep, ensure, unlockedRef } = useWebAudio();
 
   /* ===== AUTH ===== */
   useEffect(() => {
@@ -174,7 +141,6 @@ export default function App() {
         setMap(m);
       },
       () => {
-        // fallback: střed Evropy
         const m = new mapboxgl.Map({
           container: "map",
           style: "mapbox://styles/mapbox/streets-v11",
@@ -187,13 +153,12 @@ export default function App() {
     );
   }, [map]);
 
-  /* ===== Zápis mé pozice do DB + můj marker ===== */
+  /* ===== Zápis mé pozice + můj marker ===== */
   useEffect(() => {
     if (!uid || !map) return;
 
     const meRef = dbref(db, `users/${uid}`);
 
-    // první uložení + odpojení
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         set(meRef, {
@@ -207,7 +172,6 @@ export default function App() {
         });
         onDisconnect(meRef).update({ online: false, lastActive: now() });
 
-        // můj marker
         const el = document.createElement("div");
         el.style.width = "28px";
         el.style.height = "28px";
@@ -222,7 +186,6 @@ export default function App() {
       { enableHighAccuracy: true }
     );
 
-    // pravidelná aktualizace
     const id = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
@@ -242,7 +205,7 @@ export default function App() {
         () => {},
         { enableHighAccuracy: true }
       );
-    }, 20_000);
+    }, 20000);
 
     return () => clearInterval(id);
   }, [uid, map, name, photoURL, JSON.stringify(photos)]);
@@ -253,16 +216,13 @@ export default function App() {
     const usersRef = dbref(db, "users");
     return onValue(usersRef, (snap) => {
       const data = snap.val() || {};
-
-      // přidej / uprav markery
       Object.entries(data).forEach(([id, u]) => {
         if (!u || !u.lat || !u.lng) return;
         if (id === uid) return;
 
-        const isOnline = !!u.online && (now() - (u.lastActive || 0) < 90_000);
+        const isOnline = !!u.online && (now() - (u.lastActive || 0) < 90000);
 
         if (!isOnline && !showOffline) {
-          // skryj offline, pokud nejsou povolení
           if (others.current[id]) {
             others.current[id].remove();
             delete others.current[id];
@@ -281,19 +241,15 @@ export default function App() {
           el.style.borderRadius = "50%";
           el.style.background = "#9ca3af";
           el.style.boxShadow = isOnline ? boxShadowOnline : boxShadowOffline;
-
           mk = others.current[id] = new mapboxgl.Marker(el)
             .setLngLat([u.lng, u.lat])
             .addTo(map);
         } else {
-          // aktualizuj pozici + styl podle online/offline
           mk.setLngLat([u.lng, u.lat]);
           const el = mk.getElement();
           el.style.boxShadow = isOnline ? boxShadowOnline : boxShadowOffline;
         }
       });
-
-      // odstraň markery, kteří už v DB nejsou
       Object.keys(others.current).forEach((id) => {
         if (!data[id]) {
           others.current[id].remove();
@@ -303,28 +259,19 @@ export default function App() {
     });
   }, [map, uid, showOffline]);
 
-  /* ===== Perzistence nastavení ===== */
-  useEffect(() => {
-    localStorage.setItem("name", name);
-  }, [name]);
-  useEffect(() => {
-    localStorage.setItem("soundEnabled", String(soundEnabled));
-  }, [soundEnabled]);
-  useEffect(() => {
-    localStorage.setItem("showOffline", String(showOffline));
-  }, [showOffline]);
-  useEffect(() => {
-    localStorage.setItem("photoURL", photoURL || "");
-  }, [photoURL]);
-  useEffect(() => {
-    localStorage.setItem("photos", JSON.stringify(photos || []));
-  }, [photos]);
+  /* ===== Perzistence ===== */
+  useEffect(() => localStorage.setItem("name", name), [name]);
+  useEffect(() => localStorage.setItem("soundEnabled", String(soundEnabled)), [soundEnabled]);
+  useEffect(() => localStorage.setItem("showOffline", String(showOffline)), [showOffline]);
+  useEffect(() => localStorage.setItem("photoURL", photoURL || ""), [photoURL]);
+  useEffect(() => localStorage.setItem("photos", JSON.stringify(photos || [])), [photos]);
 
-  /* ===== Uploady (s procenty) ===== */
+  /* ===== Uploady (bez komprese, s jasnou chybou) ===== */
   function attachProgress(task, label) {
     setUploading(true);
     setUploadPct(0);
     setUploadLabel(label);
+    setLastUploadError("");
 
     task.on(
       "state_changed",
@@ -333,8 +280,9 @@ export default function App() {
         setUploadPct(pct);
       },
       (err) => {
-        console.error(err);
-        alert("Nahrávání selhalo. Zkus menší fotku nebo to zopakuj.");
+        console.error("UPLOAD ERROR", err);
+        setLastUploadError(`${err.code || "error"}: ${err.message || ""}`);
+        alert(`Nahrávání selhalo: ${err.code || ""}\n${err.message || ""}`);
         setUploading(false);
         setUploadPct(0);
         setUploadLabel("");
@@ -345,33 +293,26 @@ export default function App() {
   async function uploadMainPhoto(file) {
     if (!file) return;
     if (!uid) {
-      setPendingMain(file);
-      alert("Chvilku… přihlašuju a pak fotku nahraju.");
+      alert("Přihlašuju… zkus znovu za vteřinu.");
       return;
     }
     try {
-      const blob = (await downscaleImage(file, 800, 0.85)) || file;
       const path = `avatars/${uid}.jpg`;
-      const task = uploadBytesResumable(sref(storage, path), blob, {
-        contentType: "image/jpeg",
-      });
+      const task = uploadBytesResumable(sref(storage, path), file);
       attachProgress(task, "profil");
       await task;
       const url = await getDownloadURL(sref(storage, path));
       setPhotoURL(url);
       await update(dbref(db, `users/${uid}`), { photoURL: url });
-
-      // pokud galerie prázdná, doplníme ji touto fotkou
       if (!photos || photos.length === 0) {
         const next = [url];
         setPhotos(next);
         await update(dbref(db, `users/${uid}`), { photos: next });
       }
-
       alert("📸 Profilová fotka nahrána");
     } catch (e) {
       console.error(e);
-      alert("Nahrávání selhalo. Zkus menší fotku nebo to zopakuj.");
+      alert(`Nahrávání selhalo: ${e.code || ""}\n${e.message || ""}`);
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -382,21 +323,17 @@ export default function App() {
   async function uploadGalleryPhoto(file) {
     if (!file) return;
     if (!uid) {
-      setPendingGallery(file);
-      alert("Chvilku… přihlašuju a pak fotku nahraju.");
+      alert("Přihlašuju… zkus znovu za vteřinu.");
       return;
     }
     if ((photos?.length || 0) >= 8) {
-      alert("Maximálně 8 fotek v galerii.");
+      alert("Max 8 fotek v galerii.");
       return;
     }
     try {
-      const blob = (await downscaleImage(file, 800, 0.85)) || file;
       const filename = `${uid}-${now()}.jpg`;
       const path = `gallery/${uid}/${filename}`;
-      const task = uploadBytesResumable(sref(storage, path), blob, {
-        contentType: "image/jpeg",
-      });
+      const task = uploadBytesResumable(sref(storage, path), file);
       attachProgress(task, "galerie");
       await task;
       const url = await getDownloadURL(sref(storage, path));
@@ -406,7 +343,7 @@ export default function App() {
       alert("🖼️ Fotka přidána do galerie");
     } catch (e) {
       console.error(e);
-      alert("Nahrávání selhalo. Zkus menší fotku nebo to zopakuj.");
+      alert(`Nahrávání selhalo: ${e.code || ""}\n${e.message || ""}`);
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -414,23 +351,35 @@ export default function App() {
     }
   }
 
-  // dožene čekající uploady, jakmile máme uid
-  useEffect(() => {
+  /* ===== Debug akce ===== */
+  async function debugWriteTinyFile() {
+    if (!uid) return alert("UID zatím není.");
+    try {
+      const blob = new Blob([new Uint8Array([1])], { type: "application/octet-stream" });
+      const path = `diagnostics/${uid}-${Date.now()}.bin`;
+      const task = uploadBytesResumable(sref(storage, path), blob);
+      attachProgress(task, "diagnostic");
+      await task;
+      setUploading(false);
+      setUploadPct(100);
+      alert("✅ Storage zápis OK (diagnostics).");
+    } catch (e) {
+      console.error(e);
+      alert(`❌ Storage zápis FAIL: ${e.code || ""}\n${e.message || ""}`);
+    } finally {
+      setUploadLabel("");
+      setUploadPct(0);
+    }
+  }
+
+  async function clearMyGhost() {
     if (!uid) return;
-    (async () => {
-      if (pendingMain) {
-        const f = pendingMain;
-        setPendingMain(null);
-        await uploadMainPhoto(f);
-      }
-      if (pendingGallery) {
-        const f = pendingGallery;
-        setPendingGallery(null);
-        await uploadGalleryPhoto(f);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid]);
+    const meRef = dbref(db, `users/${uid}`);
+    await update(meRef, { online: false, lastActive: now() });
+    await new Promise((r) => setTimeout(r, 300));
+    await update(meRef, { online: true, lastActive: now() });
+    alert("🧹 Zkuste znovu přepnout zobrazení offline—ghost by měl zmizet.");
+  }
 
   /* ===== UI ===== */
   const SettingRow = ({ children }) => (
@@ -442,7 +391,7 @@ export default function App() {
       {/* MAPA */}
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {/* FAB – Chat (placeholder) */}
+      {/* FAB – Chat placeholder */}
       <button
         onClick={() => alert("Chaty – zatím žádné konverzace.")}
         style={{
@@ -484,7 +433,7 @@ export default function App() {
         ⚙️
       </button>
 
-      {/* Nastavení – mobilní „sheet“ */}
+      {/* Nastavení – mobilní sheet */}
       {settingsOpen && (
         <div
           style={{
@@ -515,6 +464,11 @@ export default function App() {
             >
               Zavřít
             </button>
+          </div>
+
+          {/* Debug info řádek */}
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
+            UID: {uid || "—"} • proto: {typeof window !== "undefined" ? window.location.protocol : "—"} • audio: {unlockedRef.current ? "odemyklé" : "zamknuté"}
           </div>
 
           <SettingRow>
@@ -573,20 +527,11 @@ export default function App() {
 
               <button
                 onClick={async () => {
-                  await ensureAudioUnlocked();
                   try {
-                    if (!testSoundRef.current) {
-                      testSoundRef.current = new Audio(
-                        "https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3"
-                      );
-                    }
-                    await testSoundRef.current.play();
+                    await ensure(); // odemknout
+                    await beep(160, 880); // píp
                   } catch {
-                    try {
-                      await testSoundRef.current.play();
-                    } catch {
-                      alert("Klepni ještě jednou, prohlížeč to nepustil.");
-                    }
+                    alert("Klepni ještě jednou, prohlížeč to nepustil.");
                   }
                 }}
                 style={{
@@ -631,9 +576,7 @@ export default function App() {
               }}
             >
               <span>Galerie (max 8)</span>
-              <span style={{ color: "#9ca3af" }}>
-                {(photos?.length || 0)}/8
-              </span>
+              <span style={{ color: "#9ca3af" }}>{(photos?.length || 0)}/8</span>
             </div>
             <input
               type="file"
@@ -643,6 +586,11 @@ export default function App() {
             {uploading && uploadLabel === "galerie" && (
               <div style={{ marginTop: 6, color: "#6b7280" }}>
                 Nahrávám… {uploadPct}%
+              </div>
+            )}
+            {!!lastUploadError && (
+              <div style={{ marginTop: 6, color: "#ef4444", fontSize: 12 }}>
+                {lastUploadError}
               </div>
             )}
             <div
@@ -671,14 +619,7 @@ export default function App() {
           </SettingRow>
 
           <SettingRow>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                userSelect: "none",
-              }}
-            >
+            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <input
                 type="checkbox"
                 checked={showOffline}
@@ -687,6 +628,41 @@ export default function App() {
               Zobrazit offline uživatele (šedě)
             </label>
           </SettingRow>
+
+          {/* DEBUG TOOLS */}
+          <div style={{ marginTop: 16, paddingTop: 10, borderTop: "1px solid #e5e7eb" }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>🔧 Debug</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={debugWriteTinyFile}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                }}
+              >
+                Test Storage zápisu
+              </button>
+              <button
+                onClick={clearMyGhost}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                }}
+              >
+                Vyčistit můj starý marker
+              </button>
+            </div>
+
+            {uploading && uploadLabel === "diagnostic" && (
+              <div style={{ marginTop: 6, color: "#6b7280" }}>
+                Diagnostický upload… {uploadPct}%
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
