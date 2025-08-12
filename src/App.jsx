@@ -64,20 +64,36 @@ async function downscaleImage(file, maxWidth = 800, quality = 0.85) {
       img.onerror = rej;
       img.src = data;
     });
-    const scale = Math.min(1, maxWidth / img.width);
-    const w = Math.round(img.width * scale);
-    const h = Math.round(img.height * scale);
+
+    const scale = Math.min(1, maxWidth / (img.width || maxWidth));
+    const w = Math.max(1, Math.round((img.width || maxWidth) * scale));
+    const h = Math.max(1, Math.round((img.height || maxWidth) * scale));
+
     const c = document.createElement("canvas");
     c.width = w;
     c.height = h;
     const ctx = c.getContext("2d");
     ctx.drawImage(img, 0, 0, w, h);
-    const blob = await new Promise((res) =>
-      c.toBlob(res, "image/jpeg", quality)
-    );
+
+    // Fallback pro prohlížeče bez toBlob (nebo když vrátí null)
+    const blob = await new Promise((resolve) => {
+      if (c.toBlob) {
+        c.toBlob((b) => resolve(b || null), "image/jpeg", quality);
+      } else {
+        const dataURL = c.toDataURL("image/jpeg", quality);
+        const byteString = atob(dataURL.split(",")[1]);
+        const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+        resolve(new Blob([ab], { type: mimeString }));
+      }
+    });
+
     return blob;
-  } catch {
-    return null;
+  } catch (e) {
+    console.warn("downscaleImage failed, using original file", e);
+    return null; // volající použije původní soubor
   }
 }
 
@@ -110,6 +126,24 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploadLabel, setUploadLabel] = useState(""); // "profil" | "galerie"
+
+  // audio odemčení
+  const audioUnlockedRef = useRef(false);
+  const testSoundRef = useRef(null);
+  async function ensureAudioUnlocked() {
+    const silentDataUri =
+      "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+    return new Promise((resolve) => {
+      if (audioUnlockedRef.current) return resolve(true);
+      const a = new Audio(silentDataUri);
+      a.play()
+        .then(() => {
+          audioUnlockedRef.current = true;
+          resolve(true);
+        })
+        .catch(() => resolve(false));
+    });
+  }
 
   /* ===== AUTH ===== */
   useEffect(() => {
@@ -538,17 +572,21 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => {
+                onClick={async () => {
+                  await ensureAudioUnlocked();
                   try {
-                    const a = new Audio(
-                      "https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3"
-                    );
-                    // tohle běží na „click“, takže by to mělo projít autoplay policy
-                    a.play().catch(() =>
-                      alert("Klepni ještě jednou, prohlížeč to nepustil.")
-                    );
+                    if (!testSoundRef.current) {
+                      testSoundRef.current = new Audio(
+                        "https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3"
+                      );
+                    }
+                    await testSoundRef.current.play();
                   } catch {
-                    alert("Klepni ještě jednou, prohlížeč to nepustil.");
+                    try {
+                      await testSoundRef.current.play();
+                    } catch {
+                      alert("Klepni ještě jednou, prohlížeč to nepustil.");
+                    }
                   }
                 }}
                 style={{
