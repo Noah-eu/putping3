@@ -1,4 +1,4 @@
-// App.jsx – dočasná testovací stránka pro upload fotky na Firebase Storage
+// App.jsx – test upload fotky + přihlášení s retry + galerie i foťák
 import React, { useEffect, useState } from "react";
 import { auth, db, storage } from "./firebase";
 
@@ -7,7 +7,6 @@ import { ref as dbref, set } from "firebase/database";
 import { ref as sref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function App() {
-  // ===== STATE =====
   const [uid, setUid] = useState(localStorage.getItem("uid") || "");
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
@@ -23,11 +22,21 @@ export default function App() {
       }
     });
 
-    if (!auth.currentUser) {
-      signInAnonymously(auth).catch((e) => {
-        alert("Chyba při anonymním přihlášení: " + (e?.message || e));
-      });
-    }
+    const signInAnonWithRetry = async (attempt = 1) => {
+      if (auth.currentUser?.uid) return; // už přihlášen
+      try {
+        await signInAnonymously(auth);
+      } catch (e) {
+        if (e?.code === "auth/network-request-failed" && attempt < 4) {
+          // retry po 1s, 2s, 4s
+          setTimeout(() => signInAnonWithRetry(attempt + 1), 1000 * Math.pow(2, attempt - 1));
+        } else {
+          setUploadErr(`Auth error: ${e?.code || e?.message || e}`);
+        }
+      }
+    };
+
+    signInAnonWithRetry();
     return () => unsub();
   }, []);
 
@@ -95,7 +104,6 @@ export default function App() {
     }
   };
 
-  // ===== UI =====
   return (
     <div style={{
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
@@ -122,7 +130,6 @@ export default function App() {
             accept="image/*"
             onChange={onPickPhoto}
             style={{ display: "none" }}
-            capture="environment"
           />
         </label>
         <button
