@@ -29,11 +29,11 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-/* ===== Mapbox token (tvůj) ===== */
+/* ===== Mapbox ===== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
-/* ===== Firebase config (tvůj) ===== */
+/* ===== Firebase config ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
@@ -53,7 +53,7 @@ const storage = getStorage(app);
 
 const now = () => Date.now();
 
-/** Downscale obrázku (JPEG) pro rychlejší upload */
+/* --- Zmenšení obrázku --- */
 async function downscaleImage(file, maxWidth = 800, quality = 0.85) {
   try {
     const img = document.createElement("img");
@@ -85,25 +85,67 @@ async function downscaleImage(file, maxWidth = 800, quality = 0.85) {
   }
 }
 
-/** Promise wrapper pro uploadBytesResumable + průběh */
-function waitUpload(task, onProgress) {
+/* --- Pomocný wrapper s time-outem --- */
+function waitUploadWithTimeout(task, onProgress, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
+    let lastPct = 0;
+    let finished = false;
+
+    const timer = setTimeout(() => {
+      if (finished) return;
+      try {
+        task.cancel(); // zruší přenos
+      } catch {}
+      reject(new Error("timeout/no-progress"));
+    }, timeoutMs);
+
     task.on(
       "state_changed",
       (snap) => {
-        const pct = Math.round(
-          (snap.bytesTransferred / snap.totalBytes) * 100
-        );
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        lastPct = pct;
         onProgress?.(pct);
       },
-      (err) => reject(err),
-      () => resolve(task.snapshot)
+      (err) => {
+        clearTimeout(timer);
+        if (!finished) reject(err);
+      },
+      () => {
+        finished = true;
+        clearTimeout(timer);
+        resolve(task.snapshot);
+      }
     );
   });
 }
 
+/* --- WebAudio „beep“ (spolehlivý test zvuku) --- */
+function playBeep() {
+  try {
+    const AudioCtx =
+      window.AudioContext || window.webkitAudioContext || null;
+    if (!AudioCtx) throw new Error("no-audiocontext");
+    const ctx = new AudioCtx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.value = 880; // A5
+    g.gain.value = 0.001; // velmi potichu, ale slyšitelné
+    o.start();
+    setTimeout(() => {
+      o.stop();
+      ctx.close();
+    }, 180);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
-  // ===== STATE
+  /* STATE */
   const [uid, setUid] = useState(localStorage.getItem("uid") || null);
   const [name, setName] = useState(localStorage.getItem("name") || "Anonym");
   const [soundEnabled, setSoundEnabled] = useState(
@@ -113,26 +155,24 @@ export default function App() {
     localStorage.getItem("showOffline") !== "false"
   );
 
-  const [photoURL, setPhotoURL] = useState(
-    localStorage.getItem("photoURL") || ""
-  );
+  const [photoURL, setPhotoURL] = useState(localStorage.getItem("photoURL") || "");
   const [photos, setPhotos] = useState(
     JSON.parse(localStorage.getItem("photos") || "[]")
-  ); // galerie (max 8)
+  );
 
   const [map, setMap] = useState(null);
   const meMarker = useRef(null);
-  const others = useRef({}); // id -> marker
+  const others = useRef({});
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Upload fronta a stav
+  // upload stav
   const [pendingMain, setPendingMain] = useState(null);
   const [pendingGallery, setPendingGallery] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [uploadLabel, setUploadLabel] = useState(""); // "profil" | "galerie"
+  const [uploadLabel, setUploadLabel] = useState("");
 
-  // ===== AUTH
+  /* AUTH */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -146,7 +186,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ===== MAPA
+  /* MAPA */
   useEffect(() => {
     if (map) return;
     if (!navigator.geolocation) return;
@@ -173,7 +213,7 @@ export default function App() {
     );
   }, [map]);
 
-  // ===== Moje pozice + marker + heartbeat
+  /* MOJE POZICE + HEARTBEAT */
   useEffect(() => {
     if (!uid || !map) return;
 
@@ -223,23 +263,22 @@ export default function App() {
         () => {},
         { enableHighAccuracy: true }
       );
-    }, 20_000);
+    }, 20000);
 
     return () => clearInterval(id);
   }, [uid, map, name, photoURL, JSON.stringify(photos)]);
 
-  // ===== Ostatní uživatelé
+  /* OSTATNÍ UŽIVATELÉ */
   useEffect(() => {
     if (!map) return;
     const usersRef = dbref(db, "users");
     return onValue(usersRef, (snap) => {
       const data = snap.val() || {};
-
       Object.entries(data).forEach(([id, u]) => {
         if (!u || !u.lat || !u.lng) return;
         if (id === uid) return;
 
-        const isOnline = !!u.online && now() - (u.lastActive || 0) < 90_000;
+        const isOnline = !!u.online && now() - (u.lastActive || 0) < 90000;
 
         if (!isOnline && !showOffline) {
           if (others.current[id]) {
@@ -280,24 +319,26 @@ export default function App() {
     });
   }, [map, uid, showOffline]);
 
-  // ===== Perzistence nastavení
-  useEffect(() => {
-    localStorage.setItem("name", name);
-  }, [name]);
-  useEffect(() => {
-    localStorage.setItem("soundEnabled", String(soundEnabled));
-  }, [soundEnabled]);
-  useEffect(() => {
-    localStorage.setItem("showOffline", String(showOffline));
-  }, [showOffline]);
-  useEffect(() => {
-    localStorage.setItem("photoURL", photoURL || "");
-  }, [photoURL]);
-  useEffect(() => {
-    localStorage.setItem("photos", JSON.stringify(photos || []));
-  }, [photos]);
+  /* PERSISTENCE */
+  useEffect(() => localStorage.setItem("name", name), [name]);
+  useEffect(
+    () => localStorage.setItem("soundEnabled", String(soundEnabled)),
+    [soundEnabled]
+  );
+  useEffect(
+    () => localStorage.setItem("showOffline", String(showOffline)),
+    [showOffline]
+  );
+  useEffect(
+    () => localStorage.setItem("photoURL", photoURL || ""),
+    [photoURL]
+  );
+  useEffect(
+    () => localStorage.setItem("photos", JSON.stringify(photos || [])),
+    [photos]
+  );
 
-  // ===== Uploady
+  /* UPLOADY */
   async function uploadMainPhoto(file) {
     if (!file) return;
     if (!uid) {
@@ -316,7 +357,7 @@ export default function App() {
         contentType: "image/jpeg",
       });
 
-      await waitUpload(task, setUploadPct);
+      await waitUploadWithTimeout(task, setUploadPct, 20000);
       const url = await getDownloadURL(sref(storage, path));
       setPhotoURL(url);
       await update(dbref(db, `users/${uid}`), { photoURL: url });
@@ -360,7 +401,7 @@ export default function App() {
         contentType: "image/jpeg",
       });
 
-      await waitUpload(task, setUploadPct);
+      await waitUploadWithTimeout(task, setUploadPct, 20000);
       const url = await getDownloadURL(sref(storage, path));
       const next = [...(photos || []), url].slice(0, 8);
       setPhotos(next);
@@ -376,7 +417,7 @@ export default function App() {
     }
   }
 
-  // Dožene čekající uploady po přihlášení
+  // Dožene čekající uploady
   useEffect(() => {
     if (!uid) return;
     (async () => {
@@ -394,8 +435,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // ===== Utilities – „duchové“ / staré markery
-  async function clearMyOldGhosts() {
+  /* Duchové – tvrdé čištění duplicit podle jména */
+  async function clearMyDuplicates() {
     try {
       if (!name) {
         alert("Nejdřív zadej své jméno.");
@@ -404,42 +445,35 @@ export default function App() {
       const q = query(dbref(db, "users"), orderByChild("name"), equalTo(name));
       const snap = await get(q);
       if (!snap.exists()) {
-        alert("Nenašel jsem žádné staré záznamy.");
+        alert("Nenašel jsem žádné záznamy pro toto jméno.");
         return;
       }
       const tasks = [];
       snap.forEach((child) => {
-        const u = child.val();
-        const isMe = child.key === uid;
-        const offline =
-          !u?.online || now() - (u?.lastActive || 0) > 24 * 60 * 60 * 1000;
-        if (!isMe && offline) {
+        if (child.key !== uid) {
           tasks.push(remove(dbref(db, `users/${child.key}`)));
         }
       });
       await Promise.all(tasks);
-      alert("Staré záznamy smazány.");
+      alert("Duplicity smazány (ponechán jen aktuální záznam).");
     } catch (e) {
       console.error(e);
       alert(`Mazání selhalo: ${e.code || e.message}`);
     }
   }
 
-  // ===== UI
+  /* UI */
   const SettingRow = ({ children }) => (
     <div style={{ marginBottom: 14 }}>{children}</div>
   );
 
-  const proto =
-    (window.location.protocol || "").replace(":", "") || "unknown";
-  const audioUnlocked = soundEnabled ? "odemýklé" : "zamčené";
+  const proto = (window.location.protocol || "").replace(":", "") || "unknown";
 
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-      {/* MAPA */}
       <div id="map" style={{ width: "100%", height: "100%" }} />
 
-      {/* FAB – Chat (placeholder) */}
+      {/* FAB Chat (placeholder) */}
       <button
         onClick={() => alert("Chaty – zatím žádné konverzace.")}
         style={{
@@ -460,7 +494,7 @@ export default function App() {
         💬
       </button>
 
-      {/* FAB – Nastavení */}
+      {/* FAB Nastavení */}
       <button
         onClick={() => setSettingsOpen(true)}
         style={{
@@ -481,7 +515,7 @@ export default function App() {
         ⚙️
       </button>
 
-      {/* Nastavení – mobilní sheet */}
+      {/* Sheet Nastavení */}
       {settingsOpen && (
         <div
           style={{
@@ -517,7 +551,7 @@ export default function App() {
           </div>
 
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>
-            UID: {uid || "…" } • proto: {proto} • audio: {audioUnlocked}
+            UID: {uid || "…"} • proto: {proto}
           </div>
 
           <SettingRow>
@@ -575,16 +609,9 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  try {
-                    const a = new Audio(
-                      "https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3"
-                    );
-                    a.play().catch(() =>
-                      alert("Klepni ještě jednou, prohlížeč to nepustil.")
-                    );
-                  } catch {
-                    alert("Klepni ještě jednou, prohlížeč to nepustil.");
-                  }
+                  // WebAudio pípnutí – spolehlivý test
+                  const ok = playBeep();
+                  if (!ok) alert("Klepni ještě jednou, prohlížeč to nepustil.");
                 }}
                 style={{
                   height: 46,
@@ -628,9 +655,7 @@ export default function App() {
               }}
             >
               <span>Galerie (max 8)</span>
-              <span style={{ color: "#9ca3af" }}>
-                {(photos?.length || 0)}/8
-              </span>
+              <span style={{ color: "#9ca3af" }}>{(photos?.length || 0)}/8</span>
             </div>
             <input
               type="file"
@@ -685,7 +710,7 @@ export default function App() {
             </label>
           </SettingRow>
 
-          {/* Debug sekce */}
+          {/* Debug */}
           <div
             style={{
               marginTop: 12,
@@ -701,19 +726,22 @@ export default function App() {
                 onClick={async () => {
                   try {
                     const dummy = new Blob(["hello"], { type: "text/plain" });
-                    const task = uploadBytesResumable(
-                      sref(storage, `diagnostic/${uid || "anon"}-${now()}.txt`),
-                      dummy
-                    );
+                    const path = `diagnostic/${uid || "anon"}-${now()}.txt`;
+                    const task = uploadBytesResumable(sref(storage, path), dummy, {
+                      contentType: "text/plain",
+                    });
                     setUploading(true);
                     setUploadLabel("diagnostic");
                     setUploadPct(0);
-                    await waitUpload(task, setUploadPct);
+                    await waitUploadWithTimeout(task, setUploadPct, 20000);
                     setUploading(false);
                     setUploadLabel("");
                     setUploadPct(0);
                     alert("Diagnostic: OK (zápis do Storage funguje)");
                   } catch (e) {
+                    setUploading(false);
+                    setUploadLabel("");
+                    setUploadPct(0);
                     alert(`Diagnostic failed: ${e.code || e.message}`);
                   }
                 }}
@@ -728,7 +756,7 @@ export default function App() {
               </button>
 
               <button
-                onClick={clearMyOldGhosts}
+                onClick={clearMyDuplicates}
                 style={{
                   padding: "10px 14px",
                   borderRadius: 10,
@@ -736,7 +764,7 @@ export default function App() {
                   background: "white",
                 }}
               >
-                Vyčistit můj starý marker
+                Vyčistit mé duplicity (stejné jméno)
               </button>
             </div>
             {uploadLabel === "diagnostic" && (
