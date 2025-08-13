@@ -1,335 +1,166 @@
-// App.jsx – finální verze pro mobily s FAB, galerií, pingem, chatem a swipe náhledem
-
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-} from "firebase/auth";
-import {
-  getDatabase,
-  ref,
-  set,
-  update,
-  onValue,
-  remove,
-  push,
-  serverTimestamp,
-} from "firebase/database";
-import {
-  getStorage,
-  ref as sref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-
-import "swiper/css";
+import { getDatabase, ref, set, onValue } from "firebase/database";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "./App.css";
 
-/* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
-  databaseURL:
-    "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.firebasestorage.app",
+  storageBucket: "putping-dc57e.appspot.com",
   messagingSenderId: "244045363394",
-  appId: "1:244045363394:web:64e930bff17a816549635b",
-  measurementId: "G-RLMGM46M6X",
+  appId: "1:244045363394:web:64e93b0ff17a816549635b",
+  measurementId: "G-RL6MGM46M6X"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
-const storage = getStorage(app);
-
-/* Mapbox */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
-function pairIdOf(a, b) {
-  return a < b ? `${a}_${b}` : `${b}_${a}`;
-}
-
-async function compressImage(file, maxDim = 800, quality = 0.8) {
-  const img = await new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = reject;
-    i.src = URL.createObjectURL(file);
-  });
-  const ratio = Math.min(maxDim / Math.max(img.width, img.height), 1);
-  const canvas = document.createElement("canvas");
-  canvas.width = img.width * ratio;
-  canvas.height = img.height * ratio;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return await new Promise((res) =>
-    canvas.toBlob((b) => res(b), "image/jpeg", quality)
-  );
-}
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
 export default function App() {
   const [map, setMap] = useState(null);
-  const [me, setMe] = useState(null);
-  const [users, setUsers] = useState({});
-  const [galleries, setGalleries] = useState({});
-  const [soundEnabled, setSoundEnabled] = useState(
-    localStorage.getItem("soundEnabled") === "1"
-  );
-  const [chatList, setChatList] = useState([]);
-  const [openChatWith, setOpenChatWith] = useState(null);
-  const [chatMsgs, setChatMsgs] = useState([]);
-  const [chatText, setChatText] = useState("");
-  const [galleryView, setGalleryView] = useState(null);
-  const [fabOpen, setFabOpen] = useState(false);
-  const markers = useRef({});
-  const pingSound = useRef(
-    new Audio(
-      "https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b831a2f36.mp3?filename=notification-113724.mp3"
-    )
-  );
+  const [photos, setPhotos] = useState([]);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      let u = user;
-      if (!u) {
-        const cred = await signInAnonymously(auth);
-        u = cred.user;
-      }
-      setMe({ uid: u.uid, name: "Anonym" });
-      const meRef = ref(db, `users/${u.uid}`);
-      update(meRef, { lastActive: Date.now(), online: true });
-
-      if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-          (pos) => {
-            update(meRef, {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              lastActive: Date.now(),
-              online: true,
-            });
-          },
-          () => {},
-          { enableHighAccuracy: true }
-        );
-      }
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (map || !me) return;
+    signInAnonymously(auth);
     const m = new mapboxgl.Map({
       container: "map",
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [14.42, 50.088],
-      zoom: 13,
+      style: "mapbox://styles/mapbox/streets-v11",
+      center: [14.42076, 50.08804],
+      zoom: 12
     });
     setMap(m);
-    return () => m.remove();
-  }, [me]);
+  }, []);
 
-  useEffect(() => {
-    if (!map || !me) return;
-    const usersRef = ref(db, "users");
-    const unsub = onValue(usersRef, (snap) => {
-      const data = snap.val() || {};
-      setUsers(data);
-
-      Object.entries(data).forEach(([uid, u]) => {
-        if (!u.lat || !u.lng) return;
-        const photo = u.photoURL;
-        const el = document.createElement("div");
-        el.style.width = "40px";
-        el.style.height = "40px";
-        el.style.borderRadius = "50%";
-        el.style.overflow = "hidden";
-        el.style.border = "2px solid white";
-        el.style.backgroundSize = "cover";
-        el.style.backgroundPosition = "center";
-        el.style.backgroundImage = `url(${photo || ""})`;
-
-        if (!markers.current[uid]) {
-          const mk = new mapboxgl.Marker(el)
-            .setLngLat([u.lng, u.lat])
-            .addTo(map);
-          el.addEventListener("click", () => setGalleryView(uid));
-          markers.current[uid] = mk;
-        } else {
-          markers.current[uid].setLngLat([u.lng, u.lat]);
-        }
-      });
-
-      Object.keys(markers.current).forEach((uid) => {
-        if (!data[uid]) {
-          markers.current[uid].remove();
-          delete markers.current[uid];
-        }
-      });
-    });
-    return () => unsub();
-  }, [map, me]);
-
-  useEffect(() => {
-    if (!me) return;
-    const refGal = ref(db, "galleries");
-    return onValue(refGal, (snap) => {
-      setGalleries(snap.val() || {});
-    });
-  }, [me]);
-
-  const uploadPhoto = async (type) => {
+  const uploadPhoto = (isProfile) => {
     const fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = "image/*";
-    fileInput.onchange = async (e) => {
+    fileInput.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const small = await compressImage(file);
-      const path =
-        type === "profile"
-          ? `avatars/${me.uid}.jpg`
-          : `galleries/${me.uid}/${Date.now()}.jpg`;
-      const dest = sref(storage, path);
-      await uploadBytes(dest, small);
-      const url = await getDownloadURL(dest);
-      if (type === "profile") {
-        await update(ref(db, `users/${me.uid}`), { photoURL: url });
-      } else {
-        await push(ref(db, `galleries/${me.uid}`), { url });
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (isProfile) {
+          setProfilePhoto(reader.result);
+        }
+        setPhotos((prev) => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
     };
     fileInput.click();
   };
 
-  const sendPing = async (toUid) => {
-    await set(ref(db, `pings/${toUid}/${me.uid}`), { time: serverTimestamp() });
-    if (soundEnabled) {
-      pingSound.current.currentTime = 0;
-      pingSound.current.play();
+  const markerClick = () => {
+    if (photos.length > 0) {
+      setShowGallery(true);
     }
   };
 
-  const openChat = (uid) => {
-    setOpenChatWith(uid);
-    const pid = pairIdOf(me.uid, uid);
-    const msgsRef = ref(db, `messages/${pid}`);
-    onValue(msgsRef, (snap) => {
-      const arr = Object.entries(snap.val() || {}).map(([id, m]) => ({
-        id,
-        ...m,
-      }));
-      arr.sort((a, b) => a.time - b.time);
-      setChatMsgs(arr);
-    });
-  };
-
-  const sendMessage = async () => {
-    if (!chatText.trim()) return;
-    const pid = pairIdOf(me.uid, openChatWith);
-    await push(ref(db, `messages/${pid}`), {
-      from: me.uid,
-      text: chatText.trim(),
-      time: Date.now(),
-    });
-    setChatText("");
-  };
-
   return (
-    <div>
-      <div id="map" style={{ width: "100vw", height: "100vh" }}></div>
+    <div style={{ height: "100vh", width: "100vw" }}>
+      <div id="map" style={{ height: "100%", width: "100%" }}></div>
 
-      {fabOpen && (
-        <div style={{ position: "absolute", bottom: 80, right: 20, zIndex: 10 }}>
-          <button onClick={() => uploadPhoto("profile")}>📷 Profil</button>
-          <button onClick={() => uploadPhoto("gallery")}>🖼 Galerie</button>
-        </div>
-      )}
+      {map &&
+        profilePhoto &&
+        new mapboxgl.Marker({
+          element: (() => {
+            const el = document.createElement("img");
+            el.src = profilePhoto;
+            el.style.width = "50px";
+            el.style.height = "50px";
+            el.style.borderRadius = "50%";
+            el.style.cursor = "pointer";
+            el.onclick = markerClick;
+            return el;
+          })()
+        })
+          .setLngLat([14.42076, 50.08804])
+          .addTo(map)}
 
-      <button
-        onClick={() => setFabOpen((p) => !p)}
+      {/* FAB */}
+      <div
         style={{
           position: "absolute",
-          bottom: 20,
-          right: 20,
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          background: "#147af3",
-          color: "white",
-          fontSize: 24,
-          zIndex: 10,
+          bottom: "20px",
+          right: "20px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px"
         }}
       >
-        ＋
-      </button>
-
-      {galleryView && (
-        <div
+        <button
           style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "50%",
-            background: "#000",
-            zIndex: 20,
+            width: "60px",
+            height: "60px",
+            borderRadius: "50%",
+            background: "#1976d2",
+            color: "white",
+            border: "none",
+            fontSize: "24px"
           }}
+          onClick={() => uploadPhoto(true)}
         >
-          <Swiper>
-            {galleries[galleryView] &&
-              Object.values(galleries[galleryView]).map((p, i) => (
-                <SwiperSlide key={i}>
-                  <img
-                    src={p.url}
-                    style={{
-                      width: 200,
-                      height: 200,
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      margin: "auto",
-                      marginTop: 20,
-                    }}
-                  />
-                </SwiperSlide>
-              ))}
-          </Swiper>
-          <button onClick={() => setGalleryView(null)}>Zavřít</button>
-        </div>
-      )}
+          📷
+        </button>
+        <button
+          style={{
+            width: "60px",
+            height: "60px",
+            borderRadius: "50%",
+            background: "#4caf50",
+            color: "white",
+            border: "none",
+            fontSize: "24px"
+          }}
+          onClick={() => uploadPhoto(false)}
+        >
+          ➕
+        </button>
+      </div>
 
-      {openChatWith && (
+      {/* Gallery */}
+      {showGallery && (
         <div
           style={{
-            position: "absolute",
+            position: "fixed",
             top: 0,
-            bottom: 0,
             left: 0,
-            right: 0,
-            background: "#fff",
-            zIndex: 30,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.9)",
             display: "flex",
-            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column"
           }}
+          onClick={() => setShowGallery(false)}
         >
-          <button onClick={() => setOpenChatWith(null)}>✖</button>
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            {chatMsgs.map((m) => (
-              <div key={m.id}>{m.text}</div>
+          <Swiper spaceBetween={10} slidesPerView={1}>
+            {photos.map((src, idx) => (
+              <SwiperSlide key={idx}>
+                <img
+                  src={src}
+                  alt=""
+                  style={{
+                    borderRadius: "50%",
+                    width: "70vw",
+                    height: "70vw",
+                    objectFit: "cover"
+                  }}
+                />
+              </SwiperSlide>
             ))}
-          </div>
-          <div style={{ display: "flex" }}>
-            <input
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value)}
-            />
-            <button onClick={sendMessage}>➤</button>
-          </div>
+          </Swiper>
         </div>
       )}
     </div>
