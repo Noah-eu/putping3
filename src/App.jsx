@@ -1,10 +1,11 @@
+// App.jsx – finální mobilní verze PutPing
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
   signInAnonymously,
-  onAuthStateChanged,
+  onAuthStateChanged
 } from "firebase/auth";
 import {
   getDatabase,
@@ -14,17 +15,18 @@ import {
   onValue,
   remove,
   push,
-  serverTimestamp,
+  serverTimestamp
 } from "firebase/database";
 import {
   getStorage,
   ref as sref,
   uploadBytes,
-  getDownloadURL,
+  getDownloadURL
 } from "firebase/storage";
-import { useSwipeable } from "react-swipeable";
+import "swiper/css";
+import { Swiper, SwiperSlide } from "swiper/react";
 
-/* ───────── Firebase ───────── */
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
@@ -36,63 +38,33 @@ const firebaseConfig = {
   appId: "1:244045363394:web:64e930bff17a816549635b",
   measurementId: "G-RLMGM46M6X",
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-mapboxgl.accessToken =
-  "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
+// Mapbox token
+mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
-/* ───────── Helpers ───────── */
 function pairIdOf(a, b) {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
 }
 
-async function compressImage(file, maxDim = 800, quality = 0.8) {
-  const img = await new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = reject;
-    i.src = URL.createObjectURL(file);
-  });
-
-  const { width, height } = img;
-  const ratio = Math.min(maxDim / Math.max(width, height), 1);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(width * ratio);
-  canvas.height = Math.round(height * ratio);
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-  const blob = await new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
-  );
-  return blob;
-}
-
-/* ───────── App ───────── */
 export default function App() {
-  const [map, setMap] = useState(null);
   const [me, setMe] = useState(null);
   const [users, setUsers] = useState({});
-  const [openChatList, setOpenChatList] = useState(false);
+  const [map, setMap] = useState(null);
+  const markers = useRef({});
+  const [gallery, setGallery] = useState([]);
+  const [chatList, setChatList] = useState([]);
   const [openChatWith, setOpenChatWith] = useState(null);
   const [chatMsgs, setChatMsgs] = useState([]);
   const [chatText, setChatText] = useState("");
-  const [gallery, setGallery] = useState([]);
-  const [galleryIndex, setGalleryIndex] = useState(0);
-  const [showGallery, setShowGallery] = useState(false);
-  const markers = useRef({});
-
   const pingSound = useRef(
-    new Audio(
-      "https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b831a2f36.mp3?filename=notification-113724.mp3"
-    )
+    new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b831a2f36.mp3?filename=notification-113724.mp3")
   );
 
-  /* ── Auth ── */
+  // Auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       let u = user;
@@ -100,11 +72,10 @@ export default function App() {
         const cred = await signInAnonymously(auth);
         u = cred.user;
       }
-      const uid = u.uid;
-      setMe({ uid, name: localStorage.getItem("userName") || "Anonym" });
+      setMe({ uid: u.uid, name: localStorage.getItem("userName") || "Anonym" });
 
-      const meRef = ref(db, `users/${uid}`);
-      update(meRef, { name: "Anonym", lastActive: Date.now(), online: true });
+      const meRef = ref(db, `users/${u.uid}`);
+      update(meRef, { name: localStorage.getItem("userName") || "Anonym", online: true, lastActive: Date.now() });
 
       if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition(
@@ -113,233 +84,217 @@ export default function App() {
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
               lastActive: Date.now(),
-              online: true,
+              online: true
             });
           },
-          () => {},
-          { enableHighAccuracy: true }
+          (err) => console.warn("Geolocation error", err),
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
         );
       }
     });
     return () => unsub();
   }, []);
 
-  /* ── Map ── */
+  // Init map
   useEffect(() => {
     if (map || !me) return;
     const m = new mapboxgl.Map({
       container: "map",
       style: "mapbox://styles/mapbox/streets-v12",
       center: [14.42076, 50.08804],
-      zoom: 13,
+      zoom: 13
     });
     setMap(m);
     return () => m.remove();
   }, [me]);
 
-  /* ── Markers ── */
+  // Users
   useEffect(() => {
     if (!map || !me) return;
     const unsub = onValue(ref(db, "users"), (snap) => {
       const data = snap.val() || {};
       setUsers(data);
+
       Object.entries(data).forEach(([uid, u]) => {
         if (!u.lat || !u.lng) return;
+        const img = document.createElement("img");
+        img.src = u.photoURL || "https://via.placeholder.com/50";
+        img.style.width = "50px";
+        img.style.height = "50px";
+        img.style.borderRadius = "50%";
+        const el = document.createElement("div");
+        el.appendChild(img);
+
         if (!markers.current[uid]) {
-          const el = document.createElement("div");
-          el.style.width = "40px";
-          el.style.height = "40px";
-          el.style.borderRadius = "50%";
-          el.style.backgroundSize = "cover";
-          el.style.backgroundImage = u.photoURL
-            ? `url(${u.photoURL})`
-            : "url(https://via.placeholder.com/40)";
-          el.onclick = () => {
-            if (u.photos) {
-              setGallery(u.photos);
-              setGalleryIndex(0);
-              setShowGallery(true);
-            }
-          };
-          markers.current[uid] = new mapboxgl.Marker(el)
+          const mk = new mapboxgl.Marker({ element: el })
             .setLngLat([u.lng, u.lat])
             .addTo(map);
+          markers.current[uid] = mk;
+          el.addEventListener("click", () => openGallery(uid));
         } else {
           markers.current[uid].setLngLat([u.lng, u.lat]);
+        }
+      });
+
+      Object.keys(markers.current).forEach((uid) => {
+        if (!data[uid]) {
+          markers.current[uid].remove();
+          delete markers.current[uid];
         }
       });
     });
     return () => unsub();
   }, [map, me]);
 
-  /* ── Chat list ── */
-  const openChat = (uid) => {
-    setOpenChatWith(uid);
-    const pid = pairIdOf(me.uid, uid);
-    onValue(ref(db, `messages/${pid}`), (snap) => {
-      const msgs = Object.values(snap.val() || {}).sort((a, b) => a.time - b.time);
-      setChatMsgs(msgs);
+  // Pings
+  useEffect(() => {
+    if (!me) return;
+    const unsub = onValue(ref(db, `pings/${me.uid}`), (snap) => {
+      if (snap.val()) {
+        pingSound.current.play().catch(() => {});
+        remove(ref(db, `pings/${me.uid}`));
+      }
     });
-  };
+    return () => unsub();
+  }, [me]);
 
-  const sendMessage = () => {
-    if (!chatText.trim()) return;
-    const pid = pairIdOf(me.uid, openChatWith);
-    push(ref(db, `messages/${pid}`), {
-      from: me.uid,
-      to: openChatWith,
-      text: chatText.trim(),
-      time: Date.now(),
+  // Chat list
+  useEffect(() => {
+    if (!me) return;
+    const unsub = onValue(ref(db, "messages"), (snap) => {
+      const all = snap.val() || {};
+      const list = [];
+      Object.entries(all).forEach(([pid, msgs]) => {
+        if (pid.includes(me.uid)) {
+          const other = pid.replace(me.uid, "").replace("_", "");
+          list.push({ uid: other, lastMsg: Object.values(msgs).slice(-1)[0]?.text || "" });
+        }
+      });
+      setChatList(list);
     });
-    setChatText("");
-  };
+    return () => unsub();
+  }, [me]);
 
-  const disconnectUser = (uid) => {
-    const pid = pairIdOf(me.uid, uid);
-    remove(ref(db, `messages/${pid}`));
-  };
+  function sendPing(uid) {
+    set(ref(db, `pings/${uid}/${me.uid}`), { time: serverTimestamp() });
+  }
 
-  /* ── Photo upload ── */
-  const uploadPhoto = async (isProfile) => {
-    const picker = document.createElement("input");
-    picker.type = "file";
-    picker.accept = "image/*";
-    picker.onchange = async (e) => {
+  function openGallery(uid) {
+    const userPhotosRef = ref(db, `photos/${uid}`);
+    onValue(userPhotosRef, (snap) => {
+      const data = snap.val() || {};
+      setGallery(Object.values(data));
+    }, { onlyOnce: true });
+  }
+
+  function uploadPhoto(isProfile) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
       const file = e.target.files[0];
-      const small = await compressImage(file);
-      const path = isProfile
-        ? `avatars/${me.uid}.jpg`
-        : `photos/${me.uid}/${Date.now()}.jpg`;
-      const dest = sref(storage, path);
-      await uploadBytes(dest, small);
+      if (!file || !me) return;
+      const dest = sref(storage, `${isProfile ? "avatars" : "photos"}/${me.uid}_${Date.now()}.jpg`);
+      await uploadBytes(dest, file);
       const url = await getDownloadURL(dest);
       if (isProfile) {
         update(ref(db, `users/${me.uid}`), { photoURL: url });
       } else {
-        const userRef = ref(db, `users/${me.uid}/photos`);
-        onValue(userRef, (snap) => {
-          const arr = snap.val() || [];
-          set(userRef, [...arr, url]);
-        }, { onlyOnce: true });
+        const pRef = push(ref(db, `photos/${me.uid}`));
+        set(pRef, url);
       }
     };
-    picker.click();
-  };
+    input.click();
+  }
 
-  /* ── Swipe handlers ── */
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () =>
-      setGalleryIndex((i) => (i + 1) % (gallery.length || 1)),
-    onSwipedRight: () =>
-      setGalleryIndex((i) => (i - 1 + gallery.length) % (gallery.length || 1)),
-  });
+  function openChat(uid) {
+    setOpenChatWith(uid);
+    const pid = pairIdOf(me.uid, uid);
+    onValue(ref(db, `messages/${pid}`), (snap) => {
+      const arr = Object.entries(snap.val() || {}).map(([id, m]) => ({ id, ...m }));
+      setChatMsgs(arr);
+    });
+  }
 
-  /* ── UI ── */
+  function sendMessage() {
+    if (!chatText.trim() || !me || !openChatWith) return;
+    const pid = pairIdOf(me.uid, openChatWith);
+    push(ref(db, `messages/${pid}`), {
+      from: me.uid, text: chatText.trim(), time: Date.now()
+    });
+    setChatText("");
+  }
+
+  function breakContact(uid) {
+    const pid = pairIdOf(me.uid, uid);
+    remove(ref(db, `messages/${pid}`));
+  }
+
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
-      <div id="map" style={{ width: "100%", height: "100%" }} />
+    <div>
+      <div id="map" style={{ width: "100vw", height: "100vh" }} />
+
       {/* FAB */}
-      <div style={{ position: "absolute", bottom: 20, right: 20 }}>
-        <button
-          onClick={() => {
-            const menu = document.getElementById("fabMenu");
-            menu.style.display =
-              menu.style.display === "flex" ? "none" : "flex";
-          }}
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            background: "#147af3",
-            color: "#fff",
-            fontSize: 24,
-            border: "none",
-          }}
-        >
-          ＋
-        </button>
-        <div
-          id="fabMenu"
-          style={{
-            display: "none",
-            flexDirection: "column",
-            gap: 8,
-            marginTop: 8,
-          }}
-        >
-          <button onClick={() => uploadPhoto(true)}>Profilová fotka</button>
-          <button onClick={() => uploadPhoto(false)}>Do galerie</button>
-        </div>
+      <div style={{ position: "absolute", bottom: 20, right: 20, zIndex: 10 }}>
+        <button onClick={() => uploadPhoto(true)} style={fabBtn}>📷 Profil</button>
+        <button onClick={() => uploadPhoto(false)} style={fabBtn}>🖼 Galerie</button>
       </div>
 
-      {/* Chat list button */}
-      <div style={{ position: "absolute", bottom: 100, right: 20 }}>
-        <button onClick={() => setOpenChatList(true)}>💬 Chaty</button>
+      {/* Chat list */}
+      <div style={{ position: "absolute", top: 20, left: 20, zIndex: 10 }}>
+        <button onClick={() => setOpenChatWith("LIST")} style={fabBtn}>💬 Chaty</button>
       </div>
 
       {/* Chat list modal */}
-      {openChatList && (
-        <div style={{ position: "absolute", inset: 0, background: "#fff" }}>
+      {openChatWith === "LIST" && (
+        <div style={modal}>
           <h3>Moje chaty</h3>
-          {Object.keys(users)
-            .filter((uid) => uid !== me.uid)
-            .map((uid) => (
-              <div key={uid}>
-                <span>{users[uid]?.name || "Anonym"}</span>
-                <button onClick={() => openChat(uid)}>Otevřít</button>
-                <button onClick={() => disconnectUser(uid)}>❌</button>
-              </div>
-            ))}
-          <button onClick={() => setOpenChatList(false)}>Zavřít</button>
+          {chatList.map((c, i) => (
+            <div key={i} style={{ borderBottom: "1px solid #ccc" }}>
+              <span onClick={() => openChat(c.uid)}>{c.uid} – {c.lastMsg}</span>
+              <button onClick={() => breakContact(c.uid)}>❌</button>
+            </div>
+          ))}
+          <button onClick={() => setOpenChatWith(null)}>Zavřít</button>
         </div>
       )}
 
       {/* Chat modal */}
-      {openChatWith && (
-        <div style={{ position: "absolute", inset: 0, background: "#fff" }}>
-          <h3>Chat</h3>
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            {chatMsgs.map((m, i) => (
-              <div key={i} style={{ textAlign: m.from === me.uid ? "right" : "left" }}>
-                {m.text}
-              </div>
+      {openChatWith && openChatWith !== "LIST" && (
+        <div style={modal}>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {chatMsgs.map(m => (
+              <div key={m.id} style={{ textAlign: m.from === me.uid ? "right" : "left" }}>{m.text}</div>
             ))}
           </div>
-          <input
-            value={chatText}
-            onChange={(e) => setChatText(e.target.value)}
-          />
-          <button onClick={sendMessage}>Poslat</button>
-          <button onClick={() => setOpenChatWith(null)}>Zpět</button>
+          <input value={chatText} onChange={e => setChatText(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} />
+          <button onClick={sendMessage}>Odeslat</button>
+          <button onClick={() => setOpenChatWith(null)}>Zavřít</button>
         </div>
       )}
 
-      {/* Gallery modal */}
-      {showGallery && (
-        <div
-          {...swipeHandlers}
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "#000",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onClick={() => setShowGallery(false)}
-        >
-          <img
-            src={gallery[galleryIndex]}
-            alt=""
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
-          />
+      {/* Gallery swipe */}
+      {gallery.length > 0 && (
+        <div style={modal}>
+          <Swiper spaceBetween={10} slidesPerView={1}>
+            {gallery.map((url, i) => (
+              <SwiperSlide key={i}>
+                <img src={url} style={{ width: "100%", height: "auto" }} />
+              </SwiperSlide>
+            ))}
+          </Swiper>
+          <button onClick={() => setGallery([])}>Zavřít</button>
         </div>
       )}
     </div>
   );
 }
+
+const fabBtn = {
+  padding: "10px 14px", borderRadius: "50%", border: "none", background: "#147af3", color: "#fff", margin: "5px"
+};
+
+const modal = {
+  position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+  background: "#fff", display: "flex", flexDirection: "column", zIndex: 20, padding: 10
+};
