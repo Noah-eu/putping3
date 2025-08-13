@@ -6,15 +6,23 @@ import {
   ref,
   set,
   onValue,
-  update,
+  remove,
   onDisconnect,
-  push,
-  remove
+  update,
+  serverTimestamp
 } from "firebase/database";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
+} from "firebase/storage";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
+// ===== Mapbox token =====
 mapboxgl.accessToken = "TVŮJ_MAPBOX_TOKEN";
 
+// ===== Firebase config =====
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
@@ -26,24 +34,28 @@ const firebaseConfig = {
   measurementId: "G-RLMGM46M6X"
 };
 
+// ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
 
 export default function App() {
   const [map, setMap] = useState(null);
   const [userName, setUserName] = useState(localStorage.getItem("userName") || "");
   const [userId] = useState(localStorage.getItem("userId") || Math.random().toString(36).substr(2, 9));
-  const [soundEnabled, setSoundEnabled] = useState(localStorage.getItem("soundEnabled") === "true");
-  const [photoURL, setPhotoURL] = useState(localStorage.getItem("photoURL") || "");
-  const [showSettings, setShowSettings] = useState(false);
-  const [initialSetupDone, setInitialSetupDone] = useState(localStorage.getItem("setupDone") === "true");
-
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [showSettings, setShowSettings] = useState(!localStorage.getItem("userName"));
+  const [currentChatUser, setCurrentChatUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
   const markersById = useRef({});
   const pingSound = useRef(new Audio("https://notificationsounds.com/storage/sounds/file-sounds-1150-event.mp3"));
+  const TTL = 5 * 60 * 1000; // 5 min online
 
   useEffect(() => {
     localStorage.setItem("userId", userId);
+    signInAnonymously(auth);
 
     navigator.geolocation.getCurrentPosition((position) => {
       const { latitude, longitude } = position.coords;
@@ -61,9 +73,9 @@ export default function App() {
         lat: latitude,
         lng: longitude,
         lastActive: Date.now(),
-        photoURL
+        photo: localStorage.getItem("userPhoto") || null
       });
-      onDisconnect(meRef).remove();
+      onDisconnect(meRef).update({ lastActive: Date.now(), online: false });
 
       setInterval(() => {
         update(meRef, {
@@ -71,147 +83,129 @@ export default function App() {
           lat: latitude,
           lng: longitude,
           name: userName || "Anonym",
-          photoURL
+          online: true
         });
       }, 20000);
     });
-  }, [userId, userName, photoURL]);
+  }, [userId, userName]);
 
+  // ===== Listen users =====
   useEffect(() => {
     if (!map) return;
-
     const usersRef = ref(db, "users");
+
     onValue(usersRef, (snapshot) => {
       const data = snapshot.val() || {};
+      const now = Date.now();
+
       Object.entries(data).forEach(([id, user]) => {
         if (id === userId) return;
-
-        const popupContent = `
-          <div style="text-align:center">
-            ${user.photoURL ? `<img src="${user.photoURL}" style="width:50px;height:50px;border-radius:50%" />` : ""}
-            <p>${user.name || "Anonym"}</p>
-            <button onclick="window.sendPing('${id}')">📩 Ping</button>
-            <button onclick="window.openChat('${id}')">💬 Chat</button>
-          </div>
-        `;
+        const isOnline = user.lastActive && now - user.lastActive <= TTL;
 
         if (!markersById.current[id]) {
-          markersById.current[id] = new mapboxgl.Marker({ color: "blue" })
-            .setLngLat([user.lng, user.lat])
-            .setPopup(new mapboxgl.Popup().setHTML(popupContent))
-            .addTo(map);
+          const el = document.createElement("div");
+          el.className = "marker";
+          el.style.backgroundColor = isOnline ? "blue" : "gray";
+          el.style.width = "20px";
+          el.style.height = "20px";
+          el.style.borderRadius = "50%";
+          el.style.cursor = "pointer";
+
+          const popupContent = document.createElement("div");
+          popupContent.innerHTML = `
+            <strong>${user.name || "Anonym"}</strong><br/>
+            ${isOnline ? "Online" : "Offline"}<br/>
+            <button id="ping-${id}">📩 Ping</button>
+            <button id="chat-${id}">💬 Chat</button>
+          `;
+
+          const popup = new mapboxgl.Popup().setDOMContent(popupContent);
+          const marker = new mapboxgl.Marker(el).setLngLat([user.lng, user.lat]).setPopup(popup).addTo(map);
+          markersById.current[id] = marker;
+
+          popup.on("open", () => {
+            document.getElementById(`ping-${id}`).onclick = () => sendPing(id);
+            document.getElementById(`chat-${id}`).onclick = () => openChat(id, user.name);
+          });
         } else {
-          markersById.current[id].setLngLat([user.lng, user.lat]);
+          markersById.current[id].getElement().style.backgroundColor = isOnline ? "blue" : "gray";
+          if (isOnline) markersById.current[id].setLngLat([user.lng, user.lat]);
         }
       });
     });
-  }, [map, userId]);
+  }, [map]);
 
-  // Globální funkce pro kliknutí z popupu
-  window.sendPing = (targetId) => {
-    const pingsRef = ref(db, `pings/${targetId}`);
-    set(pingsRef, { from: userName || "Anonym", time: Date.now() });
+  // ===== Ping send =====
+  const sendPing = (targetId) => {
+    const pingRef = ref(db, `pings/${targetId}`);
+    set(pingRef, { from: userId, fromName: userName || "Anonym", time: Date.now() });
   };
 
-  window.openChat = (targetId) => {
-    const msg = prompt(`Zpráva pro ${targetId}:`);
-    if (msg) {
-      const msgRef = ref(db, `messages/${targetId}/${userId}`);
-      push(msgRef, { from: userName || "Anonym", text: msg, time: Date.now() });
-    }
-  };
-
+  // ===== Ping receive =====
   useEffect(() => {
     const pingsRef = ref(db, `pings/${userId}`);
     onValue(pingsRef, (snapshot) => {
       if (snapshot.exists()) {
-        const ping = snapshot.val();
+        const data = snapshot.val();
         if (soundEnabled) pingSound.current.play();
-        alert(`📩 Ping od ${ping.from}`);
+        alert(`📩 Ping od ${data.fromName}`);
         remove(pingsRef);
-      }
-    });
-
-    const msgRef = ref(db, `messages/${userId}`);
-    onValue(msgRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const msgs = snapshot.val();
-        const lastFrom = Object.values(msgs).flat().slice(-1)[0];
-        if (lastFrom && soundEnabled) pingSound.current.play();
-        alert(`💬 Nová zpráva od ${lastFrom?.from}: ${lastFrom?.text}`);
-        remove(msgRef);
+        // Auto open chat on ping reply
+        openChat(data.from, data.fromName);
       }
     });
   }, [soundEnabled]);
 
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // ===== Chat =====
+  const openChat = (targetId, targetName) => {
+    setCurrentChatUser({ id: targetId, name: targetName });
+    const chatRef = ref(db, `messages/${[userId, targetId].sort().join("_")}`);
+    onValue(chatRef, (snapshot) => {
+      const data = snapshot.val() || [];
+      setMessages(Object.values(data));
+    });
+  };
 
-    const storageReference = storageRef(storage, `photos/${userId}`);
-    uploadBytes(storageReference, file).then(() => {
-      getDownloadURL(storageReference).then((url) => {
-        setPhotoURL(url);
-        localStorage.setItem("photoURL", url);
-        update(ref(db, `users/${userId}`), { photoURL: url });
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    const chatRef = ref(db, `messages/${[userId, currentChatUser.id].sort().join("_")}/${Date.now()}`);
+    set(chatRef, { from: userId, fromName: userName || "Anonym", text: newMessage });
+    setNewMessage("");
+  };
+
+  // ===== Upload photo =====
+  const uploadPhoto = (file) => {
+    const photoRef = storageRef(storage, `photos/${userId}.jpg`);
+    uploadBytes(photoRef, file).then(() => {
+      getDownloadURL(photoRef).then((url) => {
+        localStorage.setItem("userPhoto", url);
+        update(ref(db, `users/${userId}`), { photo: url });
       });
     });
   };
 
-  const saveSettings = () => {
-    localStorage.setItem("userName", userName);
-    localStorage.setItem("soundEnabled", soundEnabled);
-    localStorage.setItem("setupDone", "true");
-    setInitialSetupDone(true);
-    setShowSettings(false);
-  };
-
   return (
     <div>
-      {!initialSetupDone && (
-        <div style={{ position: "absolute", zIndex: 1, background: "white", padding: 5 }}>
-          <input
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            placeholder="Zadej jméno"
-          />
-          <button onClick={() => { setSoundEnabled(true); pingSound.current.play(); }}>🔊 Povolit zvuk</button>
-          <button onClick={saveSettings}>Uložit</button>
-        </div>
-      )}
-
-      {initialSetupDone && (
-        <button
-          style={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}
-          onClick={() => setShowSettings(true)}
-        >
-          ⚙️
-        </button>
-      )}
-
       {showSettings && (
-        <div style={{ position: "absolute", zIndex: 3, background: "white", padding: 10 }}>
-          <h3>Nastavení</h3>
-          <input
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            placeholder="Změnit jméno"
-          />
-          <br />
-          <label>
-            <input
-              type="checkbox"
-              checked={soundEnabled}
-              onChange={(e) => setSoundEnabled(e.target.checked)}
-            /> Povolit zvuk
-          </label>
-          <br />
-          <input type="file" accept="image/*" onChange={handlePhotoUpload} />
-          <br />
-          <button onClick={saveSettings}>Uložit nastavení</button>
+        <div style={{ position: "absolute", zIndex: 1, background: "white", padding: 5 }}>
+          <input value={userName} onChange={(e) => setUserName(e.target.value)} />
+          <button onClick={() => { localStorage.setItem("userName", userName); setShowSettings(false); }}>Uložit</button>
+          <button onClick={() => { pingSound.current.play(); setSoundEnabled(true); }}>🔊 Povolit zvuk</button>
+          <input type="file" accept="image/*" onChange={(e) => uploadPhoto(e.target.files[0])} />
         </div>
       )}
-
+      {currentChatUser && (
+        <div style={{ position: "absolute", bottom: 0, width: "100%", background: "white", padding: 5 }}>
+          <h3>Chat s {currentChatUser.name}</h3>
+          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+            {messages.map((m, i) => (
+              <div key={i}><strong>{m.fromName}:</strong> {m.text}</div>
+            ))}
+          </div>
+          <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} />
+          <button onClick={sendMessage}>Odeslat</button>
+        </div>
+      )}
       <div id="map" style={{ width: "100vw", height: "100vh" }}></div>
     </div>
   );
