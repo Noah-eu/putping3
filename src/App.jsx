@@ -24,7 +24,7 @@ import {
 } from "firebase/storage";
 
 /* ===== Mapbox token ===== */
-mapboxgl.accessToken = "PK_VLOŽ_SEM_TVŮJ_MAPBOX_TOKEN";
+mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
 /* ===== Firebase config (tvůj) ===== */
 const firebaseConfig = {
