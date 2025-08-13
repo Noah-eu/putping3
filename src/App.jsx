@@ -1,10 +1,10 @@
-// App.jsx – mobile-first all-in-one
+// App.jsx – mobile-first all-in-one (tap fix, bigger self marker)
 // - Jedno FAB menu (profilovka, galerie, zvuk, jméno)
 // - Tlačítko Chaty (seznam, otevření chatu, přerušení kontaktu)
-// - Markery = avatar; klik => půlobrazovková kruhová galerie se swipe
+// - Markery = avatar; klik/tap => půlobrazovková kruhová galerie se swipe
 // - Ping se zvukem (příjem i odeslání)
-// - Upload fotek: komprese + uploadBytes (jako ve tvé funkční verzi)
-// - Bez „starých“ markerů (jen aktivní poslední ~2 min)
+// - Upload fotek: komprese + uploadBytes
+// - Zobrazují se jen aktivní uživatelé (poslední < 2 min)
 
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
@@ -32,7 +32,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-/* ───────── Firebase (ponechávám tvoje údaje) ───────── */
+/* ───────── Firebase (tvoje údaje) ───────── */
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
@@ -48,7 +48,7 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-/* ───────── Mapbox (ponechávám tvůj token) ───────── */
+/* ───────── Mapbox (tvůj token) ───────── */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
@@ -93,7 +93,6 @@ async function compressImage(file, maxDim = 900, quality = 0.82) {
   return blob;
 }
 
-/* ───────── App ───────── */
 export default function App() {
   // Me & auth
   const [me, setMe] = useState(null); // {uid, name}
@@ -179,15 +178,14 @@ export default function App() {
       const data = snap.val() || {};
       setUsers(data);
 
-      // pro každý online uživatel vytváříme marker znovu (bez „hacků“),
-      // aby click/DOM fungoval spolehlivě
+      // Přegeneruj markery pro ty, kteří jsou "online" (poslední < TTL)
       const onlineSet = new Set();
       Object.entries(data).forEach(([uid, u]) => {
         if (!u?.lat || !u?.lng) return;
         if (!u?.lastActive || now() - u.lastActive >= ONLINE_TTL) return; // jen aktivní
         onlineSet.add(uid);
 
-        // zruš starý marker (aby eventy seděly)
+        // Zruš starý marker
         if (markers.current[uid]) {
           markers.current[uid].remove();
           delete markers.current[uid];
@@ -196,13 +194,16 @@ export default function App() {
         // element (avatar/tečka)
         const el = document.createElement("div");
         const mine = uid === me.uid;
-        el.style.width = mine ? "36px" : "32px";
-        el.style.height = mine ? "36px" : "32px";
+        el.style.width = mine ? "44px" : "32px";  // větší vlastní marker
+        el.style.height = mine ? "44px" : "32px";
         el.style.borderRadius = "50%";
         el.style.overflow = "hidden";
         el.style.border = "1px solid rgba(0,0,0,.15)";
         el.style.boxShadow = mine ? "0 0 0 3px #ef4444 inset" : "0 0 0 3px #147af3 inset";
         el.style.background = "#ddd";
+        el.style.touchAction = "manipulation"; // lepší chování na mobilu
+        el.style.cursor = "pointer";
+
         if (u.photoURL) {
           const img = document.createElement("img");
           img.src = u.photoURL;
@@ -211,7 +212,10 @@ export default function App() {
           img.style.objectFit = "cover";
           el.appendChild(img);
         }
-        el.addEventListener("click", () => openGallery(uid));
+
+        const open = () => openGallery(uid);
+        el.addEventListener("click", open);
+        el.addEventListener("touchend", open, { passive: true });
 
         const mk = new mapboxgl.Marker(el).setLngLat([u.lng, u.lat]).addTo(map);
         markers.current[uid] = mk;
@@ -256,7 +260,6 @@ export default function App() {
       pingSound.current.currentTime = 0;
       pingSound.current.play().catch(() => {});
     }
-    // u odesílatele vytvoř userChats (příjemce se založí při příjmu)
     update(ref(db, `userChats/${me.uid}/${toUid}`), { last: serverTimestamp() });
   }
 
