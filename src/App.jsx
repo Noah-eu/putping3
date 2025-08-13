@@ -20,7 +20,7 @@ import {
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 // ===== Mapbox token =====
-mapboxgl.accessToken = "TVŮJ_MAPBOX_TOKEN";
+mapboxgl.accessToken = "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
 // ===== Firebase config =====
 const firebaseConfig = {
