@@ -1,568 +1,265 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import {
   getDatabase,
-  ref,
+  ref as dbRef,
   set,
   update,
   onValue,
   push,
-  onDisconnect,
+  remove,
 } from "firebase/database";
+import { getAuth, signInAnonymously } from "firebase/auth";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
 
-/* ========== Mapbox ========== */
+/* ===== Mapbox ===== */
 mapboxgl.accessToken =
   "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w";
 
-/* ========== Firebase (dle tebe) ========== */
+/* ===== Firebase (tvé údaje) ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
   authDomain: "putping-dc57e.firebaseapp.com",
   databaseURL:
     "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.firebasestorage.app",
+  storageBucket: "putping-dc57e.appspot.com",          // <-- důležité
   messagingSenderId: "244045363394",
   appId: "1:244045363394:web:64e930bff17a816549635b",
   measurementId: "G-RLMGM46M6X",
 };
 const app = initializeApp(firebaseConfig);
-try {
-  getAnalytics(app);
-} catch {}
-const db = getDatabase();
+const db = getDatabase(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
 
-/* ========== Nastavení ========== */
-const HEARTBEAT_MS = 20_000;
-const PING_SOUND_URL =
-  "https://notificationsounds.com/storage/sounds/file-sounds-1150-event.mp3";
-
-/* Toast */
-function Toast({ message }) {
-  if (!message) return null;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 12,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "rgba(0,0,0,0.85)",
-        color: "#fff",
-        padding: "10px 14px",
-        borderRadius: 10,
-        zIndex: 9999,
-        maxWidth: 380,
-        boxShadow: "0 6px 16px rgba(0,0,0,.3)",
-        fontSize: 14,
-        lineHeight: 1.35,
-        textAlign: "center",
-      }}
-    >
-      {message}
-    </div>
-  );
+/* ===== Helpers ===== */
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
-
-/* Chat overlay */
-function ChatModal({ me, peer, messages, onClose, onSend, soundEnabled }) {
-  const [text, setText] = useState("");
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.35)",
-        zIndex: 10000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          width: "min(92vw, 520px)",
-          maxHeight: "80vh",
-          background: "#fff",
-          borderRadius: 12,
-          boxShadow: "0 10px 30px rgba(0,0,0,.25)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            padding: "10px 12px",
-            borderBottom: "1px solid #eee",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <b>Chat s {peer.name || "Uživatelem"}</b>
-            {!peer.online && (
-              <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
-                (⚪ offline – zpráva se mu zobrazí po připojení)
-              </span>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            style={{ border: "1px solid #ddd", borderRadius: 8, padding: "4px 8px" }}
-          >
-            ✕ Zavřít
-          </button>
-        </div>
-
-        <div ref={listRef} style={{ padding: 12, overflowY: "auto", flex: 1 }}>
-          {(messages || []).map((m) => (
-            <div
-              key={m.id}
-              style={{
-                display: "flex",
-                marginBottom: 8,
-                justifyContent: m.from === me ? "flex-end" : "flex-start",
-              }}
-            >
-              <div
-                style={{
-                  background: m.from === me ? "#e8f5ff" : "#f5f5f5",
-                  border: "1px solid #e1e1e1",
-                  borderRadius: 10,
-                  padding: "6px 8px",
-                  maxWidth: "75%",
-                }}
-              >
-                <div style={{ fontSize: 12, color: "#667", marginBottom: 2 }}>
-                  {m.from === me ? "Ty" : m.fromName || "Uživatel"}
-                </div>
-                <div>{m.text}</div>
-                <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                  {new Date(m.ts).toLocaleString()}
-                </div>
-              </div>
-            </div>
-          ))}
-          {(!messages || messages.length === 0) && (
-            <div style={{ color: "#888", textAlign: "center", marginTop: 12 }}>
-              Zatím žádné zprávy.
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{
-            padding: 10,
-            borderTop: "1px solid #eee",
-            display: "flex",
-            gap: 8,
-          }}
-        >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Napiš zprávu…"
-            style={{
-              flex: 1,
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: "8px 10px",
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && text.trim()) {
-                onSend(text.trim());
-                setText("");
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              if (text.trim()) {
-                onSend(text.trim());
-                setText("");
-              }
-            }}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: "8px 12px",
-              background: "#f6faff",
-            }}
-          >
-            ➤ Odeslat
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function timeAgo(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "před pár sekundami";
+  const min = Math.floor(diff / 60_000);
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const d = Math.floor(h / 24);
+  return `před ${d} dny`;
 }
-
-/* Odemknutí zvuku (WebAudio) + potvrzovací pípnutí */
-function useAudioUnlock() {
-  const [soundEnabled, setSoundEnabled] = useState(false);
-  const ctxRef = useRef(null);
-  const enableSound = async () => {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!ctxRef.current && Ctx) ctxRef.current = new Ctx();
-      if (ctxRef.current && ctxRef.current.state !== "running")
-        await ctxRef.current.resume();
-
-      // potvrzovací pípnutí
-      if (ctxRef.current) {
-        const ctx = ctxRef.current;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = "sine";
-        o.frequency.value = 880;
-        g.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.start();
-        o.stop(ctx.currentTime + 0.16);
-      }
-
-      if (window.Notification?.requestPermission) {
-        try {
-          await Notification.requestPermission();
-        } catch {}
-      }
-
-      setSoundEnabled(true);
-    } catch (e) {
-      console.warn("Audio unlock fail:", e);
-      setSoundEnabled(false);
-    }
-  };
-  return { soundEnabled, enableSound };
+async function sendMessageDirect(db, meId, toUserId, text) {
+  const ts = Date.now();
+  const myThread = push(dbRef(db, `messages/${meId}/${toUserId}`));
+  const peerThread = push(dbRef(db, `messages/${toUserId}/${meId}`));
+  const payload = { from: meId, to: toUserId, text, ts };
+  await set(myThread, payload);
+  await set(peerThread, payload);
 }
-
-/* Pomocný: ID konverzace = A_B (seřazené) */
-const conversationId = (a, b) => [a, b].sort().join("_");
 
 export default function App() {
   const [map, setMap] = useState(null);
-  const [userId] = useState(
-    localStorage.getItem("userId") || Math.random().toString(36).slice(2, 11)
+  const [meId, setMeId] = useState(localStorage.getItem("userId") || "");
+  const [myName, setMyName] = useState(
+    localStorage.getItem("userName") || "Anonymní uživatel"
   );
-  const [name, setName] = useState(localStorage.getItem("userName") || "Anonym");
-  const [toast, setToast] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(
+    localStorage.getItem("soundEnabled") === "1"
+  );
 
-  const { soundEnabled, enableSound } = useAudioUnlock();
-
-  const positionRef = useRef({ lat: 50.08804, lng: 14.42076 });
+  const markersRef = useRef({}); // uid -> { marker, popup }
   const myMarkerRef = useRef(null);
-  const markersRef = useRef({}); // { uid: { marker, popup, lastName } }
+  const soundRef = useRef(null);
 
-  // chat overlay state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatPeer, setChatPeer] = useState(null); // { uid, name, online }
+  // chat panel
+  const [chatWith, setChatWith] = useState(null); // {id,name,photoUrl}
   const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
 
+  /* Init audio */
   useEffect(() => {
-    localStorage.setItem("userId", userId);
-  }, [userId]);
-
-  const showToast = (t, ms = 9000) => {
-    setToast(t);
-    if (ms > 0) setTimeout(() => setToast(""), ms);
-  };
-
-  /* Inicializace mapy + moje poloha + přítomnost */
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      alert("Prohlížeč nepodporuje geolokaci.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const m = new mapboxgl.Map({
-          container: "map",
-          style: "mapbox://styles/mapbox/streets-v11",
-          center: [longitude, latitude],
-          zoom: 14,
-        });
-        setMap(m);
-
-        const meRef = ref(db, `users/${userId}`);
-        // Nastavím se jako online + první pozice
-        set(meRef, {
-          name: name || "Anonym",
-          lat: latitude,
-          lng: longitude,
-          lastActive: Date.now(),
-          online: true,
-        });
-
-        // PŘÍTOMNOST: když se odpojím, NEsmažu se – jen nastavím online:false
-        onDisconnect(meRef).update({
-          online: false,
-          lastActive: Date.now(),
-        });
-
-        // můj marker (červený)
-        const myPopup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-          `<b>${name || "Anonym"}</b><br>${new Date().toLocaleTimeString()}`
-        );
-        const myMarker = new mapboxgl.Marker({ color: "red" })
-          .setLngLat([longitude, latitude])
-          .setPopup(myPopup)
-          .addTo(m);
-        myMarkerRef.current = { marker: myMarker, popup: myPopup };
-
-        // live update
-        const watchId = navigator.geolocation.watchPosition(
-          (p) => {
-            const { latitude: lat, longitude: lng } = p.coords;
-            positionRef.current = { lat, lng };
-            update(meRef, {
-              lat,
-              lng,
-              name: name || "Anonym",
-              lastActive: Date.now(),
-              online: true,
-            });
-            if (myMarkerRef.current)
-              myMarkerRef.current.marker.setLngLat([lng, lat]);
-          },
-          () => {},
-          { enableHighAccuracy: true }
-        );
-
-        // heartbeat (když se nehýbu)
-        const hb = setInterval(() => {
-          update(meRef, {
-            name: name || "Anonym",
-            lat: positionRef.current.lat,
-            lng: positionRef.current.lng,
-            lastActive: Date.now(),
-            online: true,
-          });
-        }, HEARTBEAT_MS);
-
-        // úklid
-        return () => {
-          clearInterval(hb);
-          navigator.geolocation.clearWatch(watchId);
-          // Při reloadu/odchodu onDisconnect zajistí online:false
-        };
-      },
-      () => alert("Nepodařilo se získat polohu."),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    soundRef.current = new Audio(
+      "https://cdn.pixabay.com/audio/2022/03/15/audio_3f61f7cdd2.mp3"
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Uložit jméno */
-  const saveName = () => {
-    localStorage.setItem("userName", name);
-    update(ref(db, `users/${userId}`), {
-      name: name || "Anonym",
-      lastActive: Date.now(),
-      online: true,
-    });
-    if (myMarkerRef.current) {
-      myMarkerRef.current.popup.setHTML(
-        `<b>${name || "Anonym"}</b><br>${new Date().toLocaleTimeString()}`
-      );
-    }
-    showToast("✅ Jméno uloženo", 2500);
-  };
-
-  /* Rychlý Ping */
-  const sendPing = async (toUid) => {
-    await push(ref(db, `pings/${toUid}`), {
-      kind: "ping",
-      from: userId,
-      fromName: name || "Anonym",
-      ts: Date.now(),
-    });
-    showToast("📩 Ping odeslán", 2500);
-  };
-
-  /* Chat – otevření, poslouchání historie, odeslání */
-  const openChat = (peerUid, peerName, peerOnline) => {
-    const cid = conversationId(userId, peerUid);
-    setChatPeer({ uid: peerUid, name: peerName || "Uživatel", online: !!peerOnline });
-    setChatOpen(true);
-
-    const convRef = ref(db, `chats/${cid}`);
-    onValue(
-      convRef,
-      (snap) => {
-        const data = snap.val() || {};
-        const list = Object.entries(data)
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([id, msg]) => ({ id, ...msg }));
-        setChatMessages(list);
-        // jemný zvuk při příchodu nové zprávy (když je overlay otevřený)
-        if (list.length) {
-          if (soundEnabled) {
-            try {
-              const a = new Audio(PING_SOUND_URL);
-              a.preload = "auto";
-              a.play().catch(() => {});
-            } catch {}
-          }
-        }
-      },
-      { onlyOnce: false }
-    );
-  };
-  const closeChat = () => {
-    setChatOpen(false);
-    setChatPeer(null);
-    setChatMessages([]);
-  };
-  const sendChatMessage = async (text) => {
-    if (!chatPeer) return;
-    const cid = conversationId(userId, chatPeer.uid);
-    await push(ref(db, `chats/${cid}`), {
-      from: userId,
-      fromName: name || "Anonym",
-      text,
-      ts: Date.now(),
-    });
-  };
-
-  /* Legacy: příjem rychlých pingů (toast) */
+  /* Anonymous auth → uid */
   useEffect(() => {
-    const unsub = onValue(ref(db, `pings/${userId}`), (snap) => {
-      const all = snap.val() || {};
-      const ids = Object.keys(all);
-      if (!ids.length) return;
+    if (meId) return;
+    signInAnonymously(auth)
+      .then((cred) => {
+        const uid = cred.user.uid;
+        setMeId(uid);
+        localStorage.setItem("userId", uid);
+      })
+      .catch(console.error);
+  }, [meId]);
 
-      ids.forEach((pid) => {
-        const p = all[pid];
-        const who = p.fromName ? ` od ${p.fromName}` : "";
-        showToast(`📩 Ping${who}!`, 9000);
-        if (soundEnabled) {
-          try {
-            const a = new Audio(PING_SOUND_URL);
-            a.preload = "auto";
-            a.play().catch(() => {});
-          } catch {}
-        }
-        // nepromazáváme pings/{userId} → nechceme zahlcovat, ale legacy pings mohou zůstat – dle potřeby lze časem čistit CRONem
+  /* Init mapy + moje poloha + zápis do DB (fallback Praha) */
+  useEffect(() => {
+    if (map || !meId) return;
+
+    const startMap = (lng, lat) => {
+      const m = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v11",
+        center: [lng, lat],
+        zoom: 14,
       });
-    });
-    return () => unsub();
-  }, [userId, soundEnabled]);
+      setMap(m);
 
-  /* Ostatní uživatelé – zobrazit VŽDY (online i offline) */
+      myMarkerRef.current = new mapboxgl.Marker({ color: "red" })
+        .setLngLat([lng, lat])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<b>${escapeHtml(myName)}</b><br>${new Date().toLocaleTimeString()}`
+          )
+        )
+        .addTo(m);
+
+      // zapiš/aktualizuj se v DB
+      const meR = dbRef(db, `users/${meId}`);
+      set(meR, {
+        name: myName || "Anonymní uživatel",
+        lat,
+        lng,
+        lastActive: Date.now(),
+        photoUrl: "", // doplní se po nahrání
+      });
+    };
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { longitude, latitude } = pos.coords;
+          startMap(longitude, latitude);
+
+          const meR = dbRef(db, `users/${meId}`);
+          // kontinuální update pozice
+          const watch = navigator.geolocation.watchPosition(
+            (p) => {
+              const { longitude: lo, latitude: la } = p.coords;
+              if (myMarkerRef.current)
+                myMarkerRef.current.setLngLat([lo, la]);
+              update(meR, {
+                lat: la,
+                lng: lo,
+                name: myName || "Anonymní uživatel",
+                lastActive: Date.now(),
+              });
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+          );
+          return () => navigator.geolocation.clearWatch(watch);
+        },
+        () => {
+          // fallback: Praha
+          startMap(14.42076, 50.08804);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+      );
+    } else {
+      startMap(14.42076, 50.08804);
+    }
+  }, [map, meId, myName]);
+
+  /* Poslech uživatelů → markery + popup (Ping/Chat/Send) */
   useEffect(() => {
-    if (!map) return;
-
-    const unsub = onValue(ref(db, "users"), (snap) => {
+    if (!map || !meId) return;
+    const usersR = dbRef(db, "users");
+    return onValue(usersR, (snap) => {
       const data = snap.val() || {};
-      const now = Date.now();
 
       Object.entries(data).forEach(([uid, u]) => {
-        if (!u) return;
-        if (uid === userId) return;
+        if (!u || typeof u.lng !== "number" || typeof u.lat !== "number") return;
+        if (uid === meId) return;
 
-        // online stav – primárně podle u.online, fallback: lastActive < 5 min
-        const isOnline =
-          u.online === true ||
-          (typeof u.lastActive === "number" && now - u.lastActive <= 5 * 60 * 1000);
-
+        const name = u.name || "Anonym";
+        const last = u.lastActive ? timeAgo(u.lastActive) : "neznámo";
         const popupHtml = `
-          <div style="min-width:200px">
-            <b>${u.name || "Uživatel"}</b><br>
-            <small>${isOnline ? "🟢 online" : "⚪ offline"}</small><br>
-            <div style="display:flex; gap:6px; margin-top:8px;">
-              <button id="ping-${uid}" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:8px;background:#f2f6ff">📩 Ping</button>
-              <button id="chat-${uid}" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:8px;background:#fff">💬 Chatovat</button>
+          <div style="font:12px/1.4 sans-serif;min-width:190px">
+            ${
+              u.photoUrl
+                ? `<img src="${u.photoUrl}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:6px;" />`
+                : ""
+            }
+            <b>${escapeHtml(name)}</b><br/>
+            <small>Naposledy: ${last}</small>
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+              <button data-act="ping" data-uid="${uid}" class="pp-btn">📩 Ping</button>
+              <button data-act="chat" data-uid="${uid}" class="pp-btn">💬 Chat</button>
+            </div>
+            <div style="margin-top:6px">
+              <input id="pp-msg-${uid}" placeholder="Napiš zprávu…" style="width:160px;padding:4px" />
+              <button data-act="send" data-uid="${uid}" class="pp-btn">Odeslat</button>
             </div>
           </div>
         `;
 
         if (!markersRef.current[uid]) {
-          const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml);
-          const marker = new mapboxgl.Marker({
-            color: isOnline ? "blue" : "gray",
-          })
+          const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(popupHtml);
+          const marker = new mapboxgl.Marker({ color: "blue" })
             .setLngLat([u.lng, u.lat])
             .setPopup(popup)
             .addTo(map);
 
+          // handlery až po otevření popupu (jistota)
           popup.on("open", () => {
-            const pingBtn = document.getElementById(`ping-${uid}`);
-            const chatBtn = document.getElementById(`chat-${uid}`);
-            if (pingBtn && !pingBtn.dataset.bound) {
-              pingBtn.dataset.bound = "1";
-              pingBtn.onclick = (e) => {
-                e.stopPropagation();
-                sendPing(uid);
+            const root = popup.getElement();
+            const pingBtn = root.querySelector(
+              `[data-act="ping"][data-uid="${uid}"]`
+            );
+            const chatBtn = root.querySelector(
+              `[data-act="chat"][data-uid="${uid}"]`
+            );
+            const sendBtn = root.querySelector(
+              `[data-act="send"][data-uid="${uid}"]`
+            );
+            const inputEl = root.querySelector(`#pp-msg-${uid}`);
+
+            if (pingBtn)
+              pingBtn.onclick = () => {
+                const id = push(dbRef(db, `pings/${uid}`)).key;
+                if (id) {
+                  set(dbRef(db, `pings/${uid}/${id}`), {
+                    from: meId,
+                    ts: Date.now(),
+                  });
+                }
               };
-            }
-            if (chatBtn && !chatBtn.dataset.bound) {
-              chatBtn.dataset.bound = "1";
-              chatBtn.onclick = (e) => {
-                e.stopPropagation();
-                openChat(uid, u.name, isOnline);
+            if (chatBtn)
+              chatBtn.onclick = () => openChat(uid);
+            if (sendBtn && inputEl)
+              sendBtn.onclick = async () => {
+                const text = (inputEl.value || "").trim();
+                if (!text) return;
+                await sendMessageDirect(db, meId, uid, text);
+                inputEl.value = "";
               };
-            }
           });
 
-          markersRef.current[uid] = {
-            marker,
-            popup,
-            lastName: u.name || "",
-          };
+          markersRef.current[uid] = { marker, popup };
         } else {
-          // update pozice + barvy
-          const mk = markersRef.current[uid].marker;
-          mk.setLngLat([u.lng, u.lat]);
-          // změna barvy podle online
-          mk.getElement().style.backgroundColor = isOnline ? "blue" : "gray";
-
-          // když se změní jméno → obnovíme HTML a rebindneme handlers
-          const prev = markersRef.current[uid].lastName;
-          const curr = u.name || "";
-          if (prev !== curr) {
-            markersRef.current[uid].lastName = curr;
-            markersRef.current[uid].popup.setHTML(popupHtml);
-            markersRef.current[uid].popup.on("open", () => {
-              const pingBtn = document.getElementById(`ping-${uid}`);
-              const chatBtn = document.getElementById(`chat-${uid}`);
-              if (pingBtn && !pingBtn.dataset.bound) {
-                pingBtn.dataset.bound = "1";
-                pingBtn.onclick = (e) => {
-                  e.stopPropagation();
-                  sendPing(uid);
-                };
-              }
-              if (chatBtn && !chatBtn.dataset.bound) {
-                chatBtn.dataset.bound = "1";
-                chatBtn.onclick = (e) => {
-                  e.stopPropagation();
-                  openChat(uid, u.name, isOnline);
-                };
-              }
-            });
-          }
+          markersRef.current[uid].marker.setLngLat([u.lng, u.lat]);
+          markersRef.current[uid].popup.setHTML(popupHtml);
         }
       });
 
-      // NEmažeme markery za „neaktivitu“ – zůstávají i offline
-      // (kdybys někdy chtěl vyčistit smazané z DB, můžeš tu smazat markery, které nejsou v data)
+      // úklid markerů smazaných userů
       Object.keys(markersRef.current).forEach((uid) => {
         if (!data[uid]) {
           markersRef.current[uid].marker.remove();
@@ -570,26 +267,159 @@ export default function App() {
         }
       });
     });
+  }, [map, meId]);
 
-    return () => unsub();
-  }, [map, userId]);
+  /* Ping listener → pípni jen na příchozí */
+  useEffect(() => {
+    if (!meId) return;
+    const r = dbRef(db, `pings/${meId}`);
+    return onValue(r, (snap) => {
+      const data = snap.val() || {};
+      const keys = Object.keys(data);
+      if (!keys.length) return;
+      const last = data[keys[keys.length - 1]];
+      if (last && last.from && last.from !== meId) {
+        if (soundEnabled && soundRef.current) {
+          soundRef.current.currentTime = 0;
+          soundRef.current.play().catch(() => {});
+        }
+        alert("📩 Ping!");
+      }
+      // smaž poslední odpracovaný ping
+      remove(dbRef(db, `pings/${meId}/${keys[keys.length - 1]}`));
+    });
+  }, [meId, soundEnabled]);
+
+  /* Příchozí zprávy → zvuk jen u cizích + chat panel doplňuj */
+  useEffect(() => {
+    if (!meId) return;
+    const inbox = dbRef(db, `messages/${meId}`);
+    return onValue(inbox, (snap) => {
+      const all = snap.val() || {};
+
+      // zvuk u cizí zprávy
+      let gotForeign = false;
+      Object.values(all).forEach((grp) => {
+        Object.values(grp || {}).forEach((m) => {
+          if (m?.from && m.from !== meId) gotForeign = true;
+        });
+      });
+      if (gotForeign && soundEnabled && soundRef.current) {
+        soundRef.current.currentTime = 0;
+        soundRef.current.play().catch(() => {});
+      }
+
+      // pokud je otevřený chat, načti jeho vlákno
+      if (chatWith?.id && all[chatWith.id]) {
+        const arr = Object.values(all[chatWith.id]).sort(
+          (a, b) => (a.ts || 0) - (b.ts || 0)
+        );
+        setChatMessages(arr);
+      }
+    });
+  }, [meId, soundEnabled, chatWith]);
+
+  /* Otevři chat s uživatelem */
+  function openChat(uid) {
+    const uR = dbRef(db, `users/${uid}`);
+    onValue(
+      uR,
+      (s) => {
+        const u = s.val() || {};
+        setChatWith({
+          id: uid,
+          name: u.name || "Uživatel",
+          photoUrl: u.photoUrl || "",
+        });
+      },
+      { onlyOnce: true }
+    );
+  }
+
+  /* Odeslat zprávu z chat panelu */
+  async function sendMessage() {
+    if (!chatWith?.id || !chatInput.trim()) return;
+    await sendMessageDirect(db, meId, chatWith.id, chatInput.trim());
+    setChatInput("");
+  }
+
+  /* Uložit jméno */
+  function saveName() {
+    localStorage.setItem("userName", myName);
+    if (meId) {
+      update(dbRef(db, `users/${meId}`), {
+        name: myName,
+        lastActive: Date.now(),
+      });
+    }
+  }
+
+  /* Povolit zvuk (odemknout audio) */
+  function enableSound() {
+    setSoundEnabled(true);
+    localStorage.setItem("soundEnabled", "1");
+    if (soundRef.current) {
+      soundRef.current.currentTime = 0;
+      soundRef.current.play().catch(() => {});
+    }
+  }
+
+  /* Upload fotky do Storage + URL do DB (s přihlášením) */
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
+      const uid = auth.currentUser?.uid || meId;
+      const path = `profilePics/${uid}.jpg`;
+      const obj = storageRef(storage, path);
+      const task = uploadBytesResumable(obj, file, { contentType: file.type });
+
+      task.on(
+        "state_changed",
+        (snap) => {
+          const pct = Math.round(
+            (snap.bytesTransferred / snap.totalBytes) * 100
+          );
+          console.log(`Upload: ${pct}%`);
+        },
+        (err) => {
+          console.error("Upload error:", err);
+          alert("Nahrání selhalo: " + (err?.message || err));
+        },
+        async () => {
+          const url = await getDownloadURL(task.snapshot.ref);
+          await update(dbRef(db, `users/${uid}`), {
+            photoUrl: url,
+            lastActive: Date.now(),
+          });
+          alert("Fotka nahrána ✅");
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Chyba při nahrávání: " + (err?.message || err));
+    } finally {
+      e.target.value = ""; // ať jde nahrát stejný soubor znovu
+    }
+  }
 
   return (
     <div>
-      <Toast message={toast} />
-
       {/* horní lišta */}
       <div
         style={{
           position: "absolute",
+          zIndex: 10,
+          top: 10,
           left: 10,
           right: 10,
-          top: 10,
-          zIndex: 10,
-          background: "#fff",
-          borderRadius: 8,
           padding: 8,
-          boxShadow: "0 4px 12px rgba(0,0,0,.15)",
+          background: "white",
+          borderRadius: 8,
+          boxShadow: "0 2px 8px rgba(0,0,0,.12)",
           display: "flex",
           gap: 8,
           alignItems: "center",
@@ -597,54 +427,146 @@ export default function App() {
         }}
       >
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Zadej jméno"
-          style={{
-            padding: "6px 8px",
-            minWidth: 180,
-            border: "1px solid #ddd",
-            borderRadius: 6,
-          }}
+          value={myName}
+          onChange={(e) => setMyName(e.target.value)}
+          placeholder="Tvoje jméno"
+          style={{ flex: "1 1 180px", padding: "8px 10px" }}
         />
-        <button
-          onClick={saveName}
-          style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd" }}
-        >
-          Uložit
-        </button>
+        <button onClick={saveName}>Uložit</button>
         <button
           onClick={enableSound}
-          disabled={soundEnabled}
           style={{
-            padding: "6px 10px",
-            borderRadius: 6,
-            border: "1px solid #16a34a",
-            background: soundEnabled ? "#16a34a" : "#fff",
-            color: soundEnabled ? "#fff" : "#0f172a",
-            cursor: soundEnabled ? "default" : "pointer",
-            transition: "all .15s ease",
+            background: soundEnabled ? "#1e90ff" : "",
+            color: soundEnabled ? "white" : "",
           }}
         >
-          {soundEnabled ? "✅ Zvuk povolen" : "🔊 Povolit zvuk"}
+          🔊 {soundEnabled ? "Zvuk povolen" : "Povolit zvuk"}
         </button>
+        <label
+          style={{
+            border: "1px solid #ddd",
+            padding: "7px 10px",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+          title="Nahrát profilovou fotku"
+        >
+          📷 Nahrát fotku
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoUpload}
+            style={{ display: "none" }}
+          />
+        </label>
       </div>
 
       {/* mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
 
-      {/* chat overlay */}
-      {chatOpen && (
-        <ChatModal
-          me={userId}
-          peer={chatPeer}
-          messages={chatMessages}
-          onClose={closeChat}
-          onSend={sendChatMessage}
-          soundEnabled={soundEnabled}
-        />
+      {/* chat panel */}
+      {chatWith && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 12,
+            right: 10,
+            bottom: 10,
+            width: 320,
+            maxHeight: "60vh",
+            background: "white",
+            borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,.16)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: 10,
+              borderBottom: "1px solid #eee",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            {chatWith.photoUrl ? (
+              <img
+                src={chatWith.photoUrl}
+                alt=""
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  background: "#eee",
+                }}
+              />
+            )}
+            <b style={{ flex: 1 }}>{chatWith.name || "Chat"}</b>
+            <button onClick={() => setChatWith(null)}>✕</button>
+          </div>
+
+          <div
+            style={{
+              padding: 10,
+              flex: 1,
+              overflow: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {chatMessages.map((m) => {
+              const mine = m.from === meId;
+              return (
+                <div
+                  key={m.ts + (m.text || "")}
+                  style={{
+                    alignSelf: mine ? "flex-end" : "flex-start",
+                    background: mine ? "#e6f2ff" : "#f5f5f5",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    maxWidth: "75%",
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {new Date(m.ts).toLocaleTimeString()}
+                  </div>
+                  <div>{m.text}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              padding: 10,
+              borderTop: "1px solid #eee",
+            }}
+          >
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              placeholder="Napiš zprávu…"
+              style={{ flex: 1, padding: "8px 10px" }}
+            />
+            <button onClick={sendMessage}>Odeslat</button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
-‬‬
