@@ -82,6 +82,7 @@ export default function App() {
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
   const [chatMsgs, setChatMsgs] = useState([]);
   const [chatText, setChatText] = useState("");
+  const chatUnsub = useRef(null);
 
   // map markers cache
   const markers = useRef({}); // uid -> { marker, popup }
@@ -310,19 +311,30 @@ export default function App() {
 
   /* ─────────────────────────────── Chat vlákna ──────────────────────────── */
 
-  function openChat(uid) {
-    if (!me) return;
-    setOpenChatWith(uid);
-    const pid = pairIdOf(me.uid, uid);
+  useEffect(() => {
+    if (!me || !openChatWith) {
+      setChatMsgs([]);
+      return;
+    }
+    const pid = pairIdOf(me.uid, openChatWith);
     const msgsRef = ref(db, `messages/${pid}`);
-    // živý poslech
-    return onValue(msgsRef, (snap) => {
+    const unsub = onValue(msgsRef, (snap) => {
       const data = snap.val() || {};
       const arr = Object.entries(data)
         .map(([id, m]) => ({ id, ...m }))
         .sort((a, b) => (a.time || 0) - (b.time || 0));
       setChatMsgs(arr);
     });
+    chatUnsub.current = unsub;
+    return () => {
+      chatUnsub.current?.();
+      chatUnsub.current = null;
+    };
+  }, [openChatWith, me]);
+
+  function openChat(uid) {
+    if (!me) return;
+    setOpenChatWith(uid);
   }
 
   async function sendMessage() {
