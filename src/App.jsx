@@ -70,6 +70,7 @@ export default function App() {
   const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
   const [users, setUsers] = useState({});
+  const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
   const [soundEnabled, setSoundEnabled] = useState(
     localStorage.getItem("soundEnabled") === "1"
   );
@@ -230,6 +231,34 @@ export default function App() {
     return () => unsub();
   }, [map, me]);
 
+  // sledování vzájemných pingů
+  useEffect(() => {
+    if (!me) return;
+    const pairRef = ref(db, "pairPings");
+    const unsub = onValue(pairRef, (snap) => {
+      setPairPings(snap.val() || {});
+    });
+    return () => unsub();
+  }, [me]);
+
+  // aktualizace popupů při změně pingů
+  useEffect(() => {
+    Object.entries(markers.current).forEach(([uid, mk]) => {
+      const u = users[uid];
+      if (!u) return;
+      const popupContent = getPopupContent({
+        uid,
+        name: u.name || "Anonym",
+        photoURL: u.photoURL,
+        lastActive: u.lastActive,
+      });
+      mk.getPopup().setDOMContent(popupContent);
+      if (mk.getPopup().isOpen()) {
+        wirePopupButtons(uid);
+      }
+    });
+  }, [pairPings, users]);
+
   function isSafeUrl(url) {
     try {
       const u = new URL(url, window.location.origin);
@@ -241,6 +270,9 @@ export default function App() {
 
   function getPopupContent({ uid, name, photoURL, lastActive }) {
     const meVsOther = uid === me.uid;
+    const pid = pairIdOf(me.uid, uid);
+    const pair = pairPings[pid] || {};
+    const canChat = pair[me.uid] && pair[uid];
     const last = lastActive ? timeAgo(lastActive) : "neznámo";
 
     const root = document.createElement("div");
@@ -300,15 +332,17 @@ export default function App() {
       pingBtn.style.cursor = "pointer";
       btnWrap.appendChild(pingBtn);
 
-      const chatBtn = document.createElement("button");
-      chatBtn.id = `btnChat_${uid}`;
-      chatBtn.textContent = "💬 Chat";
-      chatBtn.style.padding = "6px 10px";
-      chatBtn.style.border = "1px solid #ccc";
-      chatBtn.style.borderRadius = "8px";
-      chatBtn.style.background = "#fff";
-      chatBtn.style.cursor = "pointer";
-      btnWrap.appendChild(chatBtn);
+      if (canChat) {
+        const chatBtn = document.createElement("button");
+        chatBtn.id = `btnChat_${uid}`;
+        chatBtn.textContent = "💬 Chat";
+        chatBtn.style.padding = "6px 10px";
+        chatBtn.style.border = "1px solid #ccc";
+        chatBtn.style.borderRadius = "8px";
+        chatBtn.style.background = "#fff";
+        chatBtn.style.cursor = "pointer";
+        btnWrap.appendChild(chatBtn);
+      }
 
       root.appendChild(btnWrap);
     }
@@ -350,6 +384,8 @@ export default function App() {
     await set(ref(db, `pings/${toUid}/${me.uid}`), {
       time: serverTimestamp(),
     });
+    const pid = pairIdOf(me.uid, toUid);
+    await set(ref(db, `pairPings/${pid}/${me.uid}`), serverTimestamp());
     // také krátké pípnutí odesílateli, aby věděl, že kliknul
     if (soundEnabled) {
       pingSound.current.currentTime = 0;
@@ -393,6 +429,12 @@ export default function App() {
 
   function openChat(uid) {
     if (!me) return;
+    const pid = pairIdOf(me.uid, uid);
+    const pair = pairPings[pid] || {};
+    if (!(pair[me.uid] && pair[uid])) {
+      alert("Chat je dostupný až po vzájemném pingnutí.");
+      return;
+    }
     setOpenChatWith(uid);
   }
 
