@@ -89,13 +89,38 @@ export default function App() {
   // map markers cache
   const markers = useRef({}); // uid -> { marker, popup }
 
-  // zvuk
-  const pingSound = useRef(
-    new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b831a2f36.mp3?filename=notification-113724.mp3")
-  );
-  const msgSound = useRef(
-    new Audio("https://cdn.pixabay.com/download/audio/2023/03/14/audio_e399f99f8d.mp3?filename=message-14377.mp3")
-  );
+  // zvuk pomocí Web Audio API
+  const audioCtx = useRef(null);
+
+  useEffect(() => {
+    audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
+    const unlock = () => {
+      if (audioCtx.current.state === "suspended") {
+        audioCtx.current.resume();
+      }
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+    window.addEventListener("click", unlock);
+    window.addEventListener("touchstart", unlock);
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
+
+  function beep(freq = 880, duration = 0.2) {
+    if (!soundEnabled || !audioCtx.current) return;
+    const ctx = audioCtx.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.15;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  }
 
   useEffect(() => {
     if (localStorage.getItem("soundEnabled") === null) {
@@ -404,8 +429,7 @@ export default function App() {
       Object.entries(data).forEach(([fromUid, obj]) => {
         // přehraj zvuk a smaž ping
         if (soundEnabled) {
-          pingSound.current.currentTime = 0;
-          pingSound.current.play().catch(() => {});
+          beep(880);
         }
         remove(ref(db, `pings/${me.uid}/${fromUid}`));
       });
@@ -422,22 +446,17 @@ export default function App() {
     await set(ref(db, `pairPings/${pid}/${me.uid}`), serverTimestamp());
     // také krátké pípnutí odesílateli, aby věděl, že kliknul
     if (soundEnabled) {
-      pingSound.current.currentTime = 0;
-      pingSound.current.play().catch(() => {});
+      beep(880);
     }
   }
 
   function toggleSound() {
-    if (!soundEnabled) {
-      // „odemknutí“ přehrávání uživatelskou akcí
-      pingSound.current.play().catch(() => {});
-      pingSound.current.pause();
-      msgSound.current.play().catch(() => {});
-      msgSound.current.pause();
-    }
     const next = !soundEnabled;
     setSoundEnabled(next);
     localStorage.setItem("soundEnabled", next ? "1" : "0");
+    if (next) {
+      audioCtx.current?.resume();
+    }
   }
 
   /* ─────────────────────────────── Chat vlákna ──────────────────────────── */
@@ -457,8 +476,7 @@ export default function App() {
       setChatMsgs(arr);
       const last = arr[arr.length - 1];
       if (last && last.from !== me.uid && soundEnabled) {
-        msgSound.current.currentTime = 0;
-        msgSound.current.play().catch(() => {});
+        beep(660);
       }
     });
     chatUnsub.current = unsub;
