@@ -92,6 +92,9 @@ export default function App() {
   const pingSound = useRef(
     new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_8b831a2f36.mp3?filename=notification-113724.mp3")
   );
+  const msgSound = useRef(
+    new Audio("https://cdn.pixabay.com/download/audio/2023/03/14/audio_e399f99f8d.mp3?filename=message-14377.mp3")
+  );
 
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
@@ -421,6 +424,8 @@ export default function App() {
       // „odemknutí“ přehrávání uživatelskou akcí
       pingSound.current.play().catch(() => {});
       pingSound.current.pause();
+      msgSound.current.play().catch(() => {});
+      msgSound.current.pause();
     }
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -442,13 +447,18 @@ export default function App() {
         .map(([id, m]) => ({ id, ...m }))
         .sort((a, b) => (a.time || 0) - (b.time || 0));
       setChatMsgs(arr);
+      const last = arr[arr.length - 1];
+      if (last && last.from !== me.uid && soundEnabled) {
+        msgSound.current.currentTime = 0;
+        msgSound.current.play().catch(() => {});
+      }
     });
     chatUnsub.current = unsub;
     return () => {
       chatUnsub.current?.();
       chatUnsub.current = null;
     };
-  }, [openChatWith, me]);
+  }, [openChatWith, me, soundEnabled]);
 
   function openChat(uid) {
     if (!me) return;
