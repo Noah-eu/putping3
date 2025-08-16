@@ -185,7 +185,11 @@ export default function App() {
             lastActive: u.lastActive,
           });
 
-          const mk = new mapboxgl.Marker({ color, draggable })
+          const el = document.createElement("div");
+          el.className = "marker-avatar";
+          setMarkerAppearance(el, u.photoURL, color);
+
+          const mk = new mapboxgl.Marker({ element: el, draggable })
             .setLngLat([u.lng, u.lat])
             .setPopup(
               new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent)
@@ -203,10 +207,13 @@ export default function App() {
           if (isOnline) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
-          // změna barvy podle online/offline
-          markers.current[uid]
-            .getElement()
-            .querySelector("svg > g > path")?.setAttribute("fill", color);
+
+          // aktualizace vzhledu markeru
+          setMarkerAppearance(
+            markers.current[uid].getElement(),
+            u.photoURL,
+            color
+          );
 
           // aktualizace popupu (jméno, čas, avatar)
           const popupContent = getPopupContent({
@@ -256,8 +263,14 @@ export default function App() {
       if (mk.getPopup().isOpen()) {
         wirePopupButtons(uid);
       }
+
+      const isMe = me && uid === me.uid;
+      const isOnline =
+        u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
+      const color = isMe ? "red" : isOnline ? "#147af3" : "#a8a8a8";
+      setMarkerAppearance(mk.getElement(), u.photoURL, color);
     });
-  }, [pairPings, users]);
+  }, [pairPings, users, me]);
 
   function isSafeUrl(url) {
     try {
@@ -265,6 +278,16 @@ export default function App() {
       return u.protocol === "http:" || u.protocol === "https:";
     } catch {
       return false;
+    }
+  }
+
+  function setMarkerAppearance(el, photoURL, color) {
+    if (photoURL && isSafeUrl(photoURL)) {
+      el.style.backgroundImage = `url(${photoURL})`;
+      el.style.backgroundColor = "";
+    } else {
+      el.style.backgroundImage = "";
+      el.style.backgroundColor = color;
     }
   }
 
