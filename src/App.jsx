@@ -98,6 +98,23 @@ export default function App() {
   );
 
   useEffect(() => {
+    const unlock = () => {
+      pingSound.current.play().catch(() => {});
+      pingSound.current.pause();
+      msgSound.current.play().catch(() => {});
+      msgSound.current.pause();
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+    window.addEventListener("click", unlock);
+    window.addEventListener("touchstart", unlock);
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
     if (localStorage.getItem("soundEnabled") === null) {
       alert("Zvuk je ve výchozím stavu zapnut. Ikonou 🔇/🔊 jej můžeš přepnout.");
       localStorage.setItem("soundEnabled", "1");
