@@ -71,9 +71,10 @@ export default function App() {
   const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
-  const [soundEnabled, setSoundEnabled] = useState(
-    localStorage.getItem("soundEnabled") === "1"
-  );
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const stored = localStorage.getItem("soundEnabled");
+    return stored === null ? true : stored === "1";
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [draftName, setDraftName] = useState(
     localStorage.getItem("userName") || ""
@@ -95,6 +96,13 @@ export default function App() {
   const msgSound = useRef(
     new Audio("https://cdn.pixabay.com/download/audio/2023/03/14/audio_e399f99f8d.mp3?filename=message-14377.mp3")
   );
+
+  useEffect(() => {
+    if (localStorage.getItem("soundEnabled") === null) {
+      alert("Zvuk je ve výchozím stavu zapnut. Ikonou 🔇/🔊 jej můžeš přepnout.");
+      localStorage.setItem("soundEnabled", "1");
+    }
+  }, []);
 
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
@@ -543,6 +551,19 @@ export default function App() {
           gap: 8,
         }}
       >
+        <button
+          onClick={toggleSound}
+          style={{
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #ddd",
+            background: "#fff",
+            cursor: "pointer",
+          }}
+          title={soundEnabled ? "Vypnout zvuk" : "Zapnout zvuk"}
+        >
+          {soundEnabled ? "🔊" : "🔇"}
+        </button>
         <button
           onClick={() => setShowSettings(true)}
           style={{
