@@ -177,7 +177,7 @@ export default function App() {
 
         if (!markers.current[uid]) {
           // popup s tlačítky
-          const popupHTML = getPopupHTML({
+          const popupContent = getPopupContent({
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
@@ -186,7 +186,9 @@ export default function App() {
 
           const mk = new mapboxgl.Marker({ color, draggable })
             .setLngLat([u.lng, u.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML))
+            .setPopup(
+              new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent)
+            )
             .addTo(map);
 
           markers.current[uid] = mk;
@@ -206,13 +208,13 @@ export default function App() {
             .querySelector("svg > g > path")?.setAttribute("fill", color);
 
           // aktualizace popupu (jméno, čas, avatar)
-          const popupHTML = getPopupHTML({
+          const popupContent = getPopupContent({
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
             lastActive: u.lastActive,
           });
-          markers.current[uid].getPopup().setHTML(popupHTML);
+          markers.current[uid].getPopup().setDOMContent(popupContent);
         }
       });
 
@@ -228,33 +230,90 @@ export default function App() {
     return () => unsub();
   }, [map, me]);
 
-  function getPopupHTML({ uid, name, photoURL, lastActive }) {
+  function isSafeUrl(url) {
+    try {
+      const u = new URL(url, window.location.origin);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
+  function getPopupContent({ uid, name, photoURL, lastActive }) {
     const meVsOther = uid === me.uid;
     const last = lastActive ? timeAgo(lastActive) : "neznámo";
-    const avatar = photoURL
-      ? `<img src="${photoURL}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px" />`
-      : "";
-    return `
-      <div style="font: 13px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Ubuntu,Arial">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          ${avatar}
-          <div>
-            <div><b>${name}</b> ${meVsOther ? "(ty)" : ""}</div>
-            <div style="color:#666">${meVsOther ? "Ty" : "Naposledy online"}: ${meVsOther ? "teď" : last}</div>
-          </div>
-        </div>
-        ${
-          meVsOther
-            ? ""
-            : `
-          <div style="display:flex;gap:8px; margin-top:6px">
-            <button id="btnPing_${uid}" style="padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer">📩 Ping</button>
-            <button id="btnChat_${uid}" style="padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer">💬 Chat</button>
-          </div>
-        `
-        }
-      </div>
-    `;
+
+    const root = document.createElement("div");
+    root.style.font =
+      "13px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Ubuntu,Arial";
+
+    const top = document.createElement("div");
+    top.style.display = "flex";
+    top.style.alignItems = "center";
+    top.style.gap = "8px";
+    top.style.marginBottom = "6px";
+    root.appendChild(top);
+
+    if (photoURL && isSafeUrl(photoURL)) {
+      const img = document.createElement("img");
+      img.src = photoURL;
+      img.style.width = "34px";
+      img.style.height = "34px";
+      img.style.borderRadius = "50%";
+      img.style.objectFit = "cover";
+      img.style.verticalAlign = "middle";
+      top.appendChild(img);
+    }
+
+    const txtWrap = document.createElement("div");
+    const nameDiv = document.createElement("div");
+    const bold = document.createElement("b");
+    bold.textContent = name;
+    nameDiv.appendChild(bold);
+    if (meVsOther) {
+      nameDiv.append(" (ty)");
+    }
+
+    const statusDiv = document.createElement("div");
+    statusDiv.style.color = "#666";
+    statusDiv.textContent = `${meVsOther ? "Ty" : "Naposledy online"}: ${
+      meVsOther ? "teď" : last
+    }`;
+
+    txtWrap.appendChild(nameDiv);
+    txtWrap.appendChild(statusDiv);
+    top.appendChild(txtWrap);
+
+    if (!meVsOther) {
+      const btnWrap = document.createElement("div");
+      btnWrap.style.display = "flex";
+      btnWrap.style.gap = "8px";
+      btnWrap.style.marginTop = "6px";
+
+      const pingBtn = document.createElement("button");
+      pingBtn.id = `btnPing_${uid}`;
+      pingBtn.textContent = "📩 Ping";
+      pingBtn.style.padding = "6px 10px";
+      pingBtn.style.border = "1px solid #ccc";
+      pingBtn.style.borderRadius = "8px";
+      pingBtn.style.background = "#fff";
+      pingBtn.style.cursor = "pointer";
+      btnWrap.appendChild(pingBtn);
+
+      const chatBtn = document.createElement("button");
+      chatBtn.id = `btnChat_${uid}`;
+      chatBtn.textContent = "💬 Chat";
+      chatBtn.style.padding = "6px 10px";
+      chatBtn.style.border = "1px solid #ccc";
+      chatBtn.style.borderRadius = "8px";
+      chatBtn.style.background = "#fff";
+      chatBtn.style.cursor = "pointer";
+      btnWrap.appendChild(chatBtn);
+
+      root.appendChild(btnWrap);
+    }
+
+    return root;
   }
 
   function wirePopupButtons(uid) {
