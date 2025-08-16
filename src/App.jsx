@@ -2,14 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import { initializeApp } from "firebase/app";
+import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-} from "firebase/auth";
-import {
-  getDatabase,
   ref,
   set,
   update,
@@ -19,35 +13,15 @@ import {
   serverTimestamp,
 } from "firebase/database";
 import {
-  getStorage,
   ref as sref,
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-
-/* ───────────────────────────────── Firebase ───────────────────────────────── */
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCEUmxYLBn8LExlb2Ei3bUjz6vnEcNHx2Y",
-  authDomain: "putping-dc57e.firebaseapp.com",
-  databaseURL:
-    "https://putping-dc57e-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "putping-dc57e",
-  storageBucket: "putping-dc57e.firebasestorage.app",
-  messagingSenderId: "244045363394",
-  appId: "1:244045363394:web:64e930bff17a816549635b",
-  measurementId: "G-RLMGM46M6X",
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
-const storage = getStorage(app);
+import { db, auth, storage } from "./firebase.js";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
-mapboxgl.accessToken =
-  "pk.eyJ1IjoiZGl2YWRyZWRlIiwiYSI6ImNtZHd5YjR4NTE3OW4ybHF3bmVucWxqcjEifQ.tuOBnAN8iHiYujXklg9h5w"; // ← DOPLŇ TVŮJ TOKEN
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
