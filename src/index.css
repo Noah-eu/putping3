@@ -52,17 +52,23 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   pointer-events: auto;
 }
 .marker-wrapper.active .marker-avatar { display: none; }
-.bubble-img {
+.bubble-gallery {
   width: 75%;
   height: 75%;
   flex: 0 0 75%;
-  border-radius: 50%;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.bubble-photo {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  display: block;
-  margin: 0 auto;
+  scroll-snap-align: center;
   border: 1px solid #e5e7eb;
 }
-.bubble-img.empty { background: #f3f4f6; }
+.bubble-photo.empty { background: #f3f4f6; }
 .bubble-bottom {
   flex: 0 0 25%;
   width: 100%;
