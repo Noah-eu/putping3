@@ -221,7 +221,7 @@ export default function App() {
 
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
-        if (!u.lat || !u.lng) {
+        if (!Number.isFinite(u.lat) || !Number.isFinite(u.lng)) {
           if (markers.current[uid]) {
             if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
@@ -313,7 +313,11 @@ export default function App() {
   useEffect(() => {
     if (!map || !me || centeredOnMe.current) return;
     const u = users[me.uid];
-    if (u && u.lat && u.lng) {
+    if (
+      u &&
+      Number.isFinite(u.lat) &&
+      Number.isFinite(u.lng)
+    ) {
       map.setCenter([u.lng, u.lat]);
       centeredOnMe.current = true;
     }
