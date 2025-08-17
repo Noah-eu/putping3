@@ -60,7 +60,7 @@ export default function App() {
   const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
-  const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat history exists
+  const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const stored = localStorage.getItem("soundEnabled");
     return stored === null ? true : stored === "1";
@@ -407,23 +407,43 @@ export default function App() {
     if (!me) return;
     const pairRef = ref(db, "pairPings");
     const unsub = onValue(pairRef, (snap) => {
-      setPairPings(snap.val() || {});
+      const data = snap.val() || {};
+      setPairPings(data);
+      Object.entries(data).forEach(([pid, obj]) => {
+        const uids = Object.keys(obj || {});
+        if (uids.length >= 2) {
+          set(ref(db, `pairs/${pid}`), true);
+        }
+      });
     });
     return () => unsub();
   }, [me]);
 
-  // sledování historie chatů – pokud existují zprávy, už není potřeba znovu pingovat
+  // sledování povolených chatů – záznamy, které přetrvají i po deploy
+  useEffect(() => {
+    if (!me) return;
+    const pairsRef = ref(db, "pairs");
+    const unsub = onValue(pairsRef, (snap) => {
+      const data = snap.val() || {};
+      const relevant = {};
+      Object.keys(data).forEach((pid) => {
+        const [a, b] = pid.split("_");
+        if (a === me.uid || b === me.uid) relevant[pid] = true;
+      });
+      setChatPairs(relevant);
+    });
+    return () => unsub();
+  }, [me]);
+
+  // pokud existují zprávy, ulož informaci o chatu pro pozdější použití
   useEffect(() => {
     if (!me) return;
     const msgsRef = ref(db, "messages");
     const unsub = onValue(msgsRef, (snap) => {
       const data = snap.val() || {};
-      const pairs = {};
       Object.keys(data).forEach((pid) => {
-        const [a, b] = pid.split("_");
-        if (a === me.uid || b === me.uid) pairs[pid] = true;
+        set(ref(db, `pairs/${pid}`), true);
       });
-      setChatPairs(pairs);
     });
     return () => unsub();
   }, [me]);
@@ -702,6 +722,10 @@ export default function App() {
     });
     const pid = pairIdOf(me.uid, toUid);
     await set(ref(db, `pairPings/${pid}/${me.uid}`), serverTimestamp());
+    const pair = pairPings[pid] || {};
+    if (pair[toUid]) {
+      await set(ref(db, `pairs/${pid}`), true);
+    }
     // také krátké pípnutí odesílateli, aby věděl, že kliknul
     if (soundEnabled) {
       beep(880);
