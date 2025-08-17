@@ -94,6 +94,7 @@ export default function App() {
 
   // zvuk pomocí Web Audio API
   const audioCtx = useRef(null);
+  const lastMsgRef = useRef({}); // pairId -> last message id
 
   useEffect(() => {
     audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -362,6 +363,32 @@ export default function App() {
     return () => unsub();
   }, [me]);
 
+  // zvuk při nové zprávě, i když není chat otevřený
+  useEffect(() => {
+    if (!me) return;
+    const msgsRef = ref(db, "messages");
+    const unsub = onValue(msgsRef, (snap) => {
+      const data = snap.val() || {};
+      const prev = lastMsgRef.current;
+      const next = { ...prev };
+      Object.entries(data).forEach(([pid, msgs]) => {
+        const [a, b] = pid.split("_");
+        if (a !== me.uid && b !== me.uid) return;
+        const arr = Object.entries(msgs)
+          .sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+        const last = arr[arr.length - 1];
+        if (!last) return;
+        const [id, m] = last;
+        if (prev[pid] && prev[pid] !== id && m.from !== me.uid && soundEnabled) {
+          beep(660);
+        }
+        next[pid] = id;
+      });
+      lastMsgRef.current = next;
+    });
+    return () => unsub();
+  }, [me, soundEnabled]);
+
   // aktualizace bublin při změně pingů nebo uživatelů
   useEffect(() => {
     Object.entries(markers.current).forEach(([uid, mk]) => {
@@ -576,10 +603,6 @@ export default function App() {
         .map(([id, m]) => ({ id, ...m }))
         .sort((a, b) => (a.time || 0) - (b.time || 0));
       setChatMsgs(arr);
-      const last = arr[arr.length - 1];
-      if (last && last.from !== me.uid && soundEnabled) {
-        beep(660);
-      }
     });
     chatUnsub.current = unsub;
     return () => {
