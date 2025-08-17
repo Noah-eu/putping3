@@ -71,6 +71,7 @@ export default function App() {
   const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
+  const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat history exists
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const stored = localStorage.getItem("soundEnabled");
     return stored === null ? true : stored === "1";
@@ -345,6 +346,22 @@ export default function App() {
     return () => unsub();
   }, [me]);
 
+  // sledování historie chatů – pokud existují zprávy, už není potřeba znovu pingovat
+  useEffect(() => {
+    if (!me) return;
+    const msgsRef = ref(db, "messages");
+    const unsub = onValue(msgsRef, (snap) => {
+      const data = snap.val() || {};
+      const pairs = {};
+      Object.keys(data).forEach((pid) => {
+        const [a, b] = pid.split("_");
+        if (a === me.uid || b === me.uid) pairs[pid] = true;
+      });
+      setChatPairs(pairs);
+    });
+    return () => unsub();
+  }, [me]);
+
   // aktualizace bublin při změně pingů nebo uživatelů
   useEffect(() => {
     Object.entries(markers.current).forEach(([uid, mk]) => {
@@ -382,7 +399,7 @@ export default function App() {
       const avatar = wrapper.querySelector(".marker-avatar");
       setMarkerAppearance(avatar, u.photoURL, color);
     });
-  }, [pairPings, users, me]);
+  }, [pairPings, chatPairs, users, me]);
 
   function isSafeUrl(url) {
     try {
@@ -431,7 +448,7 @@ export default function App() {
     const meVsOther = uid === me.uid;
     const pid = pairIdOf(me.uid, uid);
     const pair = pairPings[pid] || {};
-    const canChat = pair[me.uid] && pair[uid];
+    const canChat = (pair[me.uid] && pair[uid]) || chatPairs[pid];
     const last = lastActive ? timeAgo(lastActive) : "neznámo";
 
     const root = document.createElement("div");
@@ -575,7 +592,7 @@ export default function App() {
     if (!me) return;
     const pid = pairIdOf(me.uid, uid);
     const pair = pairPings[pid] || {};
-    if (!(pair[me.uid] && pair[uid])) {
+    if (!((pair[me.uid] && pair[uid]) || chatPairs[pid])) {
       alert("Chat je dostupný až po vzájemném pingnutí.");
       return;
     }
