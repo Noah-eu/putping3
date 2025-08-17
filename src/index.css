@@ -53,14 +53,15 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 .marker-wrapper.active .marker-avatar { display: none; }
 .bubble-gallery {
-  width: 75%;
-  height: 75%;
-  flex: 0 0 75%;
-  display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  border-radius: 50%;
+    width: 75%;
+    height: 75%;
+    flex: 0 0 75%;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    border-radius: 50%;
+    touch-action: pan-y;
 }
 .bubble-photo {
   flex: 0 0 100%;
