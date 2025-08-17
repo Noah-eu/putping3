@@ -1361,7 +1361,7 @@ export default function App() {
             setTimeout(() => setShowIntro(false), 500);
           }}
         >
-          <img src="/splash.svg" alt="PutPing" className="intro-screen__img" />
+          <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
         </div>
       )}
     </div>
