@@ -228,12 +228,21 @@ export default function App() {
           return;
         }
 
-        // styl podle stavu
+        // styl a viditelnost podle stavu
         const isMe = uid === me.uid;
         const isOnline =
           u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
 
-        const color = isMe ? "red" : isOnline ? "#147af3" : "#a8a8a8";
+        // skrýt zmapy uživatele, kteří jsou offline (zůstává pouze můj marker)
+        if (!isOnline && !isMe) {
+          if (markers.current[uid]) {
+            markers.current[uid].remove();
+            delete markers.current[uid];
+          }
+          return;
+        }
+
+        const color = isMe ? "red" : "#147af3";
         const draggable = false;
 
         if (!markers.current[uid]) {
@@ -336,7 +345,14 @@ export default function App() {
       const isMe = me && uid === me.uid;
       const isOnline =
         u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
-      const color = isMe ? "red" : isOnline ? "#147af3" : "#a8a8a8";
+
+      if (!isOnline && !isMe) {
+        mk.remove();
+        delete markers.current[uid];
+        return;
+      }
+
+      const color = isMe ? "red" : "#147af3";
       setMarkerAppearance(mk.getElement(), u.photoURL, color);
     });
   }, [pairPings, users, me]);
