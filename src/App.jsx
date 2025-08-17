@@ -873,11 +873,14 @@ export default function App() {
                 setFabOpen(false);
               }}
               style={{
-                padding: "8px 10px",
-                borderRadius: 10,
+                width: 48,
+                height: 48,
+                borderRadius: 24,
                 border: "1px solid #ddd",
-                background: "#fff",
+                background: "transparent",
                 cursor: "pointer",
+                fontSize: 24,
+                lineHeight: "24px",
               }}
               title="Nastavení"
             >
@@ -889,11 +892,14 @@ export default function App() {
                 setFabOpen(false);
               }}
               style={{
-                padding: "8px 10px",
-                borderRadius: 10,
+                width: 48,
+                height: 48,
+                borderRadius: 24,
                 border: "1px solid #ddd",
-                background: "#fff",
+                background: "transparent",
                 cursor: "pointer",
+                fontSize: 24,
+                lineHeight: "24px",
               }}
               title="Galerie"
             >
