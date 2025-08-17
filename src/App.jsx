@@ -69,6 +69,7 @@ export default function App() {
     localStorage.getItem("userName") || ""
   );
   const [fabOpen, setFabOpen] = useState(false);
+  const [showChatList, setShowChatList] = useState(false);
 
   // chat
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
@@ -719,6 +720,16 @@ export default function App() {
             >
               ⚙️
             </button>
+            <button
+              onClick={() => {
+                setShowChatList(true);
+                setFabOpen(false);
+              }}
+              className="fab-chat"
+              title="Minulé chaty"
+            >
+              💬
+            </button>
           </>
         )}
         <button
@@ -741,6 +752,40 @@ export default function App() {
 
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
+
+      {showChatList && (
+        <div className="chat-list">
+          <div className="chat-list__header">Minulé chaty</div>
+          <div className="chat-list__items">
+            {Object.keys(chatPairs).length === 0 && (
+              <div className="chat-list__empty">Žádné chaty</div>
+            )}
+            {Object.keys(chatPairs).map((pid) => {
+              const [a, b] = pid.split("_");
+              const otherUid = a === me.uid ? b : a;
+              const u = users[otherUid];
+              return (
+                <button
+                  key={pid}
+                  className="chat-list__item"
+                  onClick={() => {
+                    openChat(otherUid);
+                    setShowChatList(false);
+                  }}
+                >
+                  {u?.name || "Neznámý uživatel"}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            className="chat-list__close"
+            onClick={() => setShowChatList(false)}
+          >
+            Zavřít
+          </button>
+        </div>
+      )}
 
       {/* Chat panel */}
       {openChatWith && (
