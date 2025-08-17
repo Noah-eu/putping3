@@ -6,6 +6,28 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 /* Map container */
 .map { width: 100vw; height: 100vh; }
 
+/* Location consent modal */
+.consent-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.consent-modal__content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 300px;
+}
+
 /* Map user marker */
 .marker-wrapper {
   position: relative;
