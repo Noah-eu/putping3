@@ -247,7 +247,7 @@ export default function App() {
         }
 
         const highlight = markerHighlightsRef.current[uid];
-        const color = isMe ? "red" : highlight || "#147af3";
+        const baseColor = isMe ? "red" : "#147af3";
         const draggable = false;
 
         if (!markers.current[uid]) {
@@ -255,7 +255,7 @@ export default function App() {
           wrapper.className = "marker-wrapper";
           const avatar = document.createElement("div");
           avatar.className = "marker-avatar";
-          setMarkerAppearance(avatar, u.photoURL, color);
+          setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
           wrapper.appendChild(avatar);
 
           const bubble = getBubbleContent({
@@ -282,7 +282,7 @@ export default function App() {
 
           const wrapper = markers.current[uid].getElement();
           const avatar = wrapper.querySelector(".marker-avatar");
-          setMarkerAppearance(avatar, u.photoURL, color);
+          setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
           const newBubble = getBubbleContent({
@@ -436,9 +436,9 @@ export default function App() {
       }
 
       const highlight = markerHighlights[uid];
-      const color = isMe ? "red" : highlight || "#147af3";
+      const baseColor = isMe ? "red" : "#147af3";
       const avatar = wrapper.querySelector(".marker-avatar");
-      setMarkerAppearance(avatar, u.photoURL, color);
+      setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
     });
   }, [pairPings, chatPairs, users, me, markerHighlights]);
 
@@ -451,7 +451,8 @@ export default function App() {
     }
   }
 
-  function setMarkerAppearance(el, photoURL, color) {
+  function setMarkerAppearance(el, photoURL, baseColor, highlight) {
+    const color = highlight || baseColor;
     if (photoURL && isSafeUrl(photoURL)) {
       el.style.backgroundImage = `url(${photoURL})`;
       el.style.backgroundColor = "";
@@ -459,6 +460,9 @@ export default function App() {
       el.style.backgroundImage = "";
       el.style.backgroundColor = color;
     }
+    el.style.boxShadow = highlight
+      ? `0 0 0 2px ${highlight}`
+      : "0 0 0 2px rgba(0,0,0,.1)";
   }
 
   function toggleBubble(uid) {
