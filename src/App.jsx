@@ -298,6 +298,8 @@ export default function App() {
           );
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
+          const scrollLeft =
+            oldBubble?.querySelector(".bubble-gallery")?.scrollLeft || 0;
           const newBubble = getBubbleContent({
             uid,
             name: u.name || "Anonym",
@@ -305,6 +307,8 @@ export default function App() {
             photoURL: u.photoURL,
           });
           wrapper.replaceChild(newBubble, oldBubble);
+          const newGallery = newBubble.querySelector(".bubble-gallery");
+          if (newGallery) newGallery.scrollLeft = scrollLeft;
           if (wrapper.classList.contains("active")) {
             wireBubbleButtons(uid);
           }
