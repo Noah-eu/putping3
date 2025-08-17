@@ -72,6 +72,7 @@ export default function App() {
   const [fabOpen, setFabOpen] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [deleteIdx, setDeleteIdx] = useState(null);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
 
   // ref pro nejnovější zvýraznění markerů
@@ -798,6 +799,18 @@ export default function App() {
     }
   }
 
+  async function deletePhoto() {
+    if (deleteIdx === null || !me) return;
+    const arr = [...(users[me.uid]?.photos || [])];
+    arr.splice(deleteIdx, 1);
+    await update(ref(db, `users/${me.uid}`), {
+      photos: arr,
+      photoURL: arr[0] || null,
+      lastActive: Date.now(),
+    });
+    setDeleteIdx(null);
+  }
+
   /* ──────────────────────────────── Render UI ───────────────────────────── */
 
   return (
@@ -1075,17 +1088,42 @@ export default function App() {
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
             >
               {(users[me.uid]?.photos || []).map((url, idx) => (
-                <img
-                  key={idx}
-                  src={url}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    border: "1px solid #ddd",
-                  }}
-                />
+                <div key={idx} style={{ position: "relative" }}>
+                  <img
+                    src={url}
+                    style={{
+                      width: 80,
+                      height: 80,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteIdx(idx);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      background: "#f33",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 18,
+                      height: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✖
+                  </button>
+                </div>
               ))}
               {(users[me.uid]?.photos || []).length === 0 && (
                 <div style={{ fontSize: 13, color: "#666" }}>Žádné fotky</div>
@@ -1107,6 +1145,64 @@ export default function App() {
               </button>
             </div>
           </div>
+          {deleteIdx !== null && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteIdx(null);
+              }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 40,
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: 260,
+                  background: "#fff",
+                  borderRadius: 14,
+                  padding: 16,
+                  boxShadow: "0 10px 30px rgba(0,0,0,.15)",
+                }}
+              >
+                <div style={{ marginBottom: 16 }}>
+                  Opravdu chcete smazat fotku?
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    onClick={() => setDeleteIdx(null)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Ne
+                  </button>
+                  <button
+                    onClick={deletePhoto}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Ano
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
