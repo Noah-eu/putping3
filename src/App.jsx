@@ -274,7 +274,8 @@ export default function App() {
         }
 
         const highlight = markerHighlightsRef.current[uid];
-        const baseColor = isMe ? "red" : "#147af3";
+        const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
+        const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
         const draggable = false;
 
         if (!markers.current[uid]) {
@@ -473,7 +474,8 @@ export default function App() {
       }
 
       const highlight = markerHighlights[uid];
-      const baseColor = isMe ? "red" : "#147af3";
+      const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
+      const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
       const avatar = wrapper.querySelector(".marker-avatar");
       setMarkerAppearance(
         avatar,
