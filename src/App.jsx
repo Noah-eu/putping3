@@ -73,6 +73,8 @@ export default function App() {
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [fadeIntro, setFadeIntro] = useState(false);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
@@ -1349,6 +1351,17 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {showIntro && (
+        <div
+          className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
+          onClick={() => {
+            setFadeIntro(true);
+            setTimeout(() => setShowIntro(false), 500);
+          }}
+        >
+          <img src="/splash.svg" alt="PutPing" className="intro-screen__img" />
         </div>
       )}
     </div>
