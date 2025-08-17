@@ -518,16 +518,18 @@ export default function App() {
     if (!meVsOther) {
       const actions = document.createElement("div");
       actions.className = "bubble-actions";
-      const pingBtn = document.createElement("button");
-      pingBtn.id = `btnPing_${uid}`;
-      pingBtn.textContent = "📩 Ping";
-      actions.appendChild(pingBtn);
+
+      const actionBtn = document.createElement("button");
+      actionBtn.id = `btnAction_${uid}`;
       if (canChat) {
-        const chatBtn = document.createElement("button");
-        chatBtn.id = `btnChat_${uid}`;
-        chatBtn.textContent = "💬 Chat";
-        actions.appendChild(chatBtn);
+        actionBtn.textContent = "💬 Chat";
+        actionBtn.dataset.action = "chat";
+      } else {
+        actionBtn.textContent = "📩 Ping";
+        actionBtn.dataset.action = "ping";
       }
+      actions.appendChild(actionBtn);
+
       bottom.appendChild(actions);
     }
 
@@ -540,17 +542,15 @@ export default function App() {
     const mk = markers.current[uid];
     if (!mk) return;
     const el = mk.getElement();
-    const pingBtn = el.querySelector(`#btnPing_${uid}`);
-    const chatBtn = el.querySelector(`#btnChat_${uid}`);
-    if (pingBtn)
-      pingBtn.onclick = (e) => {
+    const btn = el.querySelector(`#btnAction_${uid}`);
+    if (btn)
+      btn.onclick = (e) => {
         e.stopPropagation();
-        sendPing(uid);
-      };
-    if (chatBtn)
-      chatBtn.onclick = (e) => {
-        e.stopPropagation();
-        openChat(uid);
+        if (btn.dataset.action === "chat") {
+          openChat(uid);
+        } else {
+          sendPing(uid);
+        }
       };
   }
 
