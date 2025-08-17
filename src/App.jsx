@@ -87,7 +87,8 @@ export default function App() {
   const chatUnsub = useRef(null);
 
   // map markers cache
-  const markers = useRef({}); // uid -> { marker, popup }
+  const markers = useRef({}); // uid -> marker
+  const openBubble = useRef(null); // uid otevřené bubliny
   const centeredOnMe = useRef(false);
 
   // zvuk pomocí Web Audio API
@@ -222,6 +223,7 @@ export default function App() {
       Object.entries(data).forEach(([uid, u]) => {
         if (!u.lat || !u.lng) {
           if (markers.current[uid]) {
+            if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
             delete markers.current[uid];
           }
@@ -233,9 +235,10 @@ export default function App() {
         const isOnline =
           u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
 
-        // skrýt zmapy uživatele, kteří jsou offline (zůstává pouze můj marker)
+        // skrýt z mapy uživatele, kteří jsou offline (zůstává pouze můj marker)
         if (!isOnline && !isMe) {
           if (markers.current[uid]) {
+            if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
             delete markers.current[uid];
           }
@@ -246,58 +249,58 @@ export default function App() {
         const draggable = false;
 
         if (!markers.current[uid]) {
-          // popup s tlačítky
-          const popupContent = getPopupContent({
+          const wrapper = document.createElement("div");
+          wrapper.className = "marker-wrapper";
+          const avatar = document.createElement("div");
+          avatar.className = "marker-avatar";
+          setMarkerAppearance(avatar, u.photoURL, color);
+          wrapper.appendChild(avatar);
+
+          const bubble = getBubbleContent({
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
             lastActive: u.lastActive,
           });
+          wrapper.appendChild(bubble);
 
-          const el = document.createElement("div");
-          el.className = "marker-avatar";
-          setMarkerAppearance(el, u.photoURL, color);
+          avatar.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleBubble(uid);
+          });
 
-          const mk = new mapboxgl.Marker({ element: el, draggable })
+          const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
             .setLngLat([u.lng, u.lat])
-            .setPopup(
-              new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent)
-            )
             .addTo(map);
 
           markers.current[uid] = mk;
-
-          mk.getElement().addEventListener("click", () => {
-            // delegace kliků uvnitř popupu (ping / chat)
-            setTimeout(() => wirePopupButtons(uid), 0);
-          });
         } else {
-          // přesun markeru pouze když je online
           if (isOnline) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
 
-          // aktualizace vzhledu markeru
-          setMarkerAppearance(
-            markers.current[uid].getElement(),
-            u.photoURL,
-            color
-          );
+          const wrapper = markers.current[uid].getElement();
+          const avatar = wrapper.querySelector(".marker-avatar");
+          setMarkerAppearance(avatar, u.photoURL, color);
 
-          // aktualizace popupu (jméno, čas, avatar)
-          const popupContent = getPopupContent({
+          const oldBubble = wrapper.querySelector(".marker-bubble");
+          const newBubble = getBubbleContent({
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
             lastActive: u.lastActive,
           });
-          markers.current[uid].getPopup().setDOMContent(popupContent);
+          wrapper.replaceChild(newBubble, oldBubble);
+          if (wrapper.classList.contains("active")) {
+            wireBubbleButtons(uid);
+          }
         }
       });
 
       // odmazat marker, když uživatel zmizel z DB
       Object.keys(markers.current).forEach((uid) => {
         if (!data[uid]) {
+          if (openBubble.current === uid) openBubble.current = null;
           markers.current[uid].remove();
           delete markers.current[uid];
         }
@@ -316,6 +319,18 @@ export default function App() {
     }
   }, [map, me, users]);
 
+  useEffect(() => {
+    if (!map) return;
+    const handler = () => {
+      if (openBubble.current) {
+        closeBubble(openBubble.current);
+        openBubble.current = null;
+      }
+    };
+    map.on("click", handler);
+    return () => map.off("click", handler);
+  }, [map]);
+
   // sledování vzájemných pingů
   useEffect(() => {
     if (!me) return;
@@ -326,20 +341,26 @@ export default function App() {
     return () => unsub();
   }, [me]);
 
-  // aktualizace popupů při změně pingů
+  // aktualizace bublin při změně pingů nebo uživatelů
   useEffect(() => {
     Object.entries(markers.current).forEach(([uid, mk]) => {
       const u = users[uid];
       if (!u) return;
-      const popupContent = getPopupContent({
+      const wrapper = mk.getElement();
+      const oldBubble = wrapper.querySelector(".marker-bubble");
+      const newBubble = getBubbleContent({
         uid,
         name: u.name || "Anonym",
         photoURL: u.photoURL,
         lastActive: u.lastActive,
       });
-      mk.getPopup().setDOMContent(popupContent);
-      if (mk.getPopup().isOpen()) {
-        wirePopupButtons(uid);
+      if (oldBubble) {
+        wrapper.replaceChild(newBubble, oldBubble);
+      } else {
+        wrapper.appendChild(newBubble);
+      }
+      if (wrapper.classList.contains("active")) {
+        wireBubbleButtons(uid);
       }
 
       const isMe = me && uid === me.uid;
@@ -347,13 +368,15 @@ export default function App() {
         u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
 
       if (!isOnline && !isMe) {
+        if (openBubble.current === uid) openBubble.current = null;
         mk.remove();
         delete markers.current[uid];
         return;
       }
 
       const color = isMe ? "red" : "#147af3";
-      setMarkerAppearance(mk.getElement(), u.photoURL, color);
+      const avatar = wrapper.querySelector(".marker-avatar");
+      setMarkerAppearance(avatar, u.photoURL, color);
     });
   }, [pairPings, users, me]);
 
@@ -376,7 +399,31 @@ export default function App() {
     }
   }
 
-  function getPopupContent({ uid, name, photoURL, lastActive }) {
+  function toggleBubble(uid) {
+    if (openBubble.current && openBubble.current !== uid) {
+      closeBubble(openBubble.current);
+    }
+    const mk = markers.current[uid];
+    if (!mk) return;
+    const el = mk.getElement();
+    const active = el.classList.contains("active");
+    if (active) {
+      el.classList.remove("active");
+      openBubble.current = null;
+    } else {
+      el.classList.add("active");
+      openBubble.current = uid;
+      wireBubbleButtons(uid);
+    }
+  }
+
+  function closeBubble(uid) {
+    const mk = markers.current[uid];
+    if (!mk) return;
+    mk.getElement().classList.remove("active");
+  }
+
+  function getBubbleContent({ uid, name, photoURL, lastActive }) {
     const meVsOther = uid === me.uid;
     const pid = pairIdOf(me.uid, uid);
     const pair = pairPings[pid] || {};
@@ -384,85 +431,65 @@ export default function App() {
     const last = lastActive ? timeAgo(lastActive) : "neznámo";
 
     const root = document.createElement("div");
-    root.style.font =
-      "13px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Ubuntu,Arial";
+    root.className = "marker-bubble";
+    root.addEventListener("click", (e) => e.stopPropagation());
 
-    const top = document.createElement("div");
-    top.style.display = "flex";
-    top.style.alignItems = "center";
-    top.style.gap = "8px";
-    top.style.marginBottom = "6px";
-    root.appendChild(top);
-
+    let img;
     if (photoURL && isSafeUrl(photoURL)) {
-      const img = document.createElement("img");
+      img = document.createElement("img");
       img.src = photoURL;
-      img.style.width = "34px";
-      img.style.height = "34px";
-      img.style.borderRadius = "50%";
-      img.style.objectFit = "cover";
-      img.style.verticalAlign = "middle";
-      top.appendChild(img);
+      img.className = "bubble-img";
+    } else {
+      img = document.createElement("div");
+      img.className = "bubble-img empty";
     }
+    root.appendChild(img);
 
-    const txtWrap = document.createElement("div");
     const nameDiv = document.createElement("div");
-    const bold = document.createElement("b");
-    bold.textContent = name;
-    nameDiv.appendChild(bold);
-    if (meVsOther) {
-      nameDiv.append(" (ty)");
-    }
+    nameDiv.className = "bubble-name";
+    nameDiv.textContent = name + (meVsOther ? " (ty)" : "");
+    root.appendChild(nameDiv);
 
-    const statusDiv = document.createElement("div");
-    statusDiv.style.color = "#666";
-    statusDiv.textContent = `${meVsOther ? "Ty" : "Naposledy online"}: ${
-      meVsOther ? "teď" : last
-    }`;
-
-    txtWrap.appendChild(nameDiv);
-    txtWrap.appendChild(statusDiv);
-    top.appendChild(txtWrap);
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "bubble-info";
+    infoDiv.textContent = meVsOther ? "teď" : `Naposledy online: ${last}`;
+    root.appendChild(infoDiv);
 
     if (!meVsOther) {
-      const btnWrap = document.createElement("div");
-      btnWrap.style.display = "flex";
-      btnWrap.style.gap = "8px";
-      btnWrap.style.marginTop = "6px";
-
+      const actions = document.createElement("div");
+      actions.className = "bubble-actions";
       const pingBtn = document.createElement("button");
       pingBtn.id = `btnPing_${uid}`;
       pingBtn.textContent = "📩 Ping";
-      pingBtn.style.padding = "6px 10px";
-      pingBtn.style.border = "1px solid #ccc";
-      pingBtn.style.borderRadius = "8px";
-      pingBtn.style.background = "#fff";
-      pingBtn.style.cursor = "pointer";
-      btnWrap.appendChild(pingBtn);
-
+      actions.appendChild(pingBtn);
       if (canChat) {
         const chatBtn = document.createElement("button");
         chatBtn.id = `btnChat_${uid}`;
         chatBtn.textContent = "💬 Chat";
-        chatBtn.style.padding = "6px 10px";
-        chatBtn.style.border = "1px solid #ccc";
-        chatBtn.style.borderRadius = "8px";
-        chatBtn.style.background = "#fff";
-        chatBtn.style.cursor = "pointer";
-        btnWrap.appendChild(chatBtn);
+        actions.appendChild(chatBtn);
       }
-
-      root.appendChild(btnWrap);
+      root.appendChild(actions);
     }
 
     return root;
   }
 
-  function wirePopupButtons(uid) {
-    const pingBtn = document.getElementById(`btnPing_${uid}`);
-    const chatBtn = document.getElementById(`btnChat_${uid}`);
-    if (pingBtn) pingBtn.onclick = () => sendPing(uid);
-    if (chatBtn) chatBtn.onclick = () => openChat(uid);
+  function wireBubbleButtons(uid) {
+    const mk = markers.current[uid];
+    if (!mk) return;
+    const el = mk.getElement();
+    const pingBtn = el.querySelector(`#btnPing_${uid}`);
+    const chatBtn = el.querySelector(`#btnChat_${uid}`);
+    if (pingBtn)
+      pingBtn.onclick = (e) => {
+        e.stopPropagation();
+        sendPing(uid);
+      };
+    if (chatBtn)
+      chatBtn.onclick = (e) => {
+        e.stopPropagation();
+        openChat(uid);
+      };
   }
 
   /* ─────────────────────────────── Ping / zvuk ──────────────────────────── */
