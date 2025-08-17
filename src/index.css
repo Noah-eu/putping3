@@ -7,7 +7,11 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .map { width: 100vw; height: 100vh; }
 
 /* Map user marker */
-.marker-wrapper { position: relative; }
+.marker-wrapper {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
 .marker-avatar {
   width: 32px;
   height: 32px;
