@@ -213,21 +213,25 @@ export default function App() {
     if (!me || !locationConsent) return;
     if (!("geolocation" in navigator)) return;
     const meRef = ref(db, `users/${me.uid}`);
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        update(meRef, {
-          lat: latitude,
-          lng: longitude,
-          lastActive: Date.now(),
-          online: true,
-        });
-      },
-      (err) => {
-        console.warn("Geolocation error", err);
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-    );
+    const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
+
+    const updatePos = (pos) => {
+      const { latitude, longitude } = pos.coords;
+      update(meRef, {
+        lat: latitude,
+        lng: longitude,
+        lastActive: Date.now(),
+        online: true,
+      });
+    };
+    const handleErr = (err) => {
+      console.warn("Geolocation error", err);
+    };
+
+    // iOS may not trigger watchPosition immediately; request current position once
+    navigator.geolocation.getCurrentPosition(updatePos, handleErr, opts);
+    const id = navigator.geolocation.watchPosition(updatePos, handleErr, opts);
+
     return () => navigator.geolocation.clearWatch(id);
   }, [me, locationConsent]);
 
