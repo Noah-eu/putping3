@@ -575,11 +575,11 @@ export default function App() {
 
   return (
     <div>
-      {/* Horní lišta – jen ozubené kolo, ostatní v modalu */}
+      {/* Plovoucí tlačítka – jen ozubené kolo, ostatní v modalu */}
       <div
         style={{
           position: "absolute",
-          top: 10,
+          bottom: 10,
           right: 10,
           zIndex: 10,
           display: "flex",
