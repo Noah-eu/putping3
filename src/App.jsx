@@ -77,6 +77,7 @@ export default function App() {
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
   );
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
@@ -137,6 +138,12 @@ export default function App() {
   function acceptLocation() {
     localStorage.setItem("locationConsent", "1");
     setLocationConsent(true);
+    if (navigator.geolocation) {
+      if (navigator.geolocation.requestAuthorization) {
+        navigator.geolocation.requestAuthorization();
+      }
+      navigator.geolocation.getCurrentPosition(() => {}, () => {});
+    }
   }
 
   useEffect(() => {
@@ -834,7 +841,7 @@ export default function App() {
 
   return (
     <div>
-      {!locationConsent && (
+      {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
             <h2>Souhlas se sdílením polohy</h2>
