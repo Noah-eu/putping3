@@ -58,7 +58,9 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   flex: 0 0 75%;
   display: flex;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
+  border-radius: 50%;
 }
 .bubble-photo {
   flex: 0 0 100%;
@@ -67,6 +69,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   object-fit: cover;
   scroll-snap-align: center;
   border: 1px solid #e5e7eb;
+  border-radius: 50%;
 }
 .bubble-photo.empty { background: #f3f4f6; }
 .bubble-bottom {
