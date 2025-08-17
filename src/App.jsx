@@ -18,6 +18,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { db, auth, storage } from "./firebase.js";
+import Sortable from "sortablejs";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -92,6 +93,8 @@ export default function App() {
   const audioCtx = useRef(null);
   const lastMsgRef = useRef({}); // pairId -> last message id
   const messagesLoaded = useRef(false);
+  const galleryRef = useRef(null);
+  const sortableRef = useRef(null);
 
   useEffect(() => {
     markerHighlightsRef.current = markerHighlights;
@@ -150,6 +153,29 @@ export default function App() {
       localStorage.setItem("soundEnabled", "1");
     }
   }, []);
+
+  useEffect(() => {
+    if (showGallery && galleryRef.current && !sortableRef.current) {
+      sortableRef.current = new Sortable(galleryRef.current, {
+        animation: 150,
+        onEnd: async (evt) => {
+          if (!me) return;
+          const arr = [...(users[me.uid]?.photos || [])];
+          const [moved] = arr.splice(evt.oldIndex, 1);
+          arr.splice(evt.newIndex, 0, moved);
+          await update(ref(db, `users/${me.uid}`), {
+            photos: arr,
+            photoURL: arr[0] || null,
+            lastActive: Date.now(),
+          });
+        },
+      });
+    }
+    if (!showGallery && sortableRef.current) {
+      sortableRef.current.destroy();
+      sortableRef.current = null;
+    }
+  }, [showGallery, users, me]);
 
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
@@ -1044,7 +1070,10 @@ export default function App() {
               </button>
             </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <div
+              ref={galleryRef}
+              style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
+            >
               {(users[me.uid]?.photos || []).map((url, idx) => (
                 <img
                   key={idx}

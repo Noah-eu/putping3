@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
     "firebase": "^10.0.0",
     "mapbox-gl": "^2.15.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    "sortablejs": "^1.15.6",
     "vite": "^7.1.2"
   },
   "scripts": {
