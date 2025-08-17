@@ -74,6 +74,9 @@ export default function App() {
   const [showGallery, setShowGallery] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
+  const [locationConsent, setLocationConsent] = useState(() =>
+    localStorage.getItem("locationConsent") === "1"
+  );
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
@@ -129,6 +132,11 @@ export default function App() {
     osc.frequency.value = freq;
     osc.start();
     osc.stop(ctx.currentTime + duration);
+  }
+
+  function acceptLocation() {
+    localStorage.setItem("locationConsent", "1");
+    setLocationConsent(true);
   }
 
   useEffect(() => {
@@ -197,27 +205,31 @@ export default function App() {
         online: true,
       });
 
-      // geolokace (watch)
-      if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-          (pos) => {
-            const { latitude, longitude } = pos.coords;
-            update(meRef, {
-              lat: latitude,
-              lng: longitude,
-              lastActive: Date.now(),
-              online: true,
-            });
-          },
-          (err) => {
-            console.warn("Geolocation error", err);
-          },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-        );
-      }
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!me || !locationConsent) return;
+    if (!("geolocation" in navigator)) return;
+    const meRef = ref(db, `users/${me.uid}`);
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        update(meRef, {
+          lat: latitude,
+          lng: longitude,
+          lastActive: Date.now(),
+          online: true,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation error", err);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [me, locationConsent]);
 
   /* ───────────────────────────── Init mapy ──────────────────────────────── */
 
@@ -818,6 +830,17 @@ export default function App() {
 
   return (
     <div>
+      {!locationConsent && (
+        <div className="consent-modal">
+          <div className="consent-modal__content">
+            <h2>Souhlas se sdílením polohy</h2>
+            <p>Chceme zobrazit tvoji pozici na mapě.</p>
+            <button className="btn" onClick={acceptLocation}>
+              Souhlasím
+            </button>
+          </div>
+        </div>
+      )}
       {/* Plovoucí menu (FAB) */}
       <div
         style={{
