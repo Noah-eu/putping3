@@ -80,6 +80,7 @@ export default function App() {
   const [chatMsgs, setChatMsgs] = useState([]);
   const [chatText, setChatText] = useState("");
   const chatUnsub = useRef(null);
+  const chatBoxRef = useRef(null);
 
   // map markers cache
   const markers = useRef({}); // uid -> marker
@@ -624,6 +625,12 @@ export default function App() {
     };
   }, [openChatWith, me, soundEnabled]);
 
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  }, [chatMsgs, openChatWith]);
+
   function openChat(uid) {
     if (!me) return;
     const pid = pairIdOf(me.uid, uid);
@@ -851,7 +858,7 @@ export default function App() {
               ✖
             </button>
           </div>
-          <div style={{ padding: 10, gap: 6, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+          <div ref={chatBoxRef} style={{ padding: 10, gap: 6, display: "flex", flexDirection: "column", overflowY: "auto" }}>
             {chatMsgs.map((m) => {
               const mine = m.from === me?.uid;
               return (
