@@ -73,8 +73,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   padding: 4px 8px;
 }
 .bubble-name { font-weight: 700; }
-.bubble-info { color: #6b7280; margin-top: 2px; }
-.bubble-actions { margin-top: 4px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.bubble-actions { margin-top: 2px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .bubble-actions button {
   padding: 4px 8px;
   border: 1px solid #ccc;
