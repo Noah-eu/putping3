@@ -220,7 +220,13 @@ export default function App() {
 
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
-        if (!u.lat || !u.lng) return;
+        if (!u.lat || !u.lng) {
+          if (markers.current[uid]) {
+            markers.current[uid].remove();
+            delete markers.current[uid];
+          }
+          return;
+        }
 
         // styl podle stavu
         const isMe = uid === me.uid;
