@@ -256,12 +256,18 @@ export default function App() {
           wrapper.className = "marker-wrapper";
           const avatar = document.createElement("div");
           avatar.className = "marker-avatar";
-          setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
+          setMarkerAppearance(
+            avatar,
+            (u.photos && u.photos[0]) || u.photoURL,
+            baseColor,
+            highlight
+          );
           wrapper.appendChild(avatar);
 
           const bubble = getBubbleContent({
             uid,
             name: u.name || "Anonym",
+            photos: u.photos,
             photoURL: u.photoURL,
           });
           wrapper.appendChild(bubble);
@@ -283,12 +289,18 @@ export default function App() {
 
           const wrapper = markers.current[uid].getElement();
           const avatar = wrapper.querySelector(".marker-avatar");
-          setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
+          setMarkerAppearance(
+            avatar,
+            (u.photos && u.photos[0]) || u.photoURL,
+            baseColor,
+            highlight
+          );
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
           const newBubble = getBubbleContent({
             uid,
             name: u.name || "Anonym",
+            photos: u.photos,
             photoURL: u.photoURL,
           });
           wrapper.replaceChild(newBubble, oldBubble);
@@ -407,6 +419,7 @@ export default function App() {
       const newBubble = getBubbleContent({
         uid,
         name: u.name || "Anonym",
+        photos: u.photos,
         photoURL: u.photoURL,
       });
       if (oldBubble) {
@@ -432,7 +445,12 @@ export default function App() {
       const highlight = markerHighlights[uid];
       const baseColor = isMe ? "red" : "#147af3";
       const avatar = wrapper.querySelector(".marker-avatar");
-      setMarkerAppearance(avatar, u.photoURL, baseColor, highlight);
+      setMarkerAppearance(
+        avatar,
+        (u.photos && u.photos[0]) || u.photoURL,
+        baseColor,
+        highlight
+      );
     });
   }, [pairPings, chatPairs, users, me, markerHighlights]);
 
@@ -483,7 +501,7 @@ export default function App() {
     mk.getElement().classList.remove("active");
   }
 
-  function getBubbleContent({ uid, name, photoURL }) {
+  function getBubbleContent({ uid, name, photos, photoURL }) {
     const meVsOther = uid === me.uid;
     const pid = pairIdOf(me.uid, uid);
     const pair = pairPings[pid] || {};
@@ -493,16 +511,28 @@ export default function App() {
     root.className = "marker-bubble";
     root.addEventListener("click", (e) => e.stopPropagation());
 
-    let img;
-    if (photoURL && isSafeUrl(photoURL)) {
-      img = document.createElement("img");
-      img.src = photoURL;
-      img.className = "bubble-img";
+    const list = Array.isArray(photos) && photos.length
+      ? photos
+      : photoURL
+      ? [photoURL]
+      : [];
+
+    const gallery = document.createElement("div");
+    gallery.className = "bubble-gallery";
+    if (list.length === 0) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "bubble-photo empty";
+      gallery.appendChild(placeholder);
     } else {
-      img = document.createElement("div");
-      img.className = "bubble-img empty";
+      list.forEach((url) => {
+        if (!isSafeUrl(url)) return;
+        const img = document.createElement("img");
+        img.src = url;
+        img.className = "bubble-photo";
+        gallery.appendChild(img);
+      });
     }
-    root.appendChild(img);
+    root.appendChild(gallery);
 
     const bottom = document.createElement("div");
     bottom.className = "bubble-bottom";
@@ -682,23 +712,34 @@ export default function App() {
     setShowSettings(false);
   }
 
-  async function onPickAvatar(e) {
+  async function onPickPhotos(e) {
     if (!me) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     try {
-      const small = await compressImage(file, 800, 0.8);
-      const dest = sref(storage, `avatars/${me.uid}.jpg`);
-      await uploadBytes(dest, small, { contentType: "image/jpeg" });
-      const url = await getDownloadURL(dest);
+      const existing = users[me.uid]?.photos || [];
+      const allowed = Math.max(0, 8 - existing.length);
+      const selected = files.slice(0, allowed);
+      const urls = [...existing];
+      for (let i = 0; i < selected.length; i++) {
+        const small = await compressImage(selected[i], 800, 0.8);
+        const dest = sref(
+          storage,
+          `avatars/${me.uid}/${Date.now()}_${i}.jpg`
+        );
+        await uploadBytes(dest, small, { contentType: "image/jpeg" });
+        const url = await getDownloadURL(dest);
+        urls.push(url);
+      }
       await update(ref(db, `users/${me.uid}`), {
-        photoURL: url,
+        photos: urls,
+        photoURL: urls[0] || null,
         lastActive: Date.now(),
       });
-      alert("🖼️ Fotka nahrána.");
+      alert("🖼️ Fotky nahrány.");
     } catch (e2) {
       console.error(e2);
-      alert("Nahrání fotky se nezdařilo – zkus menší obrázek.");
+      alert("Nahrání fotek se nezdařilo – zkus menší obrázky.");
     } finally {
       e.target.value = "";
     }
@@ -970,14 +1011,15 @@ export default function App() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <input
-                id="fileAvatar"
+                id="filePhotos"
                 type="file"
                 accept="image/*"
+                multiple
                 style={{ display: "none" }}
-                onChange={onPickAvatar}
+                onChange={onPickPhotos}
               />
               <button
-                onClick={() => document.getElementById("fileAvatar")?.click()}
+                onClick={() => document.getElementById("filePhotos")?.click()}
                 style={{
                   padding: "8px 10px",
                   borderRadius: 8,
@@ -986,7 +1028,7 @@ export default function App() {
                   cursor: "pointer",
                 }}
               >
-                📷 Přidat / změnit fotku
+                📷 Přidat fotky (max 8)
               </button>
             </div>
 
