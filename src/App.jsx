@@ -95,6 +95,7 @@ export default function App() {
   // zvuk pomocí Web Audio API
   const audioCtx = useRef(null);
   const lastMsgRef = useRef({}); // pairId -> last message id
+  const messagesLoaded = useRef(false);
 
   useEffect(() => {
     audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -366,6 +367,8 @@ export default function App() {
   // zvuk při nové zprávě, i když není chat otevřený
   useEffect(() => {
     if (!me) return;
+    lastMsgRef.current = {};
+    messagesLoaded.current = false;
     const msgsRef = ref(db, "messages");
     const unsub = onValue(msgsRef, (snap) => {
       const data = snap.val() || {};
@@ -379,12 +382,18 @@ export default function App() {
         const last = arr[arr.length - 1];
         if (!last) return;
         const [id, m] = last;
-        if (prev[pid] && prev[pid] !== id && m.from !== me.uid && soundEnabled) {
+        if (
+          messagesLoaded.current &&
+          prev[pid] !== id &&
+          m.from !== me.uid &&
+          soundEnabled
+        ) {
           beep(660);
         }
         next[pid] = id;
       });
       lastMsgRef.current = next;
+      messagesLoaded.current = true;
     });
     return () => unsub();
   }, [me, soundEnabled]);
