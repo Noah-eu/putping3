@@ -83,7 +83,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     border-radius: 50%;
-    touch-action: pan-y;
+    touch-action: pan-x;
 }
 .bubble-photo {
   flex: 0 0 100%;
