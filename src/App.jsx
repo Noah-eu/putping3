@@ -477,6 +477,25 @@ export default function App() {
       : "0 0 0 2px rgba(0,0,0,.1)";
   }
 
+  function freezeMap(center) {
+    if (!map) return;
+    if (center) {
+      map.setCenter(center);
+    }
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoomRotate.disable();
+  }
+
+  function unfreezeMap() {
+    if (!map) return;
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.doubleClickZoom.enable();
+    map.touchZoomRotate.enable();
+  }
+
   function toggleBubble(uid) {
     if (openBubble.current && openBubble.current !== uid) {
       closeBubble(openBubble.current);
@@ -488,9 +507,11 @@ export default function App() {
     if (active) {
       el.classList.remove("active");
       openBubble.current = null;
+      unfreezeMap();
     } else {
       el.classList.add("active");
       openBubble.current = uid;
+      freezeMap(mk.getLngLat());
       wireBubbleButtons(uid);
     }
   }
@@ -499,6 +520,7 @@ export default function App() {
     const mk = markers.current[uid];
     if (!mk) return;
     mk.getElement().classList.remove("active");
+    unfreezeMap();
   }
 
   function getBubbleContent({ uid, name, photos, photoURL }) {
