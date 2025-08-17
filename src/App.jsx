@@ -88,6 +88,7 @@ export default function App() {
 
   // map markers cache
   const markers = useRef({}); // uid -> { marker, popup }
+  const centeredOnMe = useRef(false);
 
   // zvuk pomocí Web Audio API
   const audioCtx = useRef(null);
@@ -290,6 +291,15 @@ export default function App() {
 
     return () => unsub();
   }, [map, me]);
+
+  useEffect(() => {
+    if (!map || !me || centeredOnMe.current) return;
+    const u = users[me.uid];
+    if (u && u.lat && u.lng) {
+      map.setCenter([u.lng, u.lat]);
+      centeredOnMe.current = true;
+    }
+  }, [map, me, users]);
 
   // sledování vzájemných pingů
   useEffect(() => {
