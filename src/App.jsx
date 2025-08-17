@@ -70,6 +70,7 @@ export default function App() {
   );
   const [fabOpen, setFabOpen] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
 
   // ref pro nejnovější zvýraznění markerů
@@ -820,6 +821,22 @@ export default function App() {
             </button>
             <button
               onClick={() => {
+                setShowGallery(true);
+                setFabOpen(false);
+              }}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #ddd",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+              title="Galerie"
+            >
+              🖼️
+            </button>
+            <button
+              onClick={() => {
                 setShowChatList(true);
                 setFabOpen(false);
               }}
@@ -972,6 +989,94 @@ export default function App() {
         </div>
       )}
 
+      {/* Galerie (modal) */}
+      {showGallery && (
+        <div
+          onClick={() => setShowGallery(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 30,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 360,
+              background: "#fff",
+              borderRadius: 14,
+              padding: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,.15)",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 16 }}>
+              Galerie
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <input
+                id="filePhotos"
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+                onChange={onPickPhotos}
+              />
+              <button
+                onClick={() => document.getElementById("filePhotos")?.click()}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #ddd",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                📷 Přidat další fotky
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {(users[me.uid]?.photos || []).map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                    border: "1px solid #ddd",
+                  }}
+                />
+              ))}
+              {(users[me.uid]?.photos || []).length === 0 && (
+                <div style={{ fontSize: 13, color: "#666" }}>Žádné fotky</div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowGallery(false)}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #ddd",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Zavřít
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Nastavení (modal) */}
       {showSettings && (
         <div
@@ -1028,29 +1133,6 @@ export default function App() {
                 }}
               >
                 {soundEnabled ? "🔊 Zvuk povolen" : "🔈 Povolit zvuk"}
-              </button>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <input
-                id="filePhotos"
-                type="file"
-                accept="image/*"
-                multiple
-                style={{ display: "none" }}
-                onChange={onPickPhotos}
-              />
-              <button
-                onClick={() => document.getElementById("filePhotos")?.click()}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                📷 Přidat fotky (max 8)
               </button>
             </div>
 
