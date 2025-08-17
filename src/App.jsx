@@ -449,15 +449,18 @@ export default function App() {
     }
     root.appendChild(img);
 
+    const bottom = document.createElement("div");
+    bottom.className = "bubble-bottom";
+
     const nameDiv = document.createElement("div");
     nameDiv.className = "bubble-name";
     nameDiv.textContent = name + (meVsOther ? " (ty)" : "");
-    root.appendChild(nameDiv);
+    bottom.appendChild(nameDiv);
 
     const infoDiv = document.createElement("div");
     infoDiv.className = "bubble-info";
     infoDiv.textContent = meVsOther ? "teď" : `Naposledy online: ${last}`;
-    root.appendChild(infoDiv);
+    bottom.appendChild(infoDiv);
 
     if (!meVsOther) {
       const actions = document.createElement("div");
@@ -472,8 +475,10 @@ export default function App() {
         chatBtn.textContent = "💬 Chat";
         actions.appendChild(chatBtn);
       }
-      root.appendChild(actions);
+      bottom.appendChild(actions);
     }
+
+    root.appendChild(bottom);
 
     return root;
   }
