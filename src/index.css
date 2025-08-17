@@ -6,6 +6,38 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 /* Map container */
 .map { width: 100vw; height: 100vh; }
 
+/* Splash screen */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background: #ff0f7b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: splashFade 1s ease 5s forwards;
+}
+
+.splash-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 64px;
+  font-weight: 700;
+  color: #000;
+}
+
+.splash-heart {
+  font-size: 72px;
+}
+
+@keyframes splashFade {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
 /* Location consent modal */
 .consent-modal {
   position: fixed;
