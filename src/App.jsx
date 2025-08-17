@@ -1,7 +1,6 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
-import SplashScreen from "./SplashScreen.jsx";
 
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
@@ -58,7 +57,6 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
 
 export default function App() {
   const [map, setMap] = useState(null);
-  const [showSplash, setShowSplash] = useState(true);
   const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
@@ -843,9 +841,6 @@ export default function App() {
 
   return (
     <div>
-      {showSplash && (
-        <SplashScreen onFinish={() => setShowSplash(false)} />
-      )}
       {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
