@@ -159,11 +159,9 @@ export default function App() {
     if (showGallery && galleryRef.current && !sortableRef.current) {
       sortableRef.current = new Sortable(galleryRef.current, {
         animation: 150,
-        onEnd: async (evt) => {
-          if (!me) return;
-          const arr = [...(users[me.uid]?.photos || [])];
-          const [moved] = arr.splice(evt.oldIndex, 1);
-          arr.splice(evt.newIndex, 0, moved);
+        onEnd: async () => {
+          if (!me || !sortableRef.current) return;
+          const arr = sortableRef.current.toArray();
           await update(ref(db, `users/${me.uid}`), {
             photos: arr,
             photoURL: arr[0] || null,
@@ -775,7 +773,7 @@ export default function App() {
     if (files.length === 0) return;
     try {
       const existing = users[me.uid]?.photos || [];
-      const allowed = Math.max(0, 8 - existing.length);
+      const allowed = Math.max(0, 9 - existing.length);
       const selected = files.slice(0, allowed);
       const urls = [...existing];
       for (let i = 0; i < selected.length; i++) {
@@ -1091,7 +1089,7 @@ export default function App() {
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
             >
               {(users[me.uid]?.photos || []).map((url, idx) => (
-                <div key={idx} style={{ position: "relative" }}>
+                <div key={url} data-id={url} style={{ position: "relative" }}>
                   <img
                     src={url}
                     style={{
