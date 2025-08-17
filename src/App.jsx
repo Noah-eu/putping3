@@ -530,6 +530,11 @@ export default function App() {
     el.style.boxShadow = highlight
       ? `0 0 0 2px ${highlight}`
       : "0 0 0 2px rgba(0,0,0,.1)";
+    if (highlight) {
+      el.classList.add("marker-highlight");
+    } else {
+      el.classList.remove("marker-highlight");
+    }
   }
 
   function freezeMap(center) {
