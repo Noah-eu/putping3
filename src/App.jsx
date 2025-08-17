@@ -833,22 +833,6 @@ export default function App() {
           <>
             <button
               onClick={() => {
-                toggleSound();
-                setFabOpen(false);
-              }}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: "1px solid #ddd",
-                background: "#fff",
-                cursor: "pointer",
-              }}
-              title={soundEnabled ? "Vypnout zvuk" : "Zapnout zvuk"}
-            >
-              {soundEnabled ? "🔊" : "🔇"}
-            </button>
-            <button
-              onClick={() => {
                 setShowSettings(true);
                 setFabOpen(false);
               }}
