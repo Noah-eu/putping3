@@ -573,6 +573,9 @@ export default function App() {
 
     const gallery = document.createElement("div");
     gallery.className = "bubble-gallery";
+    ["touchstart", "touchmove", "pointerdown", "pointermove"].forEach((ev) =>
+      gallery.addEventListener(ev, (e) => e.stopPropagation())
+    );
     if (list.length === 0) {
       const placeholder = document.createElement("div");
       placeholder.className = "bubble-photo empty";
