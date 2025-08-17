@@ -70,6 +70,10 @@ export default function App() {
   );
   const [fabOpen, setFabOpen] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
+  const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
+
+  // ref pro nejnovější zvýraznění markerů
+  const markerHighlightsRef = useRef({});
 
   // chat
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
@@ -86,6 +90,10 @@ export default function App() {
   const audioCtx = useRef(null);
   const lastMsgRef = useRef({}); // pairId -> last message id
   const messagesLoaded = useRef(false);
+
+  useEffect(() => {
+    markerHighlightsRef.current = markerHighlights;
+  }, [markerHighlights]);
 
   useEffect(() => {
     audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -238,7 +246,8 @@ export default function App() {
           return;
         }
 
-        const color = isMe ? "red" : "#147af3";
+        const highlight = markerHighlightsRef.current[uid];
+        const color = isMe ? "red" : highlight || "#147af3";
         const draggable = false;
 
         if (!markers.current[uid]) {
@@ -377,6 +386,14 @@ export default function App() {
           soundEnabled
         ) {
           beep(660);
+          setMarkerHighlights((prev) => ({ ...prev, [m.from]: "purple" }));
+          setTimeout(() => {
+            setMarkerHighlights((prev) => {
+              const copy = { ...prev };
+              if (copy[m.from] === "purple") delete copy[m.from];
+              return copy;
+            });
+          }, 5000);
         }
         next[pid] = id;
       });
@@ -418,11 +435,12 @@ export default function App() {
         return;
       }
 
-      const color = isMe ? "red" : "#147af3";
+      const highlight = markerHighlights[uid];
+      const color = isMe ? "red" : highlight || "#147af3";
       const avatar = wrapper.querySelector(".marker-avatar");
       setMarkerAppearance(avatar, u.photoURL, color);
     });
-  }, [pairPings, chatPairs, users, me]);
+  }, [pairPings, chatPairs, users, me, markerHighlights]);
 
   function isSafeUrl(url) {
     try {
@@ -550,6 +568,14 @@ export default function App() {
         if (soundEnabled) {
           beep(880);
         }
+        setMarkerHighlights((prev) => ({ ...prev, [fromUid]: "red" }));
+        setTimeout(() => {
+          setMarkerHighlights((prev) => {
+            const copy = { ...prev };
+            if (copy[fromUid] === "red") delete copy[fromUid];
+            return copy;
+          });
+        }, 5000);
         remove(ref(db, `pings/${me.uid}/${fromUid}`));
       });
     });
