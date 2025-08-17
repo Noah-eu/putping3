@@ -68,6 +68,7 @@ export default function App() {
   const [draftName, setDraftName] = useState(
     localStorage.getItem("userName") || ""
   );
+  const [fabOpen, setFabOpen] = useState(false);
 
   // chat
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
@@ -671,7 +672,7 @@ export default function App() {
 
   return (
     <div>
-      {/* Plovoucí tlačítka – jen ozubené kolo, ostatní v modalu */}
+      {/* Plovoucí menu (FAB) */}
       <div
         style={{
           position: "absolute",
@@ -679,34 +680,62 @@ export default function App() {
           right: 10,
           zIndex: 10,
           display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
           gap: 8,
         }}
       >
+        {fabOpen && (
+          <>
+            <button
+              onClick={() => {
+                toggleSound();
+                setFabOpen(false);
+              }}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #ddd",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+              title={soundEnabled ? "Vypnout zvuk" : "Zapnout zvuk"}
+            >
+              {soundEnabled ? "🔊" : "🔇"}
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings(true);
+                setFabOpen(false);
+              }}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #ddd",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+              title="Nastavení"
+            >
+              ⚙️
+            </button>
+          </>
+        )}
         <button
-          onClick={toggleSound}
+          onClick={() => setFabOpen((o) => !o)}
           style={{
-            padding: "8px 10px",
-            borderRadius: 10,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
             border: "1px solid #ddd",
             background: "#fff",
             cursor: "pointer",
+            fontSize: 24,
+            lineHeight: "24px",
           }}
-          title={soundEnabled ? "Vypnout zvuk" : "Zapnout zvuk"}
+          title="Menu"
         >
-          {soundEnabled ? "🔊" : "🔇"}
-        </button>
-        <button
-          onClick={() => setShowSettings(true)}
-          style={{
-            padding: "8px 10px",
-            borderRadius: 10,
-            border: "1px solid #ddd",
-            background: "#fff",
-            cursor: "pointer",
-          }}
-          title="Nastavení"
-        >
-          ⚙️
+          {fabOpen ? "✖️" : "➕"}
         </button>
       </div>
 
