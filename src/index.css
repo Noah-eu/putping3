@@ -222,3 +222,78 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   padding: 10px 12px;
   display: flex; gap: 8px; border-top: 1px solid #f1f5f9;
 }
+
+/* FAB chat history button */
+.fab-chat {
+  position: relative;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  background: #ffe5e5;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.fab-chat::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  right: 12px;
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: #ffe5e5 transparent transparent transparent;
+}
+
+/* Chat history bubble */
+.chat-list {
+  position: absolute;
+  right: 12px;
+  bottom: 70px;
+  width: 260px;
+  max-height: 300px;
+  background: #ffe5e5;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 20;
+}
+.chat-list::after {
+  content: "";
+  position: absolute;
+  bottom: -12px;
+  right: 20px;
+  border-width: 12px 12px 0 12px;
+  border-style: solid;
+  border-color: #ffe5e5 transparent transparent transparent;
+}
+.chat-list__header {
+  padding: 8px 10px;
+  font-weight: 700;
+  border-bottom: 1px solid #fca5a5;
+}
+.chat-list__items {
+  overflow-y: auto;
+  flex: 1;
+}
+.chat-list__item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.chat-list__item:hover {
+  background: #ffd4d4;
+}
+.chat-list__empty {
+  padding: 8px 10px;
+}
+.chat-list__close {
+  padding: 6px;
+  border: none;
+  border-top: 1px solid #fca5a5;
+  background: transparent;
+  cursor: pointer;
+}
