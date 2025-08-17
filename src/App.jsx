@@ -387,13 +387,6 @@ export default function App() {
         ) {
           beep(660);
           setMarkerHighlights((prev) => ({ ...prev, [m.from]: "purple" }));
-          setTimeout(() => {
-            setMarkerHighlights((prev) => {
-              const copy = { ...prev };
-              if (copy[m.from] === "purple") delete copy[m.from];
-              return copy;
-            });
-          }, 5000);
         }
         next[pid] = id;
       });
@@ -640,6 +633,11 @@ export default function App() {
       return;
     }
     setOpenChatWith(uid);
+    setMarkerHighlights((prev) => {
+      const copy = { ...prev };
+      delete copy[uid];
+      return copy;
+    });
   }
 
   async function sendMessage() {
