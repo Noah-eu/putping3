@@ -29,18 +29,6 @@ function pairIdOf(a, b) {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
 }
 
-function timeAgo(ts) {
-  if (!ts) return "";
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "před pár sekundami";
-  const min = Math.floor(diff / 60_000);
-  if (min < 60) return `před ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `před ${h} h`;
-  const d = Math.floor(h / 24);
-  return `před ${d} dny`;
-}
-
 // Zmenší obrázek (delší strana max 800 px) → JPEG Blob
 async function compressImage(file, maxDim = 800, quality = 0.8) {
   const img = await new Promise((resolve, reject) => {
@@ -263,7 +251,6 @@ export default function App() {
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
-            lastActive: u.lastActive,
           });
           wrapper.appendChild(bubble);
 
@@ -291,7 +278,6 @@ export default function App() {
             uid,
             name: u.name || "Anonym",
             photoURL: u.photoURL,
-            lastActive: u.lastActive,
           });
           wrapper.replaceChild(newBubble, oldBubble);
           if (wrapper.classList.contains("active")) {
@@ -409,7 +395,6 @@ export default function App() {
         uid,
         name: u.name || "Anonym",
         photoURL: u.photoURL,
-        lastActive: u.lastActive,
       });
       if (oldBubble) {
         wrapper.replaceChild(newBubble, oldBubble);
@@ -480,12 +465,11 @@ export default function App() {
     mk.getElement().classList.remove("active");
   }
 
-  function getBubbleContent({ uid, name, photoURL, lastActive }) {
+  function getBubbleContent({ uid, name, photoURL }) {
     const meVsOther = uid === me.uid;
     const pid = pairIdOf(me.uid, uid);
     const pair = pairPings[pid] || {};
     const canChat = (pair[me.uid] && pair[uid]) || chatPairs[pid];
-    const last = lastActive ? timeAgo(lastActive) : "neznámo";
 
     const root = document.createElement("div");
     root.className = "marker-bubble";
@@ -509,11 +493,6 @@ export default function App() {
     nameDiv.className = "bubble-name";
     nameDiv.textContent = name + (meVsOther ? " (ty)" : "");
     bottom.appendChild(nameDiv);
-
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "bubble-info";
-    infoDiv.textContent = meVsOther ? "teď" : `Naposledy online: ${last}`;
-    bottom.appendChild(infoDiv);
 
     if (!meVsOther) {
       const actions = document.createElement("div");
