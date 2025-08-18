@@ -115,16 +115,30 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
     scroll-snap-type: x mandatory;
     border-radius: 50%;
     touch-action: pan-x;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+}
+.bubble-gallery::-webkit-scrollbar {
+  height: 4px;
+}
+.bubble-gallery::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+.bubble-gallery::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
 }
 .bubble-photo {
   flex: 0 0 100%;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   scroll-snap-align: center;
   border: 4px solid #fff;
   border-radius: 50%;
   box-sizing: border-box;
+  background: #fff;
 }
 .bubble-photo.empty { background: #f3f4f6; }
 .marker-wrapper.active img.bubble-photo {
@@ -139,7 +153,10 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   align-items: center;
   padding: 4px 8px 12px;
 }
-.bubble-name { font-weight: 700; }
+.bubble-name {
+  font-weight: 700;
+  margin-top: 6px;
+}
 .bubble-actions {
   margin-top: auto;
   display: flex;
