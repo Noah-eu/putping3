@@ -317,9 +317,11 @@ export default function App() {
         const isMe = uid === me.uid;
         const isOnline =
           u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
+        const shouldRemove = !isOnline && !isMe;
 
-        // skrýt z mapy uživatele, kteří jsou offline (zůstává pouze můj marker)
-        if (!isOnline && !isMe) {
+        // skrýt z mapy uživatele, kteří jsou offline
+        // můj marker ponecháváme i mimo online režim, aby bylo vidět mou poslední známou pozici
+        if (shouldRemove) {
           if (markers.current[uid]) {
             if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
@@ -365,7 +367,8 @@ export default function App() {
 
           markers.current[uid] = mk;
         } else {
-          if (isOnline) {
+          const shouldUpdate = isOnline || isMe;
+          if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
 
