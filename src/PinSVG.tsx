@@ -3,9 +3,10 @@ import React from "react";
 interface PinSVGProps {
   photoUrl: string;
   name: string;
+  onPing?: () => void;
 }
 
-const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name }) => (
+const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => (
   <svg
     width={240}
     height={320}
@@ -14,6 +15,10 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name }) => (
   >
     <defs>
       <linearGradient id="pinGradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#FF3366" />
+        <stop offset="100%" stopColor="#FF6F91" />
+      </linearGradient>
+      <linearGradient id="buttonGradient" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor="#FF3366" />
         <stop offset="100%" stopColor="#FF6F91" />
       </linearGradient>
@@ -48,7 +53,7 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name }) => (
     />
     <text
       x="120"
-      y="275"
+      y="225"
       textAnchor="middle"
       fontSize="24"
       fontFamily="sans-serif"
@@ -56,6 +61,39 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name }) => (
     >
       {name}
     </text>
+    <g
+      onClick={onPing}
+      onKeyDown={(e) => {
+        if (onPing && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
+          e.preventDefault();
+          onPing();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="Ping user"
+      style={{ cursor: "pointer" }}
+    >
+      <path
+        d="M70 250 Q70 230 120 230 Q170 230 170 250 Q170 270 120 290 Q70 270 70 250 Z"
+        fill="url(#buttonGradient)"
+      />
+      <path
+        d="M12 22a2 2 0 01-4 0h4zm6-6V9a6 6 0 10-12 0v7H4v2h16v-2h-2z"
+        transform="translate(95 250) scale(0.7)"
+        fill="#FFF"
+      />
+      <text
+        x="135"
+        y="267"
+        textAnchor="middle"
+        fontSize="16"
+        fontFamily="sans-serif"
+        fill="#FFF"
+      >
+        Ping
+      </text>
+    </g>
   </svg>
 );
 
