@@ -159,6 +159,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 .bubble-actions {
   margin-top: auto;
+  margin-bottom: -4px;
   display: flex;
   gap: 8px;
   justify-content: center;
@@ -173,6 +174,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   font-size: 12px;
 }
 
+
 .bubble-actions .ping-btn {
   padding: 0 16px;
   height: 32px;
@@ -180,16 +182,47 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   border-radius: 0;
   background: linear-gradient(180deg, #FF3366, #FF6F91);
   color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 12px;
   cursor: pointer;
   clip-path: path('M0 6C0 2.7 2.7 0 6 0H94C97.3 0 100 2.7 100 6V22C100 28 75 32 50 32C25 32 0 28 0 22Z');
+  position: relative;
+  overflow: hidden;
 }
 .bubble-actions .ping-btn:hover { filter: brightness(1.05); }
 .bubble-actions .ping-btn:active { transform: translateY(1px); }
-.bubble-actions .ping-btn__icon { margin-right: 4px; }
+.bubble-actions .ping-btn[data-action="chat"] {
+  background: linear-gradient(180deg, #3B82F6, #60A5FA);
+}
+
+.ping-btn__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) scale(0.9);
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ping-btn__text.visible {
+  animation: ping-text-in 0.2s ease forwards;
+}
+
+@keyframes ping-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
 
 /* Buttons */
 .btn {
