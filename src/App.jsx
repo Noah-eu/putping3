@@ -688,15 +688,24 @@ export default function App() {
 
       const actionBtn = document.createElement("button");
       actionBtn.id = `btnAction_${uid}`;
+      actionBtn.className = "ping-btn";
+      actionBtn.dataset.action = canChat ? "chat" : "ping";
+      actionBtn.innerHTML =
+        '<span class="ping-btn__text ping-btn__text--ping">🔔 Ping</span>' +
+        '<span class="ping-btn__text ping-btn__text--chat">💬 Chat</span>';
+
+      const pingText = actionBtn.querySelector(
+        ".ping-btn__text--ping"
+      );
+      const chatText = actionBtn.querySelector(
+        ".ping-btn__text--chat"
+      );
       if (canChat) {
-        actionBtn.textContent = "💬 Chat";
-        actionBtn.dataset.action = "chat";
+        chatText.classList.add("visible");
       } else {
-        actionBtn.className = "ping-btn";
-        actionBtn.innerHTML =
-          '<svg class="ping-btn__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14"><path d="M12 24a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 24Zm6.36-6v-5a6.36 6.36 0 0 0-4.86-6.18V6a1.5 1.5 0 1 0-3 0v.82A6.36 6.36 0 0 0 5.64 13v5l-1.5 1.5v1h15.72v-1Z" fill="currentColor"/></svg><span class="ping-btn__text">Ping</span>';
-        actionBtn.dataset.action = "ping";
+        pingText.classList.add("visible");
       }
+
       actions.appendChild(actionBtn);
 
       bottom.appendChild(actions);
