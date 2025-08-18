@@ -228,9 +228,14 @@ export default function App() {
 
     const updatePos = (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
+      console.log("Position accuracy", accuracy);
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
+        update(meRef, {
+          lastActive: Date.now(),
+          online: true,
+        });
         return;
       }
       update(meRef, {
