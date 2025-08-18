@@ -11,6 +11,7 @@ import {
   remove,
   push,
   serverTimestamp,
+  get,
 } from "firebase/database";
 import {
   ref as sref,
@@ -261,17 +262,29 @@ export default function App() {
   useEffect(() => {
     if (map || !me) return;
 
-    // Pokus o start u poslední pozice v DB (nebo Praha)
-    const center = [14.42076, 50.08804];
-    const m = new mapboxgl.Map({
-      container: "map",
-      style: "mapbox://styles/mapbox/streets-v12",
-      center,
-      zoom: 13,
-    });
-    setMap(m);
+    let m;
+    (async () => {
+      // Start at last known position from DB if available, otherwise Prague
+      let center = [14.42076, 50.08804];
+      try {
+        const snap = await get(ref(db, `users/${me.uid}`));
+        const u = snap.val();
+        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
+          center = [u.lng, u.lat];
+        }
+      } catch (err) {
+        console.warn("Failed to load last position", err);
+      }
+      m = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v12",
+        center,
+        zoom: 13,
+      });
+      setMap(m);
+    })();
 
-    return () => m.remove();
+    return () => m && m.remove();
   }, [me]);
 
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
