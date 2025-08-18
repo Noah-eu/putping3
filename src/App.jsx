@@ -227,8 +227,8 @@ export default function App() {
 
     const updatePos = (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
-      // Ignore obviously wrong positions when the device reports very low accuracy
-      if (accuracy && accuracy > 1000) {
+      // Ignore obviously wrong positions with extremely low accuracy (>10 km)
+      if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
         return;
       }
