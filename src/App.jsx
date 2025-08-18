@@ -236,6 +236,12 @@ export default function App() {
     };
     const handleErr = (err) => {
       console.warn("Geolocation error", err);
+      update(meRef, {
+        lat: null,
+        lng: null,
+        lastActive: Date.now(),
+        online: false,
+      });
     };
 
     // iOS may not trigger watchPosition immediately; request current position once
