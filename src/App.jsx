@@ -583,8 +583,8 @@ export default function App() {
       el.style.backgroundColor = color;
     }
     el.style.boxShadow = highlight
-      ? `0 0 0 2px ${highlight}`
-      : "0 0 0 2px rgba(0,0,0,.1)";
+      ? `0 0 0 2px #fff, 0 0 0 4px ${highlight}`
+      : "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.1)";
     if (highlight) {
       el.classList.add("marker-highlight");
     } else {

@@ -53,18 +53,17 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .marker-wrapper {
   position: relative;
   width: 32px;
-  height: 32px;
+  height: 44px;
 }
 .marker-avatar {
   width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  height: 44px;
   background-size: cover;
   background-position: center;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+  clip-path: path('M16 0C24.8 0 32 7.2 32 16C32 29.2 16 44 16 44C16 44 0 29.2 0 16C0 7.2 7.2 0 16 0Z');
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.1);
   cursor: pointer;
-  transform-origin: center;
+  transform-origin: bottom center;
 }
 
 .marker-avatar.marker-highlight {
@@ -77,12 +76,12 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 .marker-bubble {
   position: absolute;
-  top: 50%;
+  bottom: 0;
   left: 50%;
-  width: 220px;
-  height: 220px;
+  width: 240px;
+  height: 320px;
   background: #ff8fa1;
-  border-radius: 50%;
+  clip-path: path('M120 0C186 0 240 54 240 120C240 220 120 320 120 320C120 320 0 220 0 120C0 54 54 0 120 0Z');
   box-shadow: 0 2px 10px rgba(0,0,0,.15);
   text-align: center;
   font: 12px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -93,22 +92,23 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   justify-content: flex-start;
   padding: 0;
   overflow: hidden;
-  transform: translate(-50%, -50%) scale(0);
+  transform: translateX(-50%) scale(0);
+  transform-origin: bottom center;
   opacity: 0;
   pointer-events: none;
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 .marker-bubble::after { display: none; }
 .marker-wrapper.active .marker-bubble {
-  transform: translate(-50%, -50%) scale(1);
+  transform: translateX(-50%) scale(1);
   opacity: 1;
   pointer-events: auto;
 }
 .marker-wrapper.active .marker-avatar { display: none; }
 .bubble-gallery {
     width: 75%;
-    height: 75%;
-    flex: 0 0 75%;
+    height: 56%;
+    flex: 0 0 56%;
     display: flex;
     overflow-x: auto;
     overflow-y: hidden;
