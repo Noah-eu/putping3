@@ -226,7 +226,12 @@ export default function App() {
     const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
 
     const updatePos = (pos) => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, accuracy } = pos.coords;
+      // Ignore obviously wrong positions when the device reports very low accuracy
+      if (accuracy && accuracy > 1000) {
+        console.warn("Ignoring low-accuracy position", accuracy);
+        return;
+      }
       update(meRef, {
         lat: latitude,
         lng: longitude,
