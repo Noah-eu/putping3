@@ -88,6 +88,7 @@ export default function App() {
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
   const [chatMsgs, setChatMsgs] = useState([]);
   const [chatText, setChatText] = useState("");
+  const [chatPhoto, setChatPhoto] = useState(null); // { file, url }
   const chatUnsub = useRef(null);
   const chatBoxRef = useRef(null);
 
@@ -788,17 +789,44 @@ export default function App() {
     });
   }
 
+  function onPickChatPhoto(e) {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setChatPhoto({ file, url });
+    }
+    e.target.value = "";
+  }
+
   async function sendMessage() {
     const to = openChatWith;
-    if (!me || !to || !chatText.trim()) return;
+    if (!me || !to) return;
     const pid = pairIdOf(me.uid, to);
-    await push(ref(db, `messages/${pid}`), {
+    const msg = {
       from: me.uid,
       to,
-      text: chatText.trim(),
       time: Date.now(),
-    });
+    };
+    if (chatText.trim()) msg.text = chatText.trim();
+    if (chatPhoto) {
+      try {
+        const small = await compressImage(chatPhoto.file, 1200, 0.8);
+        const dest = sref(storage, `messages/${pid}/${Date.now()}.jpg`);
+        await uploadBytes(dest, small, { contentType: "image/jpeg" });
+        const url = await getDownloadURL(dest);
+        msg.photo = url;
+      } catch (e2) {
+        console.error(e2);
+        alert("Nahrání fotky se nezdařilo.");
+      }
+    }
+    if (!msg.text && !msg.photo) return;
+    await push(ref(db, `messages/${pid}`), msg);
     setChatText("");
+    if (chatPhoto) {
+      URL.revokeObjectURL(chatPhoto.url);
+      setChatPhoto(null);
+    }
   }
 
   /* ───────────────────────────── Nastavení / profil ─────────────────────── */
@@ -1039,29 +1067,38 @@ export default function App() {
               ✖
             </button>
           </div>
-          <div ref={chatBoxRef} style={{ padding: 10, gap: 6, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+          <div ref={chatBoxRef} className="chat__messages">
             {chatMsgs.map((m) => {
               const mine = m.from === me?.uid;
               return (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: mine ? "flex-end" : "flex-start",
-                    background: mine ? "#e6f0ff" : "#f2f2f2",
-                    borderRadius: 10,
-                    padding: "6px 8px",
-                    maxWidth: "80%",
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: "#666" }}>
+                <div key={m.id} className={`msg ${mine ? "msg--me" : "msg--peer"}`}>
+                  <div className="msg__time">
                     {new Date(m.time || Date.now()).toLocaleTimeString()}
                   </div>
-                  <div>{m.text}</div>
+                  {m.photo && <img src={m.photo} className="msg__image" />}
+                  {m.text && <div className="msg__bubble">{m.text}</div>}
                 </div>
               );
             })}
           </div>
-          <div style={{ padding: 8, borderTop: "1px solid #eee", display: "flex", gap: 6 }}>
+          <div className="chat__composer" style={{ alignItems: "center" }}>
+            {chatPhoto && (
+              <img
+                src={chatPhoto.url}
+                onClick={() => {
+                  URL.revokeObjectURL(chatPhoto.url);
+                  setChatPhoto(null);
+                }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                  border: "1px solid #ddd",
+                  cursor: "pointer",
+                }}
+              />
+            )}
             <input
               value={chatText}
               onChange={(e) => setChatText(e.target.value)}
@@ -1074,6 +1111,25 @@ export default function App() {
                 padding: "8px 10px",
               }}
             />
+            <input
+              id="fileChatPhoto"
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={onPickChatPhoto}
+            />
+            <button
+              onClick={() => document.getElementById("fileChatPhoto")?.click()}
+              style={{
+                padding: "8px 10px",
+                border: "1px solid #ddd",
+                borderRadius: 8,
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              📷
+            </button>
             <button
               onClick={sendMessage}
               style={{
