@@ -8,16 +8,12 @@ interface PinSVGProps {
 
 const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
   const [mode, setMode] = useState<"ping" | "chat">("ping");
-  const [rippleKey, setRippleKey] = useState(0);
-
   const handleClick = () => {
     if (mode === "ping" && onPing) onPing();
     setMode((m) => (m === "ping" ? "chat" : "ping"));
-    setRippleKey((k) => k + 1);
   };
 
   const buttonGradient = mode === "ping" ? "pingButtonGradient" : "chatButtonGradient";
-  const rippleColor = mode === "ping" ? "#FF6F91" : "#60A5FA";
   const aria = mode === "ping" ? "Ping user" : "Chat with user";
 
   return (
@@ -42,9 +38,6 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
         </linearGradient>
         <clipPath id="photoClip">
           <circle cx="120" cy="120" r="90" />
-        </clipPath>
-        <clipPath id="buttonClip">
-          <polygon points="70,260 170,260 120,320" />
         </clipPath>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.2" />
@@ -95,38 +88,32 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
         aria-label={aria}
         style={{ cursor: "pointer" }}
       >
-        <polygon
-          points="70,260 170,260 120,320"
+        <rect
+          x="60"
+          y="255"
+          width="120"
+          height="40"
+          rx="20"
           fill={`url(#${buttonGradient})`}
         />
-        <g clipPath="url(#buttonClip)">
-          <circle
-            key={rippleKey}
-            cx="120"
-            cy="280"
-            r="30"
-            fill={rippleColor}
-            className="pin-ripple"
-          />
-          <text
-            x="120"
-            y="280"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className={`pin-btn-text ${mode === "ping" ? "visible" : "hidden"}`}
-          >
-            🔔 Ping
-          </text>
-          <text
-            x="120"
-            y="280"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className={`pin-btn-text ${mode === "chat" ? "visible" : "hidden"}`}
-          >
-            💬 Chat
-          </text>
-        </g>
+        <text
+          x="120"
+          y="275"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className={`pin-btn-text ${mode === "ping" ? "visible" : "hidden"}`}
+        >
+          🔔 Ping
+        </text>
+        <text
+          x="120"
+          y="275"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className={`pin-btn-text ${mode === "chat" ? "visible" : "hidden"}`}
+        >
+          💬 Chat
+        </text>
       </g>
     </svg>
   );
