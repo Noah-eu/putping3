@@ -157,54 +157,49 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   font-weight: 700;
   margin-top: 6px;
 }
-.bubble-actions {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%) translateY(2px);
-  margin: 0;
-  display: block;
+/* ukotveni tlacitka do spicky pinu */
+.bubble-actions{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  transform:translate(-50%, 6px); /* jemne dolu k apexu */
+  margin:0;
+  display:block;
 }
 
-
-.bubble-actions .ping-btn {
-  width: 120px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  background: linear-gradient(180deg, #FF3366, #FF6F91);
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-  clip-path: path('M0 6C0 2.7 2.7 0 6 0H114C117.3 0 120 2.7 120 6V22C120 28 82 32 60 32C38 32 0 28 0 22Z');
-  position: relative;
-  overflow: hidden;
-}
-.bubble-actions .ping-btn:hover { filter: brightness(1.05); }
-.bubble-actions .ping-btn:active { transform: translateY(0) scale(0.98); }
-.bubble-actions .ping-btn[data-action="chat"] {
-  background: linear-gradient(180deg, #3B82F6, #60A5FA);
+/* vetsi pilulka, hezci tvar – SIRKA 140 x VYSKA 40 */
+.bubble-actions .ping-btn{
+  width:140px;
+  height:40px;
+  padding:0;
+  border:none;
+  background:linear-gradient(180deg,#FF3366,#FF6F91);
+  color:#fff;
+  font-size:14px;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  /* pilulka se spodni „miskou“ do spicky */
+  clip-path:path('M0 8C0 3.6 3.6 0 8 0H132C136.4 0 140 3.6 140 8V28C140 36 96 40 70 40C44 40 0 36 0 28Z');
 }
 
-.ping-btn__text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: #fff;
-  opacity: 0;
-  transform: scale(0.9);
-  pointer-events: none;
-  white-space: nowrap;
+/* modra varianta pro CHAT */
+.bubble-actions .ping-btn[data-action="chat"]{
+  background:linear-gradient(180deg,#3B82F6,#60A5FA);
 }
 
-.ping-btn__text.visible {
-  opacity: 1;
-  transform: scale(1);
-  transition: transform .18s ease, opacity .18s ease;
+/* text+ikona presne doprostred a malinko VYS */
+.ping-btn__text{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  gap:8px; color:#fff; opacity:0;
+  transform:translateY(-3px) scale(.96);
 }
+.ping-btn__text.visible{ opacity:1; transform:translateY(-3px) scale(1); transition:transform .18s ease, opacity .18s ease; }
+
+/* jemna klik animace */
+.bubble-actions .ping-btn:active{ transform:scale(.98); }
+.ping-btn__text svg{ width:18px; height:18px; }
 
 /* Buttons */
 .btn {
