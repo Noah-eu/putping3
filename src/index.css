@@ -158,33 +158,25 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   margin-top: 6px;
 }
 .bubble-actions {
-  margin-top: auto;
-  margin-bottom: -4px;
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-.bubble-actions button {
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 12px;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) translateY(2px);
+  margin: 0;
+  display: block;
 }
 
 
 .bubble-actions .ping-btn {
-  padding: 0 16px;
+  width: 120px;
   height: 32px;
+  padding: 0;
   border: none;
-  border-radius: 0;
   background: linear-gradient(180deg, #FF3366, #FF6F91);
   color: #fff;
   font-size: 12px;
   cursor: pointer;
-  clip-path: path('M0 6C0 2.7 2.7 0 6 0H94C97.3 0 100 2.7 100 6V22C100 28 75 32 50 32C25 32 0 28 0 22Z');
+  clip-path: path('M0 6C0 2.7 2.7 0 6 0H114C117.3 0 120 2.7 120 6V22C120 28 82 32 60 32C38 32 0 28 0 22Z');
   position: relative;
   overflow: hidden;
 }
