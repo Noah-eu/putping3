@@ -472,3 +472,20 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
     opacity: 0;
   }
 }
+
+/* Pin wrapper with chat button */
+.pin-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.pin-wrapper svg {
+  display: block;
+}
+
+.chat-btn {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+}
