@@ -92,26 +92,21 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
         aria-label={aria}
         style={{ cursor: "pointer" }}
       >
-        <rect
-          x="70"
-          y="240"
-          width="100"
-          height="40"
-          rx="10"
-          ry="10"
+        <polygon
+          points="70,260 170,260 120,320"
           fill={`url(#${buttonGradient})`}
         />
         <circle
           key={rippleKey}
           cx="120"
-          cy="260"
+          cy="280"
           r="30"
           fill={rippleColor}
           className="pin-ripple"
         />
         <text
           x="120"
-          y="260"
+          y="280"
           textAnchor="middle"
           dominantBaseline="middle"
           className={`pin-btn-text ${mode === "ping" ? "visible" : "hidden"}`}
@@ -120,7 +115,7 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
         </text>
         <text
           x="120"
-          y="260"
+          y="280"
           textAnchor="middle"
           dominantBaseline="middle"
           className={`pin-btn-text ${mode === "chat" ? "visible" : "hidden"}`}
