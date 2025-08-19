@@ -684,7 +684,7 @@ export default function App() {
 
     if (!meVsOther) {
       const actions = document.createElement("div");
-      actions.className = "bubble-actions";
+      actions.classList.add("bubble-actions"); // keep action container in bubble
 
       const actionBtn = document.createElement("button");
       actionBtn.id = `btnAction_${uid}`;
@@ -707,7 +707,6 @@ export default function App() {
       }
 
       actions.appendChild(actionBtn);
-
       bottom.appendChild(actions);
     }
 
