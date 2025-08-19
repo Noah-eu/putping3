@@ -684,7 +684,7 @@ export default function App() {
 
     if (!meVsOther) {
       const actions = document.createElement("div");
-      actions.classList.add("bubble-actions"); // keep action container in bubble
+      actions.className = "bubble-actions";
 
       const actionBtn = document.createElement("button");
       actionBtn.id = `btnAction_${uid}`;
