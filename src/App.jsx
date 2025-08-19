@@ -20,6 +20,7 @@ import {
 } from "firebase/storage";
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
+import { spawnDevBot } from './devBot';
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -215,6 +216,8 @@ export default function App() {
         lastActive: Date.now(),
         online: true,
       });
+
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot();
 
     });
     return () => unsub();
