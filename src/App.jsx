@@ -727,6 +727,13 @@ export default function App() {
           openChat(uid);
         } else {
           sendPing(uid);
+          btn.dataset.action = "chat";
+          btn
+            .querySelector(".ping-btn__text--ping")
+            ?.classList.remove("visible");
+          btn
+            .querySelector(".ping-btn__text--chat")
+            ?.classList.add("visible");
         }
       };
   }
