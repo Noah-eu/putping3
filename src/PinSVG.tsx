@@ -43,6 +43,9 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
         <clipPath id="photoClip">
           <circle cx="120" cy="120" r="90" />
         </clipPath>
+        <clipPath id="buttonClip">
+          <polygon points="70,260 170,260 120,320" />
+        </clipPath>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.2" />
         </filter>
@@ -96,32 +99,34 @@ const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
           points="70,260 170,260 120,320"
           fill={`url(#${buttonGradient})`}
         />
-        <circle
-          key={rippleKey}
-          cx="120"
-          cy="280"
-          r="30"
-          fill={rippleColor}
-          className="pin-ripple"
-        />
-        <text
-          x="120"
-          y="280"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className={`pin-btn-text ${mode === "ping" ? "visible" : "hidden"}`}
-        >
-          🔔 Ping
-        </text>
-        <text
-          x="120"
-          y="280"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className={`pin-btn-text ${mode === "chat" ? "visible" : "hidden"}`}
-        >
-          💬 Chat
-        </text>
+        <g clipPath="url(#buttonClip)">
+          <circle
+            key={rippleKey}
+            cx="120"
+            cy="280"
+            r="30"
+            fill={rippleColor}
+            className="pin-ripple"
+          />
+          <text
+            x="120"
+            y="280"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className={`pin-btn-text ${mode === "ping" ? "visible" : "hidden"}`}
+          >
+            🔔 Ping
+          </text>
+          <text
+            x="120"
+            y="280"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className={`pin-btn-text ${mode === "chat" ? "visible" : "hidden"}`}
+          >
+            💬 Chat
+          </text>
+        </g>
       </g>
     </svg>
   );
