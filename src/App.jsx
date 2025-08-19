@@ -1102,7 +1102,7 @@ export default function App() {
               fontWeight: 600,
             }}
           >
-            Chat
+            {users[openChatWith]?.name || "Chat"}
             <button
               onClick={() => setOpenChatWith(null)}
               style={{ border: "none", background: "transparent", cursor: "pointer" }}
