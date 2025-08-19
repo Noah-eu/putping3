@@ -691,8 +691,8 @@ export default function App() {
       actionBtn.className = "ping-btn";
       actionBtn.dataset.action = canChat ? "chat" : "ping";
       actionBtn.innerHTML =
-        '<span class="ping-btn__text ping-btn__text--ping">🔔 Ping</span>' +
-        '<span class="ping-btn__text ping-btn__text--chat">💬 Chat</span>';
+        '<span class="ping-btn__text ping-btn__text--ping">🔔 Ping Now</span>' +
+        '<span class="ping-btn__text ping-btn__text--chat">💬 Start Chat</span>';
 
       const pingText = actionBtn.querySelector(
         ".ping-btn__text--ping"
