@@ -15,11 +15,13 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 				
-const app = initializeApp(firebaseConfig);				
-				
-const db = getDatabase(app);				
-const auth = getAuth(app);				
-const storage = getStorage(app);				
-				
-// ⬇️ JEDEN společný export – žádné další exporty v tomhle souboru				
-export { db, auth, storage };				
+const app = initializeApp(firebaseConfig);
+
+const db = getDatabase(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
+
+const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
+
+// ⬇️ JEDEN společný export – žádné další exporty v tomhle souboru
+export { db, auth, storage, firebaseConfig, initSecondaryApp };
