@@ -181,39 +181,29 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   overflow: hidden;
 }
 .bubble-actions .ping-btn:hover { filter: brightness(1.05); }
-.bubble-actions .ping-btn:active { transform: translateY(1px); }
+.bubble-actions .ping-btn:active { transform: translateY(0) scale(0.98); }
 .bubble-actions .ping-btn[data-action="chat"] {
   background: linear-gradient(180deg, #3B82F6, #60A5FA);
 }
 
 .ping-btn__text {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%) scale(0.9);
-  opacity: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   color: #fff;
-  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.9);
   pointer-events: none;
+  white-space: nowrap;
 }
 
 .ping-btn__text.visible {
-  animation: ping-text-in 0.2s ease forwards;
-}
-
-@keyframes ping-text-in {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%) scale(1);
-  }
+  opacity: 1;
+  transform: scale(1);
+  transition: transform .18s ease, opacity .18s ease;
 }
 
 /* Buttons */
