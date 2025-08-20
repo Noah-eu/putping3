@@ -352,25 +352,21 @@ export default function App() {
         const isDevBot = !!u?.isDevBot;
         const isPrivateBotForSomeoneElse =
           isDevBot && u?.privateTo && u.privateTo !== viewerUid;
-
-        // Když nevíme, kdo je viewer (viewerUid == null), bota NEZOBRAZUJEME.
         if (isPrivateBotForSomeoneElse || (isDevBot && !viewerUid)) {
           if (markers.current[uid]) {
             markers.current[uid].remove();
             delete markers.current[uid];
           }
-          return; // nepokračuj ve vykreslování tohoto uživatele
+          return;
         }
 
         const isMe = viewerUid && uid === viewerUid;
-        // Když je to „já“, marker vždy ponech (i bez lat/lng/online) – jen skipni remove větve:
         const isOnline =
           u.online &&
           u.lastActive &&
           Date.now() - u.lastActive < ONLINE_TTL_MS;
         if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           if (markers.current[uid]) {
-            if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
             delete markers.current[uid];
           }
