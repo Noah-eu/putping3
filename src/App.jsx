@@ -442,6 +442,9 @@ export default function App() {
         const draggable = false;
 
         if (!markers.current[uid]) {
+          // bezpečnost: bez souřadnic marker nevytvářej
+          if (!u.lat || !u.lng) return;
+
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
           wrapper.style.transformOrigin = "bottom center";
