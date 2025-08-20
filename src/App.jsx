@@ -86,6 +86,7 @@ async function recoverAccount(oldUid) {
 
   // 3) pings schválně nepřenášíme (historie pípnutí není potřeba)
 
+  if (import.meta.env.VITE_DEV_BOT === '1') await spawnDevBot(auth.currentUser.uid);
   alert('Účet byl obnoven na nové UID.');
 }
 
