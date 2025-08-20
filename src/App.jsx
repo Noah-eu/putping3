@@ -409,7 +409,7 @@ export default function App() {
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
-        const viewerUid = (me && me.uid) || null;
+        const viewerUid = auth.currentUser?.uid || me?.uid || null;
         const isDevBot = !!u?.isDevBot;
         const isPrivateBotForSomeoneElse =
           isDevBot && u?.privateTo && u.privateTo !== viewerUid;
@@ -427,6 +427,7 @@ export default function App() {
           u.lastActive &&
           Date.now() - u.lastActive < ONLINE_TTL_MS;
         if (!isMe && (!isOnline || !u.lat || !u.lng)) {
+          // remove & return
           if (markers.current[uid]) {
             markers.current[uid].remove();
             delete markers.current[uid];
