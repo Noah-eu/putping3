@@ -308,6 +308,16 @@ export default function App() {
 
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
+        // u = data daného uživatele, uid = jeho UID
+        if (u?.isDevBot && u?.privateTo && me && u.privateTo !== me.uid) {
+          // pokud jsme ho dřív vykreslili, zase ho odstraň
+          if (markers.current[uid]) {
+            markers.current[uid].remove();
+            delete markers.current[uid];
+          }
+          return; // pro ostatní klienty bota vůbec nerenderuj
+        }
+
         if (!Number.isFinite(u.lat) || !Number.isFinite(u.lng)) {
           if (markers.current[uid]) {
             if (openBubble.current === uid) openBubble.current = null;
