@@ -173,10 +173,11 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .bubble-actions{
   position:absolute;
   left:50%;
-  bottom:0;
-  transform:translate(-50%, 6px); /* jemne dolu k apexu */
+  bottom:18px;                 /* bylo 0 – zvedneme nad apex */
+  transform:translateX(-50%);  /* zruš ten +6px dolů */
   margin:0;
   display:block;
+  z-index:2;
 }
 
 /* vetsi pilulka, hezci tvar – SIRKA 140 x VYSKA 40 */
