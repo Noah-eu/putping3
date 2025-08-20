@@ -179,7 +179,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   transform:translateX(-50%);  /* zruš ten +6px dolů */
   margin:0;
   display:block;
-  z-index:2;
+  z-index:3;
 }
 
 /* vetsi pilulka, hezci tvar – SIRKA 140 x VYSKA 40 */
