@@ -217,7 +217,7 @@ export default function App() {
         online: true,
       });
 
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot();
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
 
     });
     return () => unsub();

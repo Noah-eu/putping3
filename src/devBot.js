@@ -4,7 +4,7 @@ import { initSecondaryApp } from "./firebase.js";
 
 function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
 
-export async function spawnDevBot(){
+export async function spawnDevBot(ownerUid){
   const app = initSecondaryApp("dev-bot");
   const db2 = getDatabase(app);
   const auth2 = getAuth(app);
@@ -35,6 +35,8 @@ export async function spawnDevBot(){
     lat, lng,
     online: true,
     lastActive: Date.now(),
+    isDevBot: true,
+    privateTo: ownerUid,
   });
 
   // Reakce na pingy → spáruj pár a pošli zprávu
