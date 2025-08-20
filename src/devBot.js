@@ -1,68 +1,64 @@
-import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get, remove, push } from "firebase/database";
+import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { initSecondaryApp } from "./firebase.js";
 
-function pairIdOf(a, b) {
-  return a < b ? `${a}_${b}` : `${b}_${a}`;
-}
+function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
 
-export async function spawnDevBot() {
-  const botApp = initSecondaryApp("dev-bot");
-  const botDb = getDatabase(botApp);
-  const botAuth = getAuth(botApp);
+export async function spawnDevBot(){
+  const app = initSecondaryApp("dev-bot");
+  const db2 = getDatabase(app);
+  const auth2 = getAuth(app);
 
-  const cred = await signInAnonymously(botAuth);
+  const cred = await signInAnonymously(auth2);
   const botUid = cred.user.uid;
 
-  const photos = [
-    "https://placekitten.com/200/200",
-    "https://placekitten.com/201/200",
-  ];
+  // Najdi někoho poblíž a spawn se u něj
+  const usersSnap = await get(ref(db2, "users"));
+  let lat = 50.083, lng = 14.419; // fallback Praha
+  if (usersSnap.exists()){
+    const users = Object.entries(usersSnap.val() || {})
+      .map(([uid,u]) => ({ uid, ...(u||{}) }))
+      .filter(u => !!u.uid)
+      .sort((a,b)=> (b.lastActive||0) - (a.lastActive||0));
+    const other = users.find(u => u.uid !== botUid);
+    if (other?.lat && other?.lng){
+      lat = other.lat + (Math.random()-0.5)*0.001; // ~±100 m
+      lng = other.lng + (Math.random()-0.5)*0.001;
+    }
+  }
 
-  let lat = 50.087;
-  let lng = 14.421;
-  const userRef = ref(botDb, `users/${botUid}`);
+  const userRef = ref(db2, `users/${botUid}`);
   await set(userRef, {
     name: "Kontrolní bot",
-    photos,
-    photoURL: photos[0],
+    photoURL: "https://i.pravatar.cc/200?img=12",
+    photos: [],
+    lat, lng,
     online: true,
     lastActive: Date.now(),
-    lat,
-    lng,
   });
 
-  const inboxRef = ref(botDb, `pings/${botUid}`);
+  // Reakce na pingy → spáruj pár a pošli zprávu
+  const inboxRef = ref(db2, `pings/${botUid}`);
   onChildAdded(inboxRef, async (snap) => {
     const fromUid = snap.key;
     const pid = pairIdOf(fromUid, botUid);
 
-    await set(ref(botDb, `pairPings/${pid}/${botUid}`), serverTimestamp());
-    const otherSnap = await get(ref(botDb, `pairPings/${pid}/${fromUid}`));
-    if (otherSnap.exists()) {
-      await set(ref(botDb, `pairs/${pid}`), true);
-      await push(ref(botDb, `messages/${pid}`), {
-        from: botUid,
-        text: "Ahoj, test!",
-        time: serverTimestamp(),
-      });
-    }
-    await remove(ref(botDb, `pings/${botUid}/${fromUid}`));
+    await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
+    const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
+    if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
+
+    await set(ref(db2, `messages/${pid}/${Date.now()}`), {
+      from: botUid,
+      text: "Ahoj, testuju, že to funguje 🙂",
+      time: serverTimestamp(),
+    });
   });
 
+  // Keep-alive + malé chvění polohy, ať je vidět že žije
   setInterval(() => {
-    const jitter = () => {
-      const meters = 20 + Math.random() * 30; // 20-50 m
-      const deg = meters / 111000;
-      return (Math.random() < 0.5 ? -1 : 1) * deg;
-    };
-    lat += jitter();
-    lng += jitter();
-    update(userRef, {
-      lastActive: Date.now(),
-      lat,
-      lng,
-    });
+    const jitter = () => (Math.random()-0.5) * 0.0003; // ~±30 m
+    lat += jitter(); lng += jitter();
+    update(userRef, { lastActive: Date.now(), lat, lng });
   }, 15000);
 
   return botUid;
