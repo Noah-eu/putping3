@@ -27,6 +27,8 @@ import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, getRedirectRe
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+const ONLINE_TTL_MS = 30 * 60_000;  // 30 minut (můžeš snížit později)
+
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
 function pairIdOf(a, b) {
@@ -363,7 +365,9 @@ export default function App() {
         const isMe = viewerUid && uid === viewerUid;
         // Když je to „já“, marker vždy ponech (i bez lat/lng/online) – jen skipni remove větve:
         const isOnline =
-          u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
+          u.online &&
+          u.lastActive &&
+          Date.now() - u.lastActive < ONLINE_TTL_MS;
         if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           if (markers.current[uid]) {
             if (openBubble.current === uid) openBubble.current = null;
@@ -586,7 +590,9 @@ export default function App() {
 
       const isMe = me && uid === me.uid;
       const isOnline =
-        u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
+        u.online &&
+        u.lastActive &&
+        Date.now() - u.lastActive < ONLINE_TTL_MS;
 
       if (!isOnline && !isMe) {
         if (openBubble.current === uid) openBubble.current = null;
