@@ -333,7 +333,7 @@ export default function App() {
 
     const updatePos = (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
-      console.log("Position accuracy", accuracy);
+      console.log('My coords', latitude, longitude, 'accuracy', accuracy);
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
@@ -408,6 +408,7 @@ export default function App() {
       setUsers(data);
 
       // aktualizace / přidání markerů
+      console.log('viewerUid', (auth.currentUser && auth.currentUser.uid) || null, me);
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
         const viewerUid = (auth.currentUser && auth.currentUser.uid) || (me && me.uid) || null;
