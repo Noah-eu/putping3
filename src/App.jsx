@@ -21,6 +21,7 @@ import {
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
 import { spawnDevBot } from './devBot';
+import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -962,6 +963,10 @@ export default function App() {
 
   return (
     <div>
+      <div className="auth-bar">
+        <button id="btnAuthPrimary"></button>
+        <button id="btnSignOut" title="Odhlásit se">Odhlásit</button>
+      </div>
       {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
