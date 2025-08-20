@@ -323,24 +323,11 @@ export default function App() {
           return; // nepokračuj ve vykreslování tohoto uživatele
         }
 
-        if (!Number.isFinite(u.lat) || !Number.isFinite(u.lng)) {
-          if (markers.current[uid]) {
-            if (openBubble.current === uid) openBubble.current = null;
-            markers.current[uid].remove();
-            delete markers.current[uid];
-          }
-          return;
-        }
-
-        // styl a viditelnost podle stavu
-        const isMe = uid === me.uid;
+        const isMe = viewerUid && uid === viewerUid;
+        // Když je to „já“, marker vždy ponech (i bez lat/lng/online) – jen skipni remove větve:
         const isOnline =
           u.online && u.lastActive && Date.now() - u.lastActive < 5 * 60_000;
-        const shouldRemove = !isOnline && !isMe;
-
-        // skrýt z mapy uživatele, kteří jsou offline
-        // můj marker ponecháváme i mimo online režim, aby bylo vidět mou poslední známou pozici
-        if (shouldRemove) {
+        if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           if (markers.current[uid]) {
             if (openBubble.current === uid) openBubble.current = null;
             markers.current[uid].remove();
@@ -387,7 +374,7 @@ export default function App() {
 
           markers.current[uid] = mk;
         } else {
-          const shouldUpdate = isOnline || isMe;
+          const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
