@@ -479,32 +479,29 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 
 /* Auth bar */
-.auth-bar {
+.auth-bar{
   position: fixed;
-  top: 8px;
   left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom)); /* iOS safe-area */
   transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
+  display: flex; gap: 8px;
   z-index: 1000;
-  background: rgba(255,255,255,.8);
+  background: rgba(255,255,255,.9);
   backdrop-filter: blur(6px);
   padding: 6px 10px;
   border-radius: 999px;
   box-shadow: 0 4px 14px rgba(0,0,0,.12);
 }
-.auth-bar button {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-weight: 600;
-  cursor: pointer;
+
+/* fallback pro prohlížeče bez env() */
+@supports not (bottom: calc(12px + env(safe-area-inset-bottom))) {
+  .auth-bar{ bottom: 12px; }
 }
-#btnAuthPrimary {
-  background: #111;
-  color: #fff;
+
+.auth-bar button{
+  border: none; border-radius: 999px;
+  padding: 8px 14px; font-weight: 600; cursor: pointer;
 }
-#btnSignOut {
-  background: #eee;
-}
+#btnAuthPrimary{ background: #111; color:#fff; }
+#btnSignOut{ background: #eee; }
 
