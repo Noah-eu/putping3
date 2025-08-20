@@ -114,13 +114,15 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   overflow-x:auto; overflow-y:hidden;
   scroll-snap-type:x mandatory;
   border-radius:50%;
-  padding:0;               /* zruš padding-bottom:6px */
-  scrollbar-width:thin;
+  /* ↓ přidej: lehké odsazení dolů, ať je nahoře vidět víc růžové */
+  margin-top:8px;
 
-  /* prstýnek + jemný stín KOLEM celé fotky */
+  /* prstýnek + stín (mírně tenčí) */
   box-shadow:
-    0 0 0 4px rgba(255,255,255,.85),
+    0 0 0 3px rgba(255,255,255,.85),
     0 6px 16px rgba(0,0,0,.18);
+  padding:0;
+  scrollbar-width:thin;
 }
 .bubble-gallery::-webkit-scrollbar {
   height: 4px;
@@ -134,19 +136,17 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   border-radius: 4px;
 }
 .bubble-photo{
-  flex:0 0 100%;
   width:100%; height:100%;
   object-fit:cover;
   border-radius:50%;
-  box-sizing:border-box;
-  border:4px solid #fff;   /* vnitřní bílý kroužek */
-  box-shadow:none;         /* venkovní ring už dělá .bubble-gallery */
+  border:3px solid #fff;   /* bylo 4px → zjemníme */
+  box-shadow:none;
 }
 .bubble-photo.empty{
   background:#f3f4f6; border:4px dashed rgba(255,255,255,.8);
   border-radius:50%;
 }
-/* ZAKÁZAT posun fotky dolů, ten dělal „uříznutý“ spodek */
+/* jistota: žádný posun fotky */
 .marker-wrapper.active img.bubble-photo{
   transform:none !important;
 }
