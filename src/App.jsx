@@ -206,20 +206,19 @@ export default function App() {
         const cred = await signInAnonymously(auth);
         u = cred.user;
       }
-      const uid = u.uid;
-      const name = localStorage.getItem("userName") || "Anonym";
-      setMe({ uid, name });
+      const name = u.displayName || localStorage.getItem('userName') || 'Anonym';
+      const photoURL = u.photoURL || null;
+      setMe({ uid: u.uid, name });
 
-      // Založ záznam uživatele – jen pokud ještě není
-      const meRef = ref(db, `users/${uid}`);
-      await update(meRef, {
+      await update(ref(db, `users/${u.uid}`), {
         name,
+        photoURL,
         lastActive: Date.now(),
         online: true,
       });
 
       // Spawn a development bot for the current user when enabled
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(u.uid);
 
     });
     return () => unsub();
