@@ -226,6 +226,43 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        const user = result?.user;
+        if (user) {
+          await update(ref(db, `users/${user.uid}`), {
+            name: user.displayName,
+            photoURL: user.photoURL,
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+
+    const btnAuth = document.getElementById("btnAuthPrimary");
+    const btnSignOut = document.getElementById("btnSignOut");
+    if (btnSignOut) {
+      btnSignOut.onclick = () => signOut(auth);
+    }
+    if (!btnAuth) return;
+    if (auth.currentUser?.isAnonymous) {
+      btnAuth.textContent = "Přihlásit a zachovat data (Google)";
+      btnAuth.onclick = async () => {
+        const provider = new GoogleAuthProvider();
+        await linkWithRedirect(auth.currentUser, provider);
+      };
+    } else {
+      btnAuth.textContent = "Přihlásit (Google)";
+      btnAuth.onclick = async () => {
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
+      };
+    }
+  }, [me]);
+
+  useEffect(() => {
     if (!me || !locationConsent) return;
     if (!("geolocation" in navigator)) return;
     const meRef = ref(db, `users/${me.uid}`);
