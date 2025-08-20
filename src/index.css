@@ -206,7 +206,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   gap:8px; color:#fff; opacity:0;
-  transform:translateY(-3px) scale(.96);
+  transform:translateY(-3px) scale(1); /* drží text/ikonu o chlup výš */
 }
 .ping-btn__text.visible{ opacity:1; transform:translateY(-3px) scale(1); transition:transform .18s ease, opacity .18s ease; }
 
