@@ -309,13 +309,18 @@ export default function App() {
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
-        if (u?.isDevBot && u?.privateTo && me && u.privateTo !== me.uid) {
-          // pokud jsme ho dřív vykreslili, zase ho odstraň
+        const viewerUid = (me && me.uid) || null;
+        const isDevBot = !!u?.isDevBot;
+        const isPrivateBotForSomeoneElse =
+          isDevBot && u?.privateTo && u.privateTo !== viewerUid;
+
+        // Když nevíme, kdo je viewer (viewerUid == null), bota NEZOBRAZUJEME.
+        if (isPrivateBotForSomeoneElse || (isDevBot && !viewerUid)) {
           if (markers.current[uid]) {
             markers.current[uid].remove();
             delete markers.current[uid];
           }
-          return; // pro ostatní klienty bota vůbec nerenderuj
+          return; // nepokračuj ve vykreslování tohoto uživatele
         }
 
         if (!Number.isFinite(u.lat) || !Number.isFinite(u.lng)) {
@@ -382,14 +387,6 @@ export default function App() {
 
           markers.current[uid] = mk;
         } else {
-          if (u?.isDevBot && u?.privateTo && me && u.privateTo !== me.uid) {
-            // pokud jsme ho dřív vykreslili, zase ho odstraň
-            if (markers.current[uid]) {
-              markers.current[uid].remove();
-              delete markers.current[uid];
-            }
-            return; // pro ostatní klienty bota vůbec nerenderuj
-          }
           const shouldUpdate = isOnline || isMe;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
