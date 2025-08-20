@@ -410,7 +410,7 @@ export default function App() {
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
-        const viewerUid = auth.currentUser?.uid || me?.uid || null;
+        const viewerUid = (auth.currentUser && auth.currentUser.uid) || (me && me.uid) || null;
         const isDevBot = !!u?.isDevBot;
         const isPrivateBotForSomeoneElse =
           isDevBot && u?.privateTo && u.privateTo !== viewerUid;
