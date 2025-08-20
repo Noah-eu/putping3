@@ -105,18 +105,22 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   pointer-events: auto;
 }
 .marker-wrapper.active .marker-avatar { display: none; }
-.bubble-gallery {
-    width: 75%;
-    height: 56%;
-    flex: 0 0 56%;
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    border-radius: 50%;
-    touch-action: pan-x;
-    padding-bottom: 6px;
-    scrollbar-width: thin;
+/* Galerie bude vždy čtverec = kruh */
+.bubble-gallery{
+  width:76%;
+  aspect-ratio:1/1;        /* místo height:56% a flex:0 0 56% */
+  flex:0 0 auto;
+  display:flex;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  border-radius:50%;
+  padding:0;               /* zruš padding-bottom:6px */
+  scrollbar-width:thin;
+
+  /* prstýnek + jemný stín KOLEM celé fotky */
+  box-shadow:
+    0 0 0 4px rgba(255,255,255,.85),
+    0 6px 16px rgba(0,0,0,.18);
 }
 .bubble-gallery::-webkit-scrollbar {
   height: 4px;
@@ -131,26 +135,20 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 .bubble-photo{
   flex:0 0 100%;
-  width:100%;
-  height:100%;
-  object-fit:cover;             /* dříve bylo contain → proto nebyl kruh plný */
-  scroll-snap-align:center;
+  width:100%; height:100%;
+  object-fit:cover;
   border-radius:50%;
   box-sizing:border-box;
-
-  /* dvouvrstvý rámeček: bílý okraj + jemný prstýnek a stín */
-  border:4px solid #fff;
-  box-shadow:
-    0 0 0 4px rgba(255,255,255,.7),   /* prstýnek venku */
-    0 6px 16px rgba(0,0,0,.18);       /* měkký stín */
-  background:#fff;
+  border:4px solid #fff;   /* vnitřní bílý kroužek */
+  box-shadow:none;         /* venkovní ring už dělá .bubble-gallery */
 }
 .bubble-photo.empty{
   background:#f3f4f6; border:4px dashed rgba(255,255,255,.8);
   border-radius:50%;
 }
-.marker-wrapper.active img.bubble-photo {
-  transform: translateY(10%);
+/* ZAKÁZAT posun fotky dolů, ten dělal „uříznutý“ spodek */
+.marker-wrapper.active img.bubble-photo{
+  transform:none !important;
 }
 .bubble-bottom {
   flex: 0 0 25%;
