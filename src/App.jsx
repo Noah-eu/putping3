@@ -244,8 +244,15 @@ export default function App() {
 
     const btnAuth = document.getElementById("btnAuthPrimary");
     const btnSignOut = document.getElementById("btnSignOut");
+    const btnRecover = document.getElementById("btnRecover");
     if (btnSignOut) {
       btnSignOut.onclick = () => signOut(auth);
+    }
+    if (btnRecover) {
+      btnRecover.onclick = () => {
+        const oldUid = prompt("Zadej staré UID:");
+        recoverAccount(oldUid);
+      };
     }
     if (!btnAuth) return;
     if (auth.currentUser?.isAnonymous) {
@@ -1003,6 +1010,7 @@ export default function App() {
     <div>
       <div className="auth-bar">
         <button id="btnAuthPrimary"></button>
+        <button id="btnRecover">Obnovit účet</button>
         <button id="btnSignOut" title="Odhlásit se">Odhlásit</button>
       </div>
       {isIOS && !locationConsent && (
