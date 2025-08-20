@@ -477,3 +477,34 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   left: 50%;
   transform: translateX(-50%);
 }
+
+/* Auth bar */
+.auth-bar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 1000;
+  background: rgba(255,255,255,.8);
+  backdrop-filter: blur(6px);
+  padding: 6px 10px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+.auth-bar button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#btnAuthPrimary {
+  background: #111;
+  color: #fff;
+}
+#btnSignOut {
+  background: #eee;
+}
+
