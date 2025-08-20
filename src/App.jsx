@@ -211,7 +211,7 @@ export default function App() {
 
       // Založ záznam uživatele – jen pokud ještě není
       const meRef = ref(db, `users/${uid}`);
-      update(meRef, {
+      await update(meRef, {
         name,
         lastActive: Date.now(),
         online: true,
