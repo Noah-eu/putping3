@@ -217,6 +217,7 @@ export default function App() {
         online: true,
       });
 
+      // Spawn a development bot for the current user when enabled
       if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
 
     });
