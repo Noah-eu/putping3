@@ -35,6 +35,60 @@ function pairIdOf(a, b) {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
 }
 
+function remapPairId(pid, oldUid, newUid) {
+  const [a, b] = pid.split("_");
+  const na = a === oldUid ? newUid : a;
+  const nb = b === oldUid ? newUid : b;
+  return pairIdOf(na, nb);
+}
+
+async function recoverAccount(oldUid) {
+  if (!auth.currentUser) return alert('Nejsi přihlášen');
+  const newUid = auth.currentUser.uid;
+  if (!oldUid || oldUid === newUid) return alert('Neplatné UID');
+
+  // 1) users: přenes profil (name, photoURL, photos)
+  const oldUserSnap = await get(ref(db, `users/${oldUid}`));
+  const oldUser = oldUserSnap.val() || {};
+  await update(ref(db, `users/${newUid}`), {
+    name: oldUser.name || 'Anonym',
+    photoURL: oldUser.photoURL || null,
+    photos: oldUser.photos || [],
+    lastActive: Date.now(),
+    online: true,
+  });
+
+  // 2) pairs/pairPings/messages – překlop všechna párová data
+  const allPairsSnap = await get(ref(db, `pairPings`));
+  const allPairs = allPairsSnap.val() || {};
+  const affected = Object.keys(allPairs).filter(pid => pid.includes(oldUid));
+  for (const pid of affected) {
+    const newPid = remapPairId(pid, oldUid, newUid);
+
+    // pairPings
+    const pp = (await get(ref(db, `pairPings/${pid}`))).val() || {};
+    if (pp[oldUid]) { pp[newUid] = pp[oldUid]; delete pp[oldUid]; }
+    await update(ref(db, `pairPings/${newPid}`), pp);
+
+    // pairs (stav „jsme spárovaní“)
+    const isPair = (await get(ref(db, `pairs/${pid}`))).val();
+    if (isPair) await set(ref(db, `pairs/${newPid}`), true);
+
+    // messages
+    const msgs = (await get(ref(db, `messages/${pid}`))).val() || {};
+    const entries = Object.entries(msgs);
+    for (const [mid, m] of entries) {
+      const m2 = { ...m };
+      if (m2.from === oldUid) m2.from = newUid;
+      await set(ref(db, `messages/${newPid}/${mid}`), m2);
+    }
+  }
+
+  // 3) pings schválně nepřenášíme (historie pípnutí není potřeba)
+
+  alert('Účet byl obnoven na nové UID.');
+}
+
 // Zmenší obrázek (delší strana max 800 px) → JPEG Blob
 async function compressImage(file, maxDim = 800, quality = 0.8) {
   const img = await new Promise((resolve, reject) => {
