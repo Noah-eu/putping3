@@ -382,6 +382,14 @@ export default function App() {
 
           markers.current[uid] = mk;
         } else {
+          if (u?.isDevBot && u?.privateTo && me && u.privateTo !== me.uid) {
+            // pokud jsme ho dřív vykreslili, zase ho odstraň
+            if (markers.current[uid]) {
+              markers.current[uid].remove();
+              delete markers.current[uid];
+            }
+            return; // pro ostatní klienty bota vůbec nerenderuj
+          }
           const shouldUpdate = isOnline || isMe;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
