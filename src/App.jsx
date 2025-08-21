@@ -195,9 +195,15 @@ export default function App() {
     `;
       // delete
       item.querySelector('.del').onclick = async () => {
-        const photos = [...(me.photos||[])]; photos.splice(i,1);
-        await update(ref(db, `users/${me.uid}`), { photos });
-        me.photos = photos; buildGrid();
+        const photos = [...(me.photos||[])];
+        photos.splice(i,1);
+        await update(ref(db, `users/${me.uid}`), {
+          photos,
+          photoURL: photos[0] || null,
+        });
+        me.photos = photos;
+        if (me) me.photoURL = photos[0] || null;
+        buildGrid();
       };
       // drag reorder
       item.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i); });
@@ -209,8 +215,13 @@ export default function App() {
         const photos = [...(me.photos||[])];
         const [moved] = photos.splice(from,1);
         photos.splice(to,0,moved);
-        await update(ref(db, `users/${me.uid}`), { photos });
-        me.photos = photos; buildGrid();
+        await update(ref(db, `users/${me.uid}`), {
+          photos,
+          photoURL: photos[0] || null,
+        });
+        me.photos = photos;
+        if (me) me.photoURL = photos[0] || null;
+        buildGrid();
       });
       grid.appendChild(item);
     });
