@@ -510,8 +510,8 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   position: fixed;
   right: calc(16px + env(safe-area-inset-right));
   bottom: calc(16px + env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: #111;
   color: #fff;
@@ -519,15 +519,15 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   cursor: pointer;
   display: grid;
   place-items: center;
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  box-shadow: 0 8px 28px rgba(0,0,0,.28);
   z-index: 1000;
 }
-.fab-gear svg{ width:24px;height:24px; }
+.fab-gear svg{ width:26px;height:26px; }
 
 .gear-menu{
   position: fixed;
   right: calc(16px + env(safe-area-inset-right));
-  bottom: calc(84px + env(safe-area-inset-bottom)); /* nad FAB */
+  bottom: calc(96px + env(safe-area-inset-bottom)); /* 64 + mezera */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -536,11 +536,11 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   padding: 12px;
   border-radius: 16px;
   box-shadow: 0 12px 28px rgba(0,0,0,.25);
-  z-index: 1000;
   transform: translateY(8px);
   opacity: 0;
   pointer-events: none;
   transition: transform .18s ease, opacity .18s ease;
+  z-index: 1000;
 }
 .gear-menu.open{ transform:translateY(0); opacity:1; pointer-events:auto; }
 
