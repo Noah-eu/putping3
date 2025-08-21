@@ -28,6 +28,9 @@ import { getRedirectResult, signOut } from "firebase/auth";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+window.shouldPlaySound = () =>
+  localStorage.getItem("soundEnabled") !== "0";
+
 const ONLINE_TTL_MS = 10 * 60_000; // 10 minut
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
@@ -118,18 +121,10 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
 
 export default function App() {
   const [map, setMap] = useState(null);
-  const [me, setMe] = useState(null); // {uid, name, photoURL, soundEnabled}
+  const [me, setMe] = useState(null); // {uid, name, photoURL}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
   const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    const stored = localStorage.getItem("soundEnabled");
-    return stored === null ? true : stored === "1";
-  });
-  const [showSettings, setShowSettings] = useState(false);
-  const [draftName, setDraftName] = useState(
-    localStorage.getItem("userName") || ""
-  );
   const [fabOpen, setFabOpen] = useState(false);
   const [open, setOpen] = useState(false); // gear menu open state
   const [showChatList, setShowChatList] = useState(false);
@@ -160,7 +155,6 @@ export default function App() {
   const centeredOnMe = useRef(false);
 
   // zvuk pomocí Web Audio API
-  const audioCtx = useRef(null);
   const lastMsgRef = useRef({}); // pairId -> last message id
   const messagesLoaded = useRef(false);
   const galleryRef = useRef(null);
@@ -170,35 +164,6 @@ export default function App() {
     markerHighlightsRef.current = markerHighlights;
   }, [markerHighlights]);
 
-  useEffect(() => {
-    audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
-    const unlock = () => {
-      if (audioCtx.current.state === "suspended") {
-        audioCtx.current.resume();
-      }
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-    window.addEventListener("click", unlock);
-    window.addEventListener("touchstart", unlock);
-    return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-  }, []);
-
-  function beep(freq = 880, duration = 0.2) {
-    if (!soundEnabled || !audioCtx.current) return;
-    const ctx = audioCtx.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    gain.gain.value = 0.15;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = freq;
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
-  }
 
   function acceptLocation() {
     localStorage.setItem("locationConsent", "1");
@@ -293,9 +258,15 @@ export default function App() {
     });
   }
 
-  function openSettingsModal() {
-    setShowSettings(true);
-    setOpen(false);
+  function openSettingsModal(){
+    const chk = document.getElementById('chkSound');
+    const on = localStorage.getItem('soundEnabled') !== '0';
+    if (chk){
+      chk.checked = on;
+      chk.onchange = () =>
+        localStorage.setItem('soundEnabled', chk.checked ? '1' : '0');
+    }
+    openSheet('settingsModal');
   }
 
   // toggle gear menu
@@ -316,23 +287,6 @@ export default function App() {
     menu.setAttribute('aria-hidden', open ? 'false' : 'true');
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }, [open]);
-
-  useEffect(() => {
-    const unlock = () => {
-      pingSound.current.play().catch(() => {});
-      pingSound.current.pause();
-      msgSound.current.play().catch(() => {});
-      msgSound.current.pause();
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-    window.addEventListener("click", unlock);
-    window.addEventListener("touchstart", unlock);
-    return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-  }, []);
 
   useEffect(() => {
     if (localStorage.getItem("soundEnabled") === null) {
@@ -478,6 +432,7 @@ export default function App() {
     document.getElementById('btnChats')?.addEventListener('click', openChatsModal);
     document.getElementById('btnSettings')?.addEventListener('click', openSettingsModal);
     document.getElementById('btnCloseChats')?.addEventListener('click', ()=>closeSheet('chatsModal'));
+    document.getElementById('btnCloseSettings')?.addEventListener('click', ()=>closeSheet('settingsModal'));
 
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
@@ -811,9 +766,9 @@ export default function App() {
           messagesLoaded.current &&
           prev[pid] !== id &&
           m.from !== me.uid &&
-          soundEnabled
+          window.shouldPlaySound()
         ) {
-          beep(660);
+          new Audio('/ping.mp3').play();
           setMarkerHighlights((prev) => ({ ...prev, [m.from]: "purple" }));
         }
         next[pid] = id;
@@ -822,7 +777,7 @@ export default function App() {
       messagesLoaded.current = true;
     });
     return () => unsub();
-  }, [me, soundEnabled]);
+  }, [me]);
 
   // aktualizace bublin při změně pingů nebo uživatelů
   useEffect(() => {
@@ -1064,8 +1019,8 @@ export default function App() {
       // každé dítě je ping od někoho
       Object.entries(data).forEach(([fromUid, obj]) => {
         // přehraj zvuk a smaž ping
-        if (soundEnabled) {
-          beep(880);
+        if (window.shouldPlaySound()) {
+          new Audio('/ping.mp3').play();
         }
         setMarkerHighlights((prev) => ({ ...prev, [fromUid]: "red" }));
         setTimeout(() => {
@@ -1079,7 +1034,7 @@ export default function App() {
       });
     });
     return () => unsub();
-  }, [me, soundEnabled]);
+  }, [me]);
 
   async function sendPing(toUid) {
     if (!me) return;
@@ -1093,17 +1048,8 @@ export default function App() {
       await set(ref(db, `pairs/${pid}`), true);
     }
     // také krátké pípnutí odesílateli, aby věděl, že kliknul
-    if (soundEnabled) {
-      beep(880);
-    }
-  }
-
-  function toggleSound() {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    localStorage.setItem("soundEnabled", next ? "1" : "0");
-    if (next) {
-      audioCtx.current?.resume();
+    if (window.shouldPlaySound()) {
+      new Audio('/ping.mp3').play();
     }
   }
 
@@ -1128,7 +1074,7 @@ export default function App() {
       chatUnsub.current?.();
       chatUnsub.current = null;
     };
-  }, [openChatWith, me, soundEnabled]);
+  }, [openChatWith, me]);
 
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -1192,27 +1138,6 @@ export default function App() {
     }
   }
 
-  /* ───────────────────────────── Nastavení / profil ─────────────────────── */
-
-  useEffect(() => {
-    if (!me) return;
-    const u = users[me.uid];
-    if (u && u.name && !draftName) {
-      setDraftName(u.name);
-      localStorage.setItem("userName", u.name);
-    }
-  }, [users, me]); // načtení jména z DB při prvním fetchi
-
-  async function saveProfile() {
-    if (!me) return;
-    const meRef = ref(db, `users/${me.uid}`);
-    await update(meRef, {
-      name: draftName || "Anonym",
-      lastActive: Date.now(),
-    });
-    localStorage.setItem("userName", draftName || "Anonym");
-    setShowSettings(false);
-  }
 
   async function onPickPhotos(e) {
     if (!me) return;
@@ -1385,6 +1310,17 @@ export default function App() {
           <button id="btnCloseChats">✕</button>
         </div>
         <div id="chatsList"></div>
+      </div>
+
+      <div id="settingsModal" className="sheet" aria-hidden="true">
+        <div className="sheet-head">
+          <h3>Nastavení</h3>
+          <button id="btnCloseSettings">✕</button>
+        </div>
+        <label className="switch">
+          <input id="chkSound" type="checkbox" />
+          <span>Přehrávat zvuky</span>
+        </label>
       </div>
 
       <button
@@ -1738,95 +1674,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Nastavení (modal) */}
-      {showSettings && (
-        <div
-          onClick={() => setShowSettings(false)}
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(0,0,0,.25)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 30,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 360,
-              background: "#fff",
-              borderRadius: 14,
-              padding: 16,
-              boxShadow: "0 10px 30px rgba(0,0,0,.15)",
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 16 }}>
-              Nastavení
-            </div>
-
-            <label style={{ display: "block", marginBottom: 10, fontSize: 13 }}>
-              Jméno
-              <input
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  marginTop: 5,
-                }}
-              />
-            </label>
-
-            <div style={{ marginBottom: 10 }}>
-              <button
-                onClick={toggleSound}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  background: soundEnabled ? "#e8fff1" : "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                {soundEnabled ? "🔊 Zvuk povolen" : "🔈 Povolit zvuk"}
-              </button>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                onClick={() => setShowSettings(false)}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                Zavřít
-              </button>
-              <button
-                onClick={saveProfile}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #147af3",
-                  background: "#147af3",
-                  color: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                Uložit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {showIntro && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
