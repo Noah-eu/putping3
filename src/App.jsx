@@ -191,11 +191,14 @@ export default function App() {
   function openSheet(id){ const el=document.getElementById(id); el?.classList.add('open'); }
   function closeSheet(id){ const el=document.getElementById(id); el?.classList.remove('open'); }
 
-  function buildGrid(){
+  function buildGrid(list){
     const grid = document.getElementById('galleryGrid'); if(!grid) return;
-    const arr = (me?.photos && Array.isArray(me.photos)) ? me.photos : (me?.photoURL ? [me.photoURL] : []);
+    const user = me ? users[me.uid] : null;
+    const current = list ?? (Array.isArray(user?.photos) && user.photos.length
+      ? user.photos
+      : (user?.photoURL ? [user.photoURL] : []));
     grid.innerHTML = '';
-    arr.forEach((url, i)=>{
+    current.forEach((url, i)=>{
       const item = document.createElement('div');
       item.className = 'tile'; item.draggable = true; item.dataset.index = String(i);
       item.innerHTML = `
@@ -205,15 +208,13 @@ export default function App() {
     `;
       // delete
       item.querySelector('.del').onclick = async () => {
-        const photos = [...(me.photos||[])];
+        const photos = [...(users[me.uid]?.photos||[])];
         photos.splice(i,1);
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
         });
-        me.photos = photos;
-        if (me) me.photoURL = photos[0] || null;
-        buildGrid();
+        buildGrid(photos);
       };
       // drag reorder
       item.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i); });
@@ -222,16 +223,14 @@ export default function App() {
         e.preventDefault();
         const from = Number(e.dataTransfer.getData('text/plain'));
         const to = Number(item.dataset.index);
-        const photos = [...(me.photos||[])];
+        const photos = [...(users[me.uid]?.photos||[])];
         const [moved] = photos.splice(from,1);
         photos.splice(to,0,moved);
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
         });
-        me.photos = photos;
-        if (me) me.photoURL = photos[0] || null;
-        buildGrid();
+        buildGrid(photos);
       });
       grid.appendChild(item);
     });
@@ -494,9 +493,9 @@ export default function App() {
         const url = await getDownloadURL(snap.ref);
         newUrls.push(url);
       }
-      const photos = [ ...(me.photos||[]), ...newUrls ];
+      const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
       await update(ref(db, `users/${me.uid}`), { photos });
-      me.photos = photos; buildGrid();
+      buildGrid(photos);
     };
 
     const btnAdd = document.getElementById('btnAddPhoto');
@@ -512,7 +511,7 @@ export default function App() {
       btnClose?.removeEventListener('click', closeGalleryModal);
       picker?.removeEventListener('change', handleChange);
     };
-  }, [me]);
+  }, [me, users]);
 
   useEffect(() => {
     if (!me || !locationConsent) return;
