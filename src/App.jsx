@@ -126,7 +126,6 @@ export default function App() {
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
   const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
   const [fabOpen, setFabOpen] = useState(false);
-  const [open, setOpen] = useState(false); // gear menu open state
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
@@ -264,24 +263,49 @@ export default function App() {
     openSheet('settingsModal');
   }
 
-  // toggle gear menu
+  // --- FAB (ozubené kolečko) – single-click open, safe for StrictMode ---
   useEffect(() => {
-    const btn = document.getElementById('btnGear');
+    const gear = document.getElementById('btnGear');
     const menu = document.getElementById('gearMenu');
-    if (!btn || !menu) return;
-    const toggle = () => setOpen((o) => !o);
-    btn.addEventListener('click', toggle);
-    return () => btn.removeEventListener('click', toggle);
-  }, []);
+    if (!gear || !menu) return;
 
-  useEffect(() => {
-    const btn = document.getElementById('btnGear');
-    const menu = document.getElementById('gearMenu');
-    if (!btn || !menu) return;
-    menu.classList.toggle('open', open);
-    menu.setAttribute('aria-hidden', open ? 'false' : 'true');
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }, [open]);
+    // inicializace ARIA
+    menu.setAttribute('aria-hidden', 'true');
+    gear.setAttribute('aria-expanded', 'false');
+
+    // vnitřní stav (nepoužívej .classList jako zdroj pravdy – může být mimo pořadí)
+    let isOpen = false;
+
+    const setOpen = (open) => {
+      isOpen = open;
+      menu.classList.toggle('open', open);
+      gear.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-hidden', String(!open));
+    };
+
+    // Handlery – používáme POINTER události, aby „klik mimo“ neshodil první klik na mobilu
+    const onGearPointer = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(!isOpen);               // otevře hned na první tap
+    };
+    const onDocPointer = () => setOpen(false);
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+
+    // Navázání – a ČISTÉ ODPOUTÁNÍ (důležité kvůli React StrictMode, který efekty mountuje 2×)
+    gear.addEventListener('pointerdown', onGearPointer);
+    document.addEventListener('pointerdown', onDocPointer);
+    document.addEventListener('keydown', onKey);
+
+    // Zamez zdvojení starých handlerů, pokud někde existovaly:
+    gear.onclick = null;
+
+    return () => {
+      gear.removeEventListener('pointerdown', onGearPointer);
+      document.removeEventListener('pointerdown', onDocPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem("soundEnabled") === null) {
@@ -365,20 +389,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const gear = document.getElementById('btnGear');
-    const menu = document.getElementById('gearMenu');
-    if (!gear || !menu) return;
-
-    const setOpen = (open) => {
-      menu.classList.toggle('open', open);
-      gear.setAttribute('aria-expanded', String(open));
-      menu.setAttribute('aria-hidden', String(!open));
-    };
-
-    gear.onclick = (e) => { e.stopPropagation(); setOpen(!menu.classList.contains('open')); };
-    document.addEventListener('click', () => setOpen(false));
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') setOpen(false); });
-
     // Naplň primární tlačítko podle stavu účtu
     const primary = document.getElementById('btnAuthPrimary');
     const refreshPrimary = () => {
@@ -405,13 +415,11 @@ export default function App() {
     recover.onclick = async () => {
       const oldUid = prompt('Vlož staré UID:');
       if (oldUid) await recoverAccount(oldUid);
-      setOpen(false);
     };
 
     const signout = document.getElementById('btnSignOut');
     signout.onclick = async () => {
       await signOut(auth);
-      setOpen(false);
     };
 
     document.getElementById('btnEnableLoc')?.addEventListener('click', () => {
