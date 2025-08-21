@@ -506,3 +506,58 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 #btnSignOut{ background: #eee; }
 #btnEnableLoc{ background:#10b981; color:#fff; border:none; border-radius:999px; padding:8px 14px; font-weight:600; }
 
+/* Floating gear button and menu */
+.fab-gear{
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  z-index: 1000;
+}
+.fab-gear svg{ width:24px;height:24px; }
+
+.gear-menu{
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(84px + env(safe-area-inset-bottom)); /* nad FAB */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255,255,255,.95);
+  backdrop-filter: blur(8px);
+  padding: 12px;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.25);
+  z-index: 1000;
+  transform: translateY(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.gear-menu.open{ transform:translateY(0); opacity:1; pointer-events:auto; }
+
+.gear-menu button{
+  min-width: 220px;
+  text-align: left;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #f3f4f6;
+  color: #111;
+}
+.gear-menu button:hover{ filter:brightness(.97); }
+
+/* schovej starou lištu, pokud ještě existuje */
+.auth-bar{ display:none !important; }
+
