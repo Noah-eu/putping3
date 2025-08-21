@@ -273,7 +273,7 @@ export default function App() {
     });
     document.querySelectorAll('.conv-item').forEach(el => {
       const peer = el.getAttribute('data-uid');
-      el.onclick = () => { openChat(peer); closeChatsModal(); };
+      el.onclick = () => { if (openChat(peer)) closeChatsModal(); };
     });
   }
 
@@ -1128,12 +1128,12 @@ export default function App() {
   }, [chatMsgs, openChatWith]);
 
   function openChat(uid) {
-    if (!me) return;
+    if (!me) return false;
     const pid = getPairId(me.uid, uid);
     const pair = pairPings[pid] || {};
     if (!((pair[me.uid] && pair[uid]) || chatPairs[pid])) {
       alert("Chat je dostupný až po vzájemném pingnutí.");
-      return;
+      return false;
     }
     setOpenChatWith(uid);
     setMarkerHighlights((prev) => {
@@ -1141,6 +1141,7 @@ export default function App() {
       delete copy[uid];
       return copy;
     });
+    return true;
   }
 
   function closeChat() {
@@ -1455,8 +1456,7 @@ export default function App() {
                   key={pid}
                   className="chat-list__item"
                   onClick={() => {
-                    openChat(otherUid);
-                    setShowChatList(false);
+                    if (openChat(otherUid)) setShowChatList(false);
                   }}
                 >
                   {u?.name || "Neznámý uživatel"}
