@@ -277,7 +277,7 @@ export default function App() {
     openSheet('settingsModal');
   }
 
-  // --- FAB (ozubené kolečko) — single tap open, click-inside friendly, cleanup safe ---
+  // --- FAB/gear menu: otevření na první tap, klik uvnitř nemá zavírat, cleanup safe ---
   useEffect(() => {
     const gear = document.getElementById('btnGear');
     const menu = document.getElementById('gearMenu');
@@ -292,71 +292,93 @@ export default function App() {
       menu.classList.toggle('open', open);
       gear.setAttribute('aria-expanded', String(open));
       menu.setAttribute('aria-hidden', String(!open));
-
-      if (open) ensureMenuInView(); // po otevření připojíme ochranu proti přesahu
     };
 
-    // otevřít/zavřít na první tap
-    const onGearPointer = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(!isOpen);
+    const onGearPointer = (e) => { e.preventDefault(); e.stopPropagation(); setOpen(!isOpen); };
+    const onDocPointer  = (e) => {
+      const t = e.target; if (!t) return;
+      if (!menu.contains(t) && !gear.contains(t)) setOpen(false);
     };
-
-    // zavírej jen při kliku MIMO menu i mimo gear
-    const onDocPointer = (e) => {
-      const t = e.target;
-      if (!t) return;
-      const insideMenu = menu.contains(t);
-      const onGear = gear.contains(t);
-      if (!insideMenu && !onGear) setOpen(false);
-    };
-
-    // zabraň bublání z menu (jinak by doc pointerdown menu hned zavřel)
     const onMenuPointer = (e) => e.stopPropagation();
-
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey         = (e) => { if (e.key === 'Escape') setOpen(false); };
 
     gear.addEventListener('pointerdown', onGearPointer);
     menu.addEventListener('pointerdown', onMenuPointer);
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
-
-    // pro jistotu zruš staré onclicky
-    gear.onclick = null;
-
-    // helper: po otevření zajisti, že menu je 100% v okně
-    function ensureMenuInView(){
-      const r = menu.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      let changed = false;
-
-      // horizontální střed (kdyby overflow doprava/doleva)
-      if (r.right > vw || r.left < 0){
-        menu.style.left = '50%';
-        changed = true;
-      }
-
-      // pokud je vyšší než viewport (bez FAB), spolehni se na max-height + scroll (už máme v CSS)
-      // tady jen drobná pojistka: srovnej transform
-      if (r.top < 0){
-        // přizvedni vizuálně o pár px
-        menu.style.transform = 'translate(-50%, 0)';
-        changed = true;
-      }
-
-      if (changed){
-        // nic dalšího; CSS už má overflow:auto
-      }
-    }
+    gear.onclick = null; // jistota
 
     return () => {
       gear.removeEventListener('pointerdown', onGearPointer);
       menu.removeEventListener('pointerdown', onMenuPointer);
       document.removeEventListener('pointerdown', onDocPointer);
-      document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keydown', onKey);
+  };
+}, []);
+
+  // helper: proveď akci a zavři menu
+  const withClose = (fn) => async (e) => {
+    e?.preventDefault?.();
+    await Promise.resolve(fn?.());
+    const menu = document.getElementById('gearMenu');
+    const gear = document.getElementById('btnGear');
+    if (menu && gear) {
+      menu.classList.remove('open');
+      menu.setAttribute('aria-hidden','true');
+      gear.setAttribute('aria-expanded','false');
+    }
+  };
+
+  useEffect(() => {
+    const primary     = document.getElementById('btnAuthPrimary');
+    const btnRecover  = document.getElementById('btnRecover');
+    const btnSignOut  = document.getElementById('btnSignOut');
+    const btnGallery  = document.getElementById('btnGallery');
+    const btnChats    = document.getElementById('btnChats');
+    const btnSettings = document.getElementById('btnSettings');
+    const btnEnable   = document.getElementById('btnEnableLoc');
+    const btnZoomIn   = document.getElementById('btnZoomIn');
+    const btnZoomOut  = document.getElementById('btnZoomOut');
+
+    if (!primary) return;
+
+    const refreshPrimary = () => {
+      const u = auth.currentUser;
+      if (!u) {
+        primary.textContent = 'Přihlásit (Google)';
+        primary.onclick = withClose(async () => {
+          const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+          await signInWithRedirect(auth, new GoogleAuthProvider());
+        });
+        return;
+      }
+      if (u.isAnonymous) {
+        primary.textContent = 'Přihlásit a zachovat data (Google)';
+        primary.onclick = withClose(async () => {
+          const { GoogleAuthProvider, linkWithRedirect } = await import('firebase/auth');
+          await linkWithRedirect(u, new GoogleAuthProvider());
+        });
+      } else {
+        primary.textContent = 'Jsi přihlášen (Google)';
+        primary.onclick = withClose(() => {});
+      }
     };
+
+    refreshPrimary();
+    getRedirectResult(auth).finally(refreshPrimary);
+    onAuthStateChanged(auth, refreshPrimary);
+
+    btnRecover  && (btnRecover.onclick  = withClose(async () => { const o = prompt('Vlož staré UID:'); if (o) await recoverAccount(o); }));
+    btnSignOut  && (btnSignOut.onclick  = withClose(async () => { await signOut(auth); }));
+    btnGallery  && (btnGallery.onclick  = withClose(() => openGalleryModal()));
+    btnChats    && (btnChats.onclick    = withClose(() => openChatsModal()));
+    btnSettings && (btnSettings.onclick = withClose(() => openSettingsModal()));
+    btnEnable   && (btnEnable.onclick   = withClose(() => {
+      navigator.geolocation?.getCurrentPosition?.(()=>{},()=>{});
+      if (typeof acceptLocation === 'function') acceptLocation();
+    }));
+    btnZoomIn   && (btnZoomIn.onclick   = withClose(() => map.zoomIn()));
+    btnZoomOut  && (btnZoomOut.onclick  = withClose(() => map.zoomOut()));
   }, []);
 
   useEffect(() => {
@@ -440,104 +462,6 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const ap = document.getElementById('btnAuthPrimary');
-    const recover = document.getElementById('btnRecover');
-    const signout = document.getElementById('btnSignOut');
-    const gallery = document.getElementById('btnGallery');
-    const chats = document.getElementById('btnChats');
-    const settings = document.getElementById('btnSettings');
-    const enableLoc = document.getElementById('btnEnableLoc');
-    const zoomIn = document.getElementById('btnZoomIn');
-    const zoomOut = document.getElementById('btnZoomOut');
-    const closeChats = document.getElementById('btnCloseChats');
-    const closeSettings = document.getElementById('btnCloseSettings');
-    const cancelChatBtn = document.getElementById('btnCancelChat');
-
-    const refreshPrimary = () => {
-      if (!ap) return;
-      if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        ap.textContent = 'Přihlásit a zachovat data (Google)';
-      } else {
-        ap.textContent = 'Přihlásit (Google)';
-      }
-    };
-    refreshPrimary();
-
-    // helper — provede akci a zavře menu
-    const withClose = (fn) => async (e) => {
-      e?.preventDefault?.();
-      await Promise.resolve(fn?.());
-      const menu = document.getElementById('gearMenu');
-      const gear = document.getElementById('btnGear');
-      if (menu && gear) {
-        menu.classList.remove('open');
-        menu.setAttribute('aria-hidden','true');
-        gear.setAttribute('aria-expanded','false');
-      }
-    };
-
-    const onGallery = withClose(openGalleryModal);
-    const onChats = withClose(openChatsModal);
-    const onSettings = withClose(openSettingsModal);
-    const onEnableLoc = withClose(() => {
-      navigator.geolocation?.getCurrentPosition?.(()=>{},()=>{});
-      if (typeof acceptLocation === 'function') acceptLocation();
-    });
-    const onZoomIn = withClose(() => map.zoomIn());
-    const onZoomOut = withClose(() => map.zoomOut());
-    const onAuthPrimary = withClose(async () => {
-      if (!auth.currentUser || auth.currentUser.isAnonymous){
-        const { GoogleAuthProvider, linkWithRedirect } = await import('firebase/auth');
-        const provider = new GoogleAuthProvider();
-        await linkWithRedirect(auth.currentUser, provider);
-      } else {
-        const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-        const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
-      }
-    });
-    const onRecover = withClose(async () => {
-      const oldUid = prompt('Vlož staré UID:');
-      if (oldUid) await recoverAccount(oldUid);
-    });
-    const onSignOut = withClose(async () => {
-      await signOut(auth);
-    });
-    const onCloseChats = () => closeSheet('chatsModal');
-    const onCloseSettings = () => closeSheet('settingsModal');
-    const onCancelChat = () => cancelChat();
-
-    gallery?.addEventListener('click', onGallery);
-    chats?.addEventListener('click', onChats);
-    settings?.addEventListener('click', onSettings);
-    enableLoc?.addEventListener('click', onEnableLoc);
-    zoomIn?.addEventListener('click', onZoomIn);
-    zoomOut?.addEventListener('click', onZoomOut);
-    ap?.addEventListener('click', onAuthPrimary);
-    recover?.addEventListener('click', onRecover);
-    signout?.addEventListener('click', onSignOut);
-    closeChats?.addEventListener('click', onCloseChats);
-    closeSettings?.addEventListener('click', onCloseSettings);
-    cancelChatBtn?.addEventListener('click', onCancelChat);
-
-    getRedirectResult(auth).finally(refreshPrimary);
-
-    return () => {
-      gallery?.removeEventListener('click', onGallery);
-      chats?.removeEventListener('click', onChats);
-      settings?.removeEventListener('click', onSettings);
-      enableLoc?.removeEventListener('click', onEnableLoc);
-      zoomIn?.removeEventListener('click', onZoomIn);
-      zoomOut?.removeEventListener('click', onZoomOut);
-      ap?.removeEventListener('click', onAuthPrimary);
-      recover?.removeEventListener('click', onRecover);
-      signout?.removeEventListener('click', onSignOut);
-      closeChats?.removeEventListener('click', onCloseChats);
-      closeSettings?.removeEventListener('click', onCloseSettings);
-      cancelChatBtn?.removeEventListener('click', onCancelChat);
-    };
-  }, [map]);
 
   useEffect(() => {
     const handleAdd = () => {
