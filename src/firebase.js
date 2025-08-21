@@ -1,8 +1,8 @@
 // src/firebase.js				
 import { initializeApp } from "firebase/app";				
 import { getDatabase } from "firebase/database";				
-import { getAuth } from "firebase/auth";				
-import { getStorage } from "firebase/storage";				
+import { getAuth } from "firebase/auth";
+import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
 				
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,9 +19,9 @@ const app = initializeApp(firebaseConfig);
 
 const db = getDatabase(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
+export const storage = getStorage(app);
 
 const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
 
-// ⬇️ JEDEN společný export – žádné další exporty v tomhle souboru
-export { db, auth, storage, firebaseConfig, initSecondaryApp };
+export { db, auth, firebaseConfig, initSecondaryApp };
+export { sref, uploadBytes, getDownloadURL };
