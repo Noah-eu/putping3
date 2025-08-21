@@ -148,6 +148,16 @@ export default function App() {
   const chatUnsub = useRef(null);
   const chatBoxRef = useRef(null);
 
+  function getPairId(uid1, uid2) {
+    const sorted = pairIdOf(uid1, uid2);
+    if (pairPings[sorted] || chatPairs[sorted]) return sorted;
+    const direct = `${uid1}_${uid2}`;
+    if (pairPings[direct] || chatPairs[direct]) return direct;
+    const reverse = `${uid2}_${uid1}`;
+    if (pairPings[reverse] || chatPairs[reverse]) return reverse;
+    return sorted;
+    }
+
   // map markers cache
   const markers = useRef({}); // uid -> marker
   const openBubble = useRef(null); // uid otevřené bubliny
@@ -928,7 +938,7 @@ export default function App() {
 
   function getBubbleContent({ uid, name, photos, photoURL }) {
     const meVsOther = uid === me.uid;
-    const pid = pairIdOf(me.uid, uid);
+    const pid = getPairId(me.uid, uid);
     const pair = pairPings[pid] || {};
     const canChat = (pair[me.uid] && pair[uid]) || chatPairs[pid];
 
@@ -1069,7 +1079,7 @@ export default function App() {
     await set(ref(db, `pings/${toUid}/${me.uid}`), {
       time: serverTimestamp(),
     });
-    const pid = pairIdOf(me.uid, toUid);
+    const pid = getPairId(me.uid, toUid);
     await set(ref(db, `pairPings/${pid}/${me.uid}`), serverTimestamp());
     const pair = pairPings[pid] || {};
     if (pair[toUid]) {
@@ -1088,7 +1098,7 @@ export default function App() {
       setChatMsgs([]);
       return;
     }
-    const pid = pairIdOf(me.uid, openChatWith);
+    const pid = getPairId(me.uid, openChatWith);
     const msgsRef = ref(db, `messages/${pid}`);
     const unsub = onValue(msgsRef, (snap) => {
       const data = snap.val() || {};
@@ -1112,7 +1122,7 @@ export default function App() {
 
   function openChat(uid) {
     if (!me) return;
-    const pid = pairIdOf(me.uid, uid);
+    const pid = getPairId(me.uid, uid);
     const pair = pairPings[pid] || {};
     if (!((pair[me.uid] && pair[uid]) || chatPairs[pid])) {
       alert("Chat je dostupný až po vzájemném pingnutí.");
@@ -1141,7 +1151,7 @@ export default function App() {
     )
       return;
 
-    const pid = pairIdOf(meUid, peerUid);
+    const pid = getPairId(meUid, peerUid);
 
     // ukonči pár
     await remove(ref(db, `pairs/${pid}`));
@@ -1163,7 +1173,7 @@ export default function App() {
   async function sendMessage() {
     const to = openChatWith;
     if (!me || !to) return;
-    const pid = pairIdOf(me.uid, to);
+    const pid = getPairId(me.uid, to);
     const msg = {
       from: me.uid,
       to,
