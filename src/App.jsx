@@ -12,6 +12,7 @@ import {
   push,
   serverTimestamp,
   get,
+  onDisconnect,
 } from "firebase/database";
 import {
   ref as sref,
@@ -267,7 +268,13 @@ export default function App() {
       const photoURL = u.photoURL || null;
       setMe({ uid: u.uid, name });
 
-      await update(ref(db, `users/${u.uid}`), {
+      const myRef = ref(db, `users/${u.uid}`);
+      onDisconnect(myRef).update({ online: false, lastActive: serverTimestamp() });
+      window.addEventListener("beforeunload", () => {
+        update(myRef, { online: false, lastActive: Date.now() });
+      });
+
+      await update(myRef, {
         name,
         photoURL,
         lastActive: Date.now(),
