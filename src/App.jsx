@@ -378,6 +378,8 @@ export default function App() {
         });
         return;
       }
+      localStorage.setItem('lastLat', String(latitude));
+      localStorage.setItem('lastLng', String(longitude));
       update(meRef, {
         lat: latitude,
         lng: longitude,
