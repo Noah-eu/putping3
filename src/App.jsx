@@ -277,53 +277,79 @@ export default function App() {
     openSheet('settingsModal');
   }
 
-  // --- FAB (ozubené kolečko) – single-click open, safe for StrictMode ---
+  // --- FAB (ozubené kolečko) — single tap open, click-inside friendly, cleanup safe ---
   useEffect(() => {
     const gear = document.getElementById('btnGear');
     const menu = document.getElementById('gearMenu');
     if (!gear || !menu) return;
 
-    // inicializace ARIA
     menu.setAttribute('aria-hidden', 'true');
     gear.setAttribute('aria-expanded', 'false');
 
-    // vnitřní stav (nepoužívej .classList jako zdroj pravdy – může být mimo pořadí)
     let isOpen = false;
-
     const setOpen = (open) => {
       isOpen = open;
       menu.classList.toggle('open', open);
       gear.setAttribute('aria-expanded', String(open));
       menu.setAttribute('aria-hidden', String(!open));
+
+      if (open) ensureMenuInView(); // po otevření připojíme ochranu proti přesahu
     };
 
-    // Handlery – používáme POINTER události, aby „klik mimo“ neshodil první klik na mobilu
+    // otevřít/zavřít na první tap
     const onGearPointer = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      setOpen(!isOpen);               // otevře hned na první tap
-    };
-    // ✅ zavři jen při kliku MIMO menu a mimo gear
-    const onDocPointer = (e) => {
-      const t = e.target;
-      const clickedInsideMenu = menu.contains(t);
-      const clickedGear = gear.contains(t);
-      if (!clickedInsideMenu && !clickedGear) setOpen(false);
+      setOpen(!isOpen);
     };
 
-    // ✅ nepropouštěj pointer z menu do documentu
+    // zavírej jen při kliku MIMO menu i mimo gear
+    const onDocPointer = (e) => {
+      const t = e.target;
+      if (!t) return;
+      const insideMenu = menu.contains(t);
+      const onGear = gear.contains(t);
+      if (!insideMenu && !onGear) setOpen(false);
+    };
+
+    // zabraň bublání z menu (jinak by doc pointerdown menu hned zavřel)
     const onMenuPointer = (e) => e.stopPropagation();
 
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
 
-    // Navázání – a ČISTÉ ODPOUTÁNÍ (důležité kvůli React StrictMode, který efekty mountuje 2×)
     gear.addEventListener('pointerdown', onGearPointer);
     menu.addEventListener('pointerdown', onMenuPointer);
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
 
-    // Zamez zdvojení starých handlerů, pokud někde existovaly:
+    // pro jistotu zruš staré onclicky
     gear.onclick = null;
+
+    // helper: po otevření zajisti, že menu je 100% v okně
+    function ensureMenuInView(){
+      const r = menu.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let changed = false;
+
+      // horizontální střed (kdyby overflow doprava/doleva)
+      if (r.right > vw || r.left < 0){
+        menu.style.left = '50%';
+        changed = true;
+      }
+
+      // pokud je vyšší než viewport (bez FAB), spolehni se na max-height + scroll (už máme v CSS)
+      // tady jen drobná pojistka: srovnej transform
+      if (r.top < 0){
+        // přizvedni vizuálně o pár px
+        menu.style.transform = 'translate(-50%, 0)';
+        changed = true;
+      }
+
+      if (changed){
+        // nic dalšího; CSS už má overflow:auto
+      }
+    }
 
     return () => {
       gear.removeEventListener('pointerdown', onGearPointer);
@@ -415,69 +441,103 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Naplň primární tlačítko podle stavu účtu
-    const primary = document.getElementById('btnAuthPrimary');
+    const ap = document.getElementById('btnAuthPrimary');
+    const recover = document.getElementById('btnRecover');
+    const signout = document.getElementById('btnSignOut');
+    const gallery = document.getElementById('btnGallery');
+    const chats = document.getElementById('btnChats');
+    const settings = document.getElementById('btnSettings');
+    const enableLoc = document.getElementById('btnEnableLoc');
+    const zoomIn = document.getElementById('btnZoomIn');
+    const zoomOut = document.getElementById('btnZoomOut');
+    const closeChats = document.getElementById('btnCloseChats');
+    const closeSettings = document.getElementById('btnCloseSettings');
+    const cancelChatBtn = document.getElementById('btnCancelChat');
+
     const refreshPrimary = () => {
+      if (!ap) return;
       if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        primary.textContent = 'Přihlásit a zachovat data (Google)';
-        primary.onclick = async () => {
-          const { GoogleAuthProvider, linkWithRedirect } = await import('firebase/auth');
-          const provider = new GoogleAuthProvider();
-          await linkWithRedirect(auth.currentUser, provider);
-        };
+        ap.textContent = 'Přihlásit a zachovat data (Google)';
       } else {
-        primary.textContent = 'Přihlásit (Google)';
-        primary.onclick = async () => {
-          const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-          const provider = new GoogleAuthProvider();
-          await signInWithRedirect(auth, provider);
-        };
+        ap.textContent = 'Přihlásit (Google)';
       }
     };
     refreshPrimary();
 
-    // Zbylé akce
-    const recover = document.getElementById('btnRecover');
-    recover.onclick = async () => {
-      const oldUid = prompt('Vlož staré UID:');
-      if (oldUid) await recoverAccount(oldUid);
-    };
-
-    const signout = document.getElementById('btnSignOut');
-    signout.onclick = async () => {
-      await signOut(auth);
-    };
-
-    const openAndClose = (fn) => (e) => {
-      e.preventDefault();
-      fn();
+    // helper — provede akci a zavře menu
+    const withClose = (fn) => async (e) => {
+      e?.preventDefault?.();
+      await Promise.resolve(fn?.());
       const menu = document.getElementById('gearMenu');
       const gear = document.getElementById('btnGear');
       if (menu && gear) {
         menu.classList.remove('open');
-        menu.setAttribute('aria-hidden', 'true');
-        gear.setAttribute('aria-expanded', 'false');
+        menu.setAttribute('aria-hidden','true');
+        gear.setAttribute('aria-expanded','false');
       }
     };
 
-    document.getElementById('btnEnableLoc')?.addEventListener('click', openAndClose(() => {
+    const onGallery = withClose(openGalleryModal);
+    const onChats = withClose(openChatsModal);
+    const onSettings = withClose(openSettingsModal);
+    const onEnableLoc = withClose(() => {
       navigator.geolocation?.getCurrentPosition?.(()=>{},()=>{});
       if (typeof acceptLocation === 'function') acceptLocation();
-    }));
+    });
+    const onZoomIn = withClose(() => map.zoomIn());
+    const onZoomOut = withClose(() => map.zoomOut());
+    const onAuthPrimary = withClose(async () => {
+      if (!auth.currentUser || auth.currentUser.isAnonymous){
+        const { GoogleAuthProvider, linkWithRedirect } = await import('firebase/auth');
+        const provider = new GoogleAuthProvider();
+        await linkWithRedirect(auth.currentUser, provider);
+      } else {
+        const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
+      }
+    });
+    const onRecover = withClose(async () => {
+      const oldUid = prompt('Vlož staré UID:');
+      if (oldUid) await recoverAccount(oldUid);
+    });
+    const onSignOut = withClose(async () => {
+      await signOut(auth);
+    });
+    const onCloseChats = () => closeSheet('chatsModal');
+    const onCloseSettings = () => closeSheet('settingsModal');
+    const onCancelChat = () => cancelChat();
 
-    document.getElementById('btnZoomIn')?.addEventListener('click', openAndClose(() => map.zoomIn()));
-    document.getElementById('btnZoomOut')?.addEventListener('click', openAndClose(() => map.zoomOut()));
+    gallery?.addEventListener('click', onGallery);
+    chats?.addEventListener('click', onChats);
+    settings?.addEventListener('click', onSettings);
+    enableLoc?.addEventListener('click', onEnableLoc);
+    zoomIn?.addEventListener('click', onZoomIn);
+    zoomOut?.addEventListener('click', onZoomOut);
+    ap?.addEventListener('click', onAuthPrimary);
+    recover?.addEventListener('click', onRecover);
+    signout?.addEventListener('click', onSignOut);
+    closeChats?.addEventListener('click', onCloseChats);
+    closeSettings?.addEventListener('click', onCloseSettings);
+    cancelChatBtn?.addEventListener('click', onCancelChat);
 
-    document.getElementById('btnGallery')?.addEventListener('click', openAndClose(openGalleryModal));
-    document.getElementById('btnChats')?.addEventListener('click', openAndClose(openChatsModal));
-    document.getElementById('btnSettings')?.addEventListener('click', openAndClose(openSettingsModal));
-    document.getElementById('btnCloseChats')?.addEventListener('click', ()=>closeSheet('chatsModal'));
-    document.getElementById('btnCloseSettings')?.addEventListener('click', ()=>closeSheet('settingsModal'));
-    document.getElementById('btnCancelChat')?.addEventListener('click', cancelChat);
-
-    // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
-  }, []);
+
+    return () => {
+      gallery?.removeEventListener('click', onGallery);
+      chats?.removeEventListener('click', onChats);
+      settings?.removeEventListener('click', onSettings);
+      enableLoc?.removeEventListener('click', onEnableLoc);
+      zoomIn?.removeEventListener('click', onZoomIn);
+      zoomOut?.removeEventListener('click', onZoomOut);
+      ap?.removeEventListener('click', onAuthPrimary);
+      recover?.removeEventListener('click', onRecover);
+      signout?.removeEventListener('click', onSignOut);
+      closeChats?.removeEventListener('click', onCloseChats);
+      closeSettings?.removeEventListener('click', onCloseSettings);
+      cancelChatBtn?.removeEventListener('click', onCancelChat);
+    };
+  }, [map]);
 
   useEffect(() => {
     const handleAdd = () => {
