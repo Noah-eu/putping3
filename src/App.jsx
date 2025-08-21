@@ -289,11 +289,22 @@ export default function App() {
       e.stopPropagation();
       setOpen(!isOpen);               // otevře hned na první tap
     };
-    const onDocPointer = () => setOpen(false);
+    // ✅ zavři jen při kliku MIMO menu a mimo gear
+    const onDocPointer = (e) => {
+      const t = e.target;
+      const clickedInsideMenu = menu.contains(t);
+      const clickedGear = gear.contains(t);
+      if (!clickedInsideMenu && !clickedGear) setOpen(false);
+    };
+
+    // ✅ nepropouštěj pointer z menu do documentu
+    const onMenuPointer = (e) => e.stopPropagation();
+
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
 
     // Navázání – a ČISTÉ ODPOUTÁNÍ (důležité kvůli React StrictMode, který efekty mountuje 2×)
     gear.addEventListener('pointerdown', onGearPointer);
+    menu.addEventListener('pointerdown', onMenuPointer);
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
 
@@ -302,6 +313,7 @@ export default function App() {
 
     return () => {
       gear.removeEventListener('pointerdown', onGearPointer);
+      menu.removeEventListener('pointerdown', onMenuPointer);
       document.removeEventListener('pointerdown', onDocPointer);
       document.removeEventListener('keydown', onKey);
     };
@@ -422,18 +434,29 @@ export default function App() {
       await signOut(auth);
     };
 
-    document.getElementById('btnEnableLoc')?.addEventListener('click', () => {
-      if (navigator.geolocation?.getCurrentPosition)
-        navigator.geolocation.getCurrentPosition(() => {}, () => {});
+    const openAndClose = (fn) => (e) => {
+      e.preventDefault();
+      fn();
+      const menu = document.getElementById('gearMenu');
+      const gear = document.getElementById('btnGear');
+      if (menu && gear) {
+        menu.classList.remove('open');
+        menu.setAttribute('aria-hidden', 'true');
+        gear.setAttribute('aria-expanded', 'false');
+      }
+    };
+
+    document.getElementById('btnEnableLoc')?.addEventListener('click', openAndClose(() => {
+      navigator.geolocation?.getCurrentPosition?.(()=>{},()=>{});
       if (typeof acceptLocation === 'function') acceptLocation();
-    });
+    }));
 
-    document.getElementById('btnZoomIn')?.addEventListener('click', () => map.zoomIn());
-    document.getElementById('btnZoomOut')?.addEventListener('click', () => map.zoomOut());
+    document.getElementById('btnZoomIn')?.addEventListener('click', openAndClose(() => map.zoomIn()));
+    document.getElementById('btnZoomOut')?.addEventListener('click', openAndClose(() => map.zoomOut()));
 
-    document.getElementById('btnGallery')?.addEventListener('click', openGalleryModal);
-    document.getElementById('btnChats')?.addEventListener('click', openChatsModal);
-    document.getElementById('btnSettings')?.addEventListener('click', openSettingsModal);
+    document.getElementById('btnGallery')?.addEventListener('click', openAndClose(openGalleryModal));
+    document.getElementById('btnChats')?.addEventListener('click', openAndClose(openChatsModal));
+    document.getElementById('btnSettings')?.addEventListener('click', openAndClose(openSettingsModal));
     document.getElementById('btnCloseChats')?.addEventListener('click', ()=>closeSheet('chatsModal'));
     document.getElementById('btnCloseSettings')?.addEventListener('click', ()=>closeSheet('settingsModal'));
     document.getElementById('btnCancelChat')?.addEventListener('click', cancelChat);
