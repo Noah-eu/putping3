@@ -1294,6 +1294,29 @@ export default function App() {
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
 
+      <div id="chatPanel" className="chat-panel hidden" aria-hidden="true">
+        <div className="chat-header">
+          <button id="btnCloseChat" title="Zpět">←</button>
+          <div className="chat-title"></div>
+          <button id="btnCancelChat" className="danger">Zrušit chat</button>
+        </div>
+        <div
+          id="chatMessages"
+          className="chat-messages"
+          role="log"
+          aria-live="polite"
+        ></div>
+        <form id="chatForm" className="chat-form">
+          <input
+            id="chatInput"
+            type="text"
+            placeholder="Napiš zprávu…"
+            autocomplete="off"
+          />
+          <button id="chatSend" type="submit">Odeslat</button>
+        </form>
+      </div>
+
       <div id="galleryModal" className="sheet" aria-hidden="true">
         <div className="sheet-head">
           <h3>Moje fotky</h3>
