@@ -211,6 +211,21 @@ export default function App() {
     }
   }
 
+  function openGalleryModal() {
+    setShowGallery(true);
+    setOpen(false);
+  }
+
+  function openChatsModal() {
+    setShowChatList(true);
+    setOpen(false);
+  }
+
+  function openSettingsModal() {
+    setShowSettings(true);
+    setOpen(false);
+  }
+
   // toggle gear menu
   useEffect(() => {
     const btn = document.getElementById('btnGear');
@@ -386,6 +401,10 @@ export default function App() {
 
     document.getElementById('btnZoomIn')?.addEventListener('click', () => map.zoomIn());
     document.getElementById('btnZoomOut')?.addEventListener('click', () => map.zoomOut());
+
+    document.getElementById('btnGallery')?.addEventListener('click', openGalleryModal);
+    document.getElementById('btnChats')?.addEventListener('click', openChatsModal);
+    document.getElementById('btnSettings')?.addEventListener('click', openSettingsModal);
 
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
@@ -1262,6 +1281,10 @@ export default function App() {
         <button id="btnAuthPrimary" role="menuitem"></button>
         <button id="btnRecover" role="menuitem">Obnovit účet</button>
         <button id="btnSignOut" role="menuitem">Odhlásit</button>
+        <hr className="gear-sep" />
+        <button id="btnGallery" role="menuitem">Galerie fotek</button>
+        <button id="btnChats" role="menuitem">Chaty</button>
+        <button id="btnSettings" role="menuitem">Nastavení</button>
         <button id="btnEnableLoc" role="menuitem">Povolit polohu</button>
         <button id="btnZoomIn" role="menuitem">Přiblížit mapu</button>
         <button id="btnZoomOut" role="menuitem">Oddálit mapu</button>
