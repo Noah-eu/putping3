@@ -1072,6 +1072,7 @@ export default function App() {
         <button id="btnAuthPrimary"></button>
         <button id="btnRecover">Obnovit účet</button>
         <button id="btnSignOut" title="Odhlásit se">Odhlásit</button>
+        <button id="btnEnableLoc" title="Povolit polohu">Povolit polohu</button>
       </div>
       {isIOS && !locationConsent && (
         <div className="consent-modal">
