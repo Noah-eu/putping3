@@ -600,3 +600,31 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 .switch{ display:flex; align-items:center; gap:10px; padding:10px; background:#f3f4f6; border-radius:12px; }
 .switch input{ width:18px; height:18px; }
+
+.chat-panel{
+  position:fixed; inset:0;
+  background: rgba(255,255,255,.9);
+  backdrop-filter: blur(8px);
+  display:flex; flex-direction:column;
+  z-index:1200;
+}
+.chat-panel.hidden{ display:none; }
+
+.chat-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  border-bottom:1px solid rgba(0,0,0,.08);
+  background:#fff;
+}
+.chat-header .danger{ background:#ef4444; color:#fff; border:none; padding:8px 12px; border-radius:10px; }
+.chat-title{ font-weight:700; }
+
+.chat-messages{ flex:1; overflow:auto; padding:12px; }
+.chat-form{
+  display:flex; gap:8px; padding:10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background:#fff; border-top:1px solid rgba(0,0,0,.08);
+}
+#chatInput{ flex:1; border:1px solid #ddd; border-radius:12px; padding:10px 12px; }
+#chatSend{ border:none; border-radius:12px; padding:10px 14px; font-weight:600; background:#111; color:#fff; }
