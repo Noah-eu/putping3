@@ -236,7 +236,8 @@ export default function App() {
       const [a,b] = pid.split('_'); const otherUid = a===my ? b : a;
       const u = users[otherUid] || { name:'Neznámý uživatel' };
       const row = document.createElement('button');
-      row.className = 'chat-row';
+      row.className = 'chat-row conv-item';
+      row.setAttribute('data-uid', otherUid);
       row.innerHTML = `
       <img class="avatar" src="${(u.photos&&u.photos[0])||u.photoURL||''}" alt="">
       <div class="meta">
@@ -244,17 +245,11 @@ export default function App() {
         <div class="sub">${pid}</div>
       </div>
     `;
-      row.onclick = () => {
-        // 1) vycentruj mapu na uživatele
-        if (u.lat && u.lng) map.flyTo({ center:[u.lng, u.lat], zoom:15 });
-        // 2) otevři jeho bublinu a přepni na Chat (máš-li funkci):
-        const el = markers.current?.[otherUid]?.getElement?.() || null;
-        el?.querySelector?.('.ping-btn')?.setAttribute('data-action','chat');
-        el?.querySelector?.('.ping-btn__text--ping')?.classList?.remove('visible');
-        el?.querySelector?.('.ping-btn__text--chat')?.classList?.add('visible');
-        closeSheet('chatsModal');
-      };
       box.appendChild(row);
+    });
+    document.querySelectorAll('.conv-item').forEach(el => {
+      const peer = el.getAttribute('data-uid');
+      el.onclick = () => openChat(peer);
     });
   }
 
