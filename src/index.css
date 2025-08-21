@@ -633,3 +633,22 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 #chatInput{ flex:1; border:1px solid #ddd; border-radius:12px; padding:10px 12px; }
 #chatSend{ border:none; border-radius:12px; padding:10px 14px; font-weight:600; background:#111; color:#fff; }
+
+/* vrstvy: chat > menu > mapa */
+.chat-panel{ z-index:2400; }
+.gear-menu{ z-index:2200; }
+.fab-gear{  z-index:2100; }
+
+/* obecné položky v menu */
+.gear-menu button{
+  min-height:44px;
+  border:none; border-radius:12px;
+  padding:10px 12px; font-weight:600; text-align:left;
+  background:#f3f4f6; color:#111;
+}
+
+/* PRIMÁRNÍ tlačítko nahoře (Google) – bílý text na černé */
+#btnAuthPrimary{
+  background:#111 !important;
+  color:#fff !important;
+}
