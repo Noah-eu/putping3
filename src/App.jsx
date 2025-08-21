@@ -224,7 +224,10 @@ export default function App() {
     const pairsSnap = await get(ref(db, 'pairs'));
     const pairs = pairsSnap.val() || {};
     const my = auth.currentUser?.uid;
-    const myPairs = Object.keys(pairs).filter(pid => pid.includes(my));
+    const myPairs = Object.keys(pairs).filter((pid) => {
+      const [a, b] = pid.split('_');
+      return a === my || b === my;
+    });
     if (!myPairs.length){ box.innerHTML = '<p>Žádné konverzace</p>'; return; }
 
     const usersSnap = await get(ref(db, 'users'));
