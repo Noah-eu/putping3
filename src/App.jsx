@@ -22,7 +22,7 @@ import {
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
 import { spawnDevBot } from './devBot';
-import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+import { getRedirectResult, signOut } from "firebase/auth";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -324,48 +324,58 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        const user = result?.user;
-        if (user) {
-          await update(ref(db, `users/${user.uid}`), {
-            name: user.displayName,
-            photoURL: user.photoURL,
-          });
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    })();
+    const gear = document.getElementById('btnGear');
+    const menu = document.getElementById('gearMenu');
+    if (!gear || !menu) return;
 
-    const btnAuth = document.getElementById("btnAuthPrimary");
-    const btnSignOut = document.getElementById("btnSignOut");
-    const btnRecover = document.getElementById("btnRecover");
-    if (btnSignOut) {
-      btnSignOut.onclick = () => signOut(auth);
-    }
-    if (btnRecover) {
-      btnRecover.onclick = () => {
-        const oldUid = prompt("Zadej staré UID:");
-        recoverAccount(oldUid);
-      };
-    }
-    if (!btnAuth) return;
-    if (auth.currentUser?.isAnonymous) {
-      btnAuth.textContent = "Přihlásit a zachovat data (Google)";
-      btnAuth.onclick = async () => {
-        const provider = new GoogleAuthProvider();
-        await linkWithRedirect(auth.currentUser, provider);
-      };
-    } else {
-      btnAuth.textContent = "Přihlásit (Google)";
-      btnAuth.onclick = async () => {
-        const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
-      };
-    }
-  }, [me]);
+    const setOpen = (open) => {
+      menu.classList.toggle('open', open);
+      gear.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-hidden', String(!open));
+    };
+
+    gear.onclick = (e) => { e.stopPropagation(); setOpen(!menu.classList.contains('open')); };
+    document.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') setOpen(false); });
+
+    // Naplň primární tlačítko podle stavu účtu
+    const primary = document.getElementById('btnAuthPrimary');
+    const refreshPrimary = () => {
+      if (!auth.currentUser || auth.currentUser.isAnonymous) {
+        primary.textContent = 'Přihlásit a zachovat data (Google)';
+        primary.onclick = async () => {
+          const { GoogleAuthProvider, linkWithRedirect } = await import('firebase/auth');
+          const provider = new GoogleAuthProvider();
+          await linkWithRedirect(auth.currentUser, provider);
+        };
+      } else {
+        primary.textContent = 'Přihlásit (Google)';
+        primary.onclick = async () => {
+          const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+        };
+      }
+    };
+    refreshPrimary();
+
+    // Zbylé akce
+    const recover = document.getElementById('btnRecover');
+    recover.onclick = async () => {
+      const oldUid = prompt('Vlož staré UID:');
+      if (oldUid) await recoverAccount(oldUid);
+      setOpen(false);
+    };
+
+    const signout = document.getElementById('btnSignOut');
+    signout.onclick = async () => {
+      await signOut(auth);
+      setOpen(false);
+    };
+
+    // změna po auth redirectu
+    getRedirectResult(auth).finally(refreshPrimary);
+  }, []);
 
   useEffect(() => {
     if (!me || !locationConsent) return;
