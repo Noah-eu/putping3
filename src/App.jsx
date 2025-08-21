@@ -282,6 +282,41 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const btn = document.getElementById("btnEnableLoc");
+    if (!btn) return;
+
+    const show = (v) => (btn.style.display = v ? "inline-flex" : "none");
+
+    const wire = () => {
+      btn.onclick = () => {
+        // uživatelský gesture → vyžádej polohu
+        if (navigator.geolocation?.getCurrentPosition) {
+          navigator.geolocation.getCurrentPosition(() => {}, () => {});
+        }
+        // tvá existující logika
+        if (typeof acceptLocation === "function") acceptLocation();
+      };
+    };
+
+    if ("permissions" in navigator && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((status) => {
+          show(status.state !== "granted");
+          status.onchange = () => show(status.state !== "granted");
+          wire();
+        })
+        .catch(() => {
+          show(true);
+          wire();
+        });
+    } else {
+      show(true);
+      wire();
+    }
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const result = await getRedirectResult(auth);
