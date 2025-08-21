@@ -313,31 +313,18 @@ export default function App() {
     if (!enable) return;
 
     const show = (v) => (enable.style.display = v ? 'inline-flex' : 'none');
-
-    const wire = () => {
-      enable.onclick = () => {
-        if (navigator.geolocation?.getCurrentPosition)
-          navigator.geolocation.getCurrentPosition(() => {}, () => {});
-        if (typeof acceptLocation === 'function') acceptLocation();
-        setOpen(false);
-      };
-    };
-
     if ('permissions' in navigator && navigator.permissions.query) {
       navigator.permissions
         .query({ name: 'geolocation' })
         .then((status) => {
           show(status.state !== 'granted');
           status.onchange = () => show(status.state !== 'granted');
-          wire();
         })
         .catch(() => {
           show(true);
-          wire();
         });
     } else {
       show(true);
-      wire();
     }
   }, []);
 
@@ -390,6 +377,15 @@ export default function App() {
       await signOut(auth);
       setOpen(false);
     };
+
+    document.getElementById('btnEnableLoc')?.addEventListener('click', () => {
+      if (navigator.geolocation?.getCurrentPosition)
+        navigator.geolocation.getCurrentPosition(() => {}, () => {});
+      if (typeof acceptLocation === 'function') acceptLocation();
+    });
+
+    document.getElementById('btnZoomIn')?.addEventListener('click', () => map.zoomIn());
+    document.getElementById('btnZoomOut')?.addEventListener('click', () => map.zoomOut());
 
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
@@ -1267,6 +1263,8 @@ export default function App() {
         <button id="btnRecover" role="menuitem">Obnovit účet</button>
         <button id="btnSignOut" role="menuitem">Odhlásit</button>
         <button id="btnEnableLoc" role="menuitem">Povolit polohu</button>
+        <button id="btnZoomIn" role="menuitem">Přiblížit mapu</button>
+        <button id="btnZoomOut" role="menuitem">Oddálit mapu</button>
       </div>
 
       {showChatList && (
