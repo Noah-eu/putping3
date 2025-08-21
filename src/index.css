@@ -590,9 +590,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 
 /* schovej staré plovoucí + a minikolečko, kdyby ještě někde vznikly */
-#btnPlus, .map-plus, .action-fab, .floating-plus, .mini-gear, #miniGear {
-  display: none !important;
-}
+#btnPlus,.map-plus,.action-fab,.floating-plus,.mini-gear,#miniGear{ display:none!important; }
 
 .chat-row{ width:100%; display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:#f9fafb; border:none; text-align:left; }
 .chat-row + .chat-row{ margin-top:8px; }
