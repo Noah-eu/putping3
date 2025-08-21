@@ -252,9 +252,45 @@ export default function App() {
     });
   }
 
-  function openChatsModal() {
-    setShowChatList(true);
-    setOpen(false);
+  function openChatsModal(){ buildChats(); openSheet('chatsModal'); }
+
+  async function buildChats(){
+    const box = document.getElementById('chatsList'); if(!box) return;
+    box.innerHTML = '<p>Načítám…</p>';
+    const pairsSnap = await get(ref(db, 'pairs'));
+    const pairs = pairsSnap.val() || {};
+    const my = auth.currentUser?.uid;
+    const myPairs = Object.keys(pairs).filter(pid => pid.includes(my));
+    if (!myPairs.length){ box.innerHTML = '<p>Žádné konverzace</p>'; return; }
+
+    const usersSnap = await get(ref(db, 'users'));
+    const users = usersSnap.val() || {};
+
+    box.innerHTML = '';
+    myPairs.forEach(pid => {
+      const [a,b] = pid.split('_'); const otherUid = a===my ? b : a;
+      const u = users[otherUid] || { name:'Neznámý uživatel' };
+      const row = document.createElement('button');
+      row.className = 'chat-row';
+      row.innerHTML = `
+      <img class="avatar" src="${(u.photos&&u.photos[0])||u.photoURL||''}" alt="">
+      <div class="meta">
+        <div class="name">${u.name||'Uživatel'}</div>
+        <div class="sub">${pid}</div>
+      </div>
+    `;
+      row.onclick = () => {
+        // 1) vycentruj mapu na uživatele
+        if (u.lat && u.lng) map.flyTo({ center:[u.lng, u.lat], zoom:15 });
+        // 2) otevři jeho bublinu a přepni na Chat (máš-li funkci):
+        const el = markers.current?.[otherUid]?.getElement?.() || null;
+        el?.querySelector?.('.ping-btn')?.setAttribute('data-action','chat');
+        el?.querySelector?.('.ping-btn__text--ping')?.classList?.remove('visible');
+        el?.querySelector?.('.ping-btn__text--chat')?.classList?.add('visible');
+        closeSheet('chatsModal');
+      };
+      box.appendChild(row);
+    });
   }
 
   function openSettingsModal() {
@@ -441,6 +477,7 @@ export default function App() {
     document.getElementById('btnGallery')?.addEventListener('click', openGalleryModal);
     document.getElementById('btnChats')?.addEventListener('click', openChatsModal);
     document.getElementById('btnSettings')?.addEventListener('click', openSettingsModal);
+    document.getElementById('btnCloseChats')?.addEventListener('click', ()=>closeSheet('chatsModal'));
 
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
@@ -1340,6 +1377,14 @@ export default function App() {
           <button id="btnCloseGallery" aria-label="Zavřít">✕</button>
         </div>
         <div id="galleryGrid" className="grid"></div>
+      </div>
+
+      <div id="chatsModal" className="sheet" aria-hidden="true">
+        <div className="sheet-head">
+          <h3>Chaty</h3>
+          <button id="btnCloseChats">✕</button>
+        </div>
+        <div id="chatsList"></div>
       </div>
 
       <button
