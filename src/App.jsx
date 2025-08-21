@@ -211,9 +211,45 @@ export default function App() {
     }
   }
 
-  function openGalleryModal() {
-    setShowGallery(true);
-    setOpen(false);
+  function openGalleryModal(){ buildGrid(); openSheet('galleryModal'); }
+  function closeGalleryModal(){ closeSheet('galleryModal'); }
+
+  function openSheet(id){ const el=document.getElementById(id); el?.classList.add('open'); }
+  function closeSheet(id){ const el=document.getElementById(id); el?.classList.remove('open'); }
+
+  function buildGrid(){
+    const grid = document.getElementById('galleryGrid'); if(!grid) return;
+    const arr = (me?.photos && Array.isArray(me.photos)) ? me.photos : (me?.photoURL ? [me.photoURL] : []);
+    grid.innerHTML = '';
+    arr.forEach((url, i)=>{
+      const item = document.createElement('div');
+      item.className = 'tile'; item.draggable = true; item.dataset.index = String(i);
+      item.innerHTML = `
+      <img src="${url}" alt="">
+      <button class="del" title="Smazat">✕</button>
+      <div class="grab" title="Přesunout">⋮⋮</div>
+    `;
+      // delete
+      item.querySelector('.del').onclick = async () => {
+        const photos = [...(me.photos||[])]; photos.splice(i,1);
+        await update(ref(db, `users/${me.uid}`), { photos });
+        me.photos = photos; buildGrid();
+      };
+      // drag reorder
+      item.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i); });
+      item.addEventListener('dragover', e => e.preventDefault());
+      item.addEventListener('drop', async e => {
+        e.preventDefault();
+        const from = Number(e.dataTransfer.getData('text/plain'));
+        const to = Number(item.dataset.index);
+        const photos = [...(me.photos||[])];
+        const [moved] = photos.splice(from,1);
+        photos.splice(to,0,moved);
+        await update(ref(db, `users/${me.uid}`), { photos });
+        me.photos = photos; buildGrid();
+      });
+      grid.appendChild(item);
+    });
   }
 
   function openChatsModal() {
@@ -409,6 +445,40 @@ export default function App() {
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
   }, []);
+
+  useEffect(() => {
+    const handleAdd = () => {
+      document.getElementById('filePicker')?.click();
+    };
+    const handleChange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length || !me) return;
+      const newUrls = [];
+      for (const f of files){
+        const path = `userPhotos/${me.uid}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const snap = await uploadBytes(sref(storage, path), f);
+        const url = await getDownloadURL(snap.ref);
+        newUrls.push(url);
+      }
+      const photos = [ ...(me.photos||[]), ...newUrls ];
+      await update(ref(db, `users/${me.uid}`), { photos });
+      me.photos = photos; buildGrid();
+    };
+
+    const btnAdd = document.getElementById('btnAddPhoto');
+    const btnClose = document.getElementById('btnCloseGallery');
+    const picker = document.getElementById('filePicker');
+
+    btnAdd?.addEventListener('click', handleAdd);
+    btnClose?.addEventListener('click', closeGalleryModal);
+    picker?.addEventListener('change', handleChange);
+
+    return () => {
+      btnAdd?.removeEventListener('click', handleAdd);
+      btnClose?.removeEventListener('click', closeGalleryModal);
+      picker?.removeEventListener('change', handleChange);
+    };
+  }, [me]);
 
   useEffect(() => {
     if (!me || !locationConsent) return;
@@ -1261,6 +1331,16 @@ export default function App() {
 
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
+
+      <div id="galleryModal" className="sheet" aria-hidden="true">
+        <div className="sheet-head">
+          <h3>Moje fotky</h3>
+          <input id="filePicker" type="file" accept="image/*" multiple hidden />
+          <button id="btnAddPhoto">+ Přidat</button>
+          <button id="btnCloseGallery" aria-label="Zavřít">✕</button>
+        </div>
+        <div id="galleryGrid" className="grid"></div>
+      </div>
 
       <button
         id="btnGear"
