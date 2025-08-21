@@ -13,6 +13,8 @@ import {
   serverTimestamp,
   get,
   onDisconnect,
+  onChildAdded,
+  off,
 } from "firebase/database";
 import {
   ref as sref,
@@ -115,6 +117,64 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
     canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
   );
   return blob;
+}
+
+let currentMsgsRef = null;
+let currentPeerUid = null;
+
+async function openChat(peerUid){
+  const meUid = auth.currentUser?.uid;
+  if (!meUid || !peerUid) return;
+
+  currentPeerUid = peerUid;
+  const pid = pairIdOf(meUid, peerUid);
+
+  // Název chatu
+  const title = document.querySelector('.chat-title');
+  const uSnap = await get(ref(db, `users/${peerUid}`));
+  title.textContent = (uSnap.val()?.name) || 'Chat';
+
+  // Panel zobraz
+  const panel = document.getElementById('chatPanel');
+  panel.classList.remove('hidden'); panel.setAttribute('aria-hidden', 'false');
+
+  // Messages container
+  const box = document.getElementById('chatMessages');
+  box.innerHTML = '';
+
+  // Zruš předchozí listener
+  if (currentMsgsRef) off(currentMsgsRef);
+  currentMsgsRef = ref(db, `messages/${pid}`);
+
+  // Stream zpráv
+  onChildAdded(currentMsgsRef, (snap) => {
+    const m = snap.val();
+    const div = document.createElement('div');
+    div.className = (m.from === meUid) ? 'msg me' : 'msg';
+    div.textContent = m.text || '';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  });
+
+  // Odeslání
+  const form = document.getElementById('chatForm');
+  const input = document.getElementById('chatInput');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const text = input.value.trim(); if (!text) return;
+    await set(ref(db, `messages/${pid}/${Date.now()}`), { from: meUid, text, time: serverTimestamp() });
+    input.value='';
+  };
+
+  // Zavření
+  document.getElementById('btnCloseChat').onclick = () => closeChat();
+}
+
+function closeChat(){
+  const panel = document.getElementById('chatPanel');
+  panel.classList.add('hidden'); panel.setAttribute('aria-hidden', 'true');
+  if (currentMsgsRef) off(currentMsgsRef);
+  currentMsgsRef = null; currentPeerUid = null;
 }
 
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
