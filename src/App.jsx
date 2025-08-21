@@ -1216,6 +1216,27 @@ export default function App() {
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
 
+      <button
+        id="btnGear"
+        className="fab-gear"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-label="Nastavení"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2-1.55a.5.5,0,0,0,.12-.64l-1.9-3.29a.5.5,0,0,0-.6-.22l-2.35,1a7,7,0,0,0-1.63-.94l-.36-2.5A.5.5,0,0,0,13.95,2H10.05a.5.5,0,0,0-.5.42l-.36,2.5a7,7,0,0,0-1.63.94l-2.35-1a.5.5,0,0,0-.6.22L2.71,8.79a.5.5,0,0,0,.12.64l2,1.55a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94l-2,1.55a.5.5,0,0,0-.12.64l1.9,3.29a.5.5,0,0,0,.6.22l2.35-1a7,7,0,0,0,1.63.94l.36,2.5a.5.5,0,0,0,.5.42h3.9a.5.5,0,0,0,.5-.42l.36-2.5a7,7,0,0,0,1.63-.94l2.35,1a.5.5,0,0,0,.6-.22l1.9-3.29a.5.5,0,0,0-.12-.64ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"
+          />
+        </svg>
+      </button>
+
+      <div id="gearMenu" className="gear-menu" role="menu" aria-hidden="true">
+        <button id="btnAuthPrimary" role="menuitem"></button>
+        <button id="btnRecover" role="menuitem">Obnovit účet</button>
+        <button id="btnSignOut" role="menuitem">Odhlásit</button>
+      </div>
+
       {showChatList && (
         <div className="chat-list">
           <div className="chat-list__header">Minulé chaty</div>
