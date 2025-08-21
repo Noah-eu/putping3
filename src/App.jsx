@@ -265,7 +265,7 @@ export default function App() {
       <img class="avatar" src="${(u.photos&&u.photos[0])||u.photoURL||''}" alt="">
       <div class="meta">
         <div class="name">${u.name||'Uživatel'}</div>
-        <div class="sub">${pid}</div>
+        <div class="sub">Klepni pro otevření konverzace</div>
       </div>
     `;
       box.appendChild(row);
@@ -1482,18 +1482,18 @@ export default function App() {
       {openChatWith && (
         <div
           style={{
-            position: "absolute",
-            right: 12,
-            bottom: 12,
-            width: 320,
-            maxHeight: 420,
+            position: "fixed",
+            right: "calc(12px + env(safe-area-inset-right))",
+            bottom: "calc(12px + env(safe-area-inset-bottom))",
+            width: "min(92vw, 360px)",
+            maxHeight: "min(70vh, 560px)",
             background: "#fff",
             border: "1px solid #ddd",
             borderRadius: 12,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            zIndex: 20,
+            zIndex: 2400, // nad mapou i FAB
           }}
         >
           <div
@@ -1507,12 +1507,28 @@ export default function App() {
             }}
           >
             {users[openChatWith]?.name || "Chat"}
-            <button
-              onClick={() => setOpenChatWith(null)}
-              style={{ border: "none", background: "transparent", cursor: "pointer" }}
-            >
-              ✖
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={cancelChat}
+                style={{
+                  marginRight: 8,
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "6px 10px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={() => setOpenChatWith(null)}
+                style={{ border: "none", background: "transparent", cursor: "pointer" }}
+              >
+                ✖
+              </button>
+            </div>
           </div>
           <div ref={chatBoxRef} className="chat__messages">
             {chatMsgs.map((m) => {
