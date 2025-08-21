@@ -131,6 +131,7 @@ export default function App() {
     localStorage.getItem("userName") || ""
   );
   const [fabOpen, setFabOpen] = useState(false);
+  const [open, setOpen] = useState(false); // gear menu open state
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
@@ -209,6 +210,25 @@ export default function App() {
       navigator.geolocation.getCurrentPosition(() => {}, () => {});
     }
   }
+
+  // toggle gear menu
+  useEffect(() => {
+    const btn = document.getElementById('btnGear');
+    const menu = document.getElementById('gearMenu');
+    if (!btn || !menu) return;
+    const toggle = () => setOpen((o) => !o);
+    btn.addEventListener('click', toggle);
+    return () => btn.removeEventListener('click', toggle);
+  }, []);
+
+  useEffect(() => {
+    const btn = document.getElementById('btnGear');
+    const menu = document.getElementById('gearMenu');
+    if (!btn || !menu) return;
+    menu.classList.toggle('open', open);
+    menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }, [open]);
 
   useEffect(() => {
     const unlock = () => {
@@ -289,28 +309,26 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const btn = document.getElementById("btnEnableLoc");
-    if (!btn) return;
+    const enable = document.getElementById('btnEnableLoc');
+    if (!enable) return;
 
-    const show = (v) => (btn.style.display = v ? "inline-flex" : "none");
+    const show = (v) => (enable.style.display = v ? 'inline-flex' : 'none');
 
     const wire = () => {
-      btn.onclick = () => {
-        // uživatelský gesture → vyžádej polohu
-        if (navigator.geolocation?.getCurrentPosition) {
+      enable.onclick = () => {
+        if (navigator.geolocation?.getCurrentPosition)
           navigator.geolocation.getCurrentPosition(() => {}, () => {});
-        }
-        // tvá existující logika
-        if (typeof acceptLocation === "function") acceptLocation();
+        if (typeof acceptLocation === 'function') acceptLocation();
+        setOpen(false);
       };
     };
 
-    if ("permissions" in navigator && navigator.permissions.query) {
+    if ('permissions' in navigator && navigator.permissions.query) {
       navigator.permissions
-        .query({ name: "geolocation" })
+        .query({ name: 'geolocation' })
         .then((status) => {
-          show(status.state !== "granted");
-          status.onchange = () => show(status.state !== "granted");
+          show(status.state !== 'granted');
+          status.onchange = () => show(status.state !== 'granted');
           wire();
         })
         .catch(() => {
@@ -1127,7 +1145,6 @@ export default function App() {
         <button id="btnAuthPrimary"></button>
         <button id="btnRecover">Obnovit účet</button>
         <button id="btnSignOut" title="Odhlásit se">Odhlásit</button>
-        <button id="btnEnableLoc" title="Povolit polohu">Povolit polohu</button>
       </div>
       {isIOS && !locationConsent && (
         <div className="consent-modal">
@@ -1245,6 +1262,7 @@ export default function App() {
         <button id="btnAuthPrimary" role="menuitem"></button>
         <button id="btnRecover" role="menuitem">Obnovit účet</button>
         <button id="btnSignOut" role="menuitem">Odhlásit</button>
+        <button id="btnEnableLoc" role="menuitem">Povolit polohu</button>
       </div>
 
       {showChatList && (
