@@ -1157,88 +1157,92 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* Plovoucí menu (FAB) */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 10,
-          right: 10,
-          zIndex: 10,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 8,
-        }}
-      >
-        {fabOpen && (
-          <>
+      {false && (
+        <>
+          {/* Plovoucí menu (FAB) */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 10,
+              right: 10,
+              zIndex: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 8,
+            }}
+          >
+            {fabOpen && (
+              <>
+                <button
+                  onClick={() => {
+                    setShowSettings(true);
+                    setFabOpen(false);
+                  }}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    border: "1px solid #ddd",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 24,
+                    lineHeight: "24px",
+                  }}
+                  title="Nastavení"
+                >
+                  ⚙️
+                </button>
+                <button
+                  onClick={() => {
+                    setShowGallery(true);
+                    setFabOpen(false);
+                  }}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    border: "1px solid #ddd",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 24,
+                    lineHeight: "24px",
+                  }}
+                  title="Galerie"
+                >
+                  🖼️
+                </button>
+                <button
+                  onClick={() => {
+                    setShowChatList(true);
+                    setFabOpen(false);
+                  }}
+                  className="fab-chat"
+                  title="Minulé chaty"
+                >
+                  💬
+                </button>
+              </>
+            )}
             <button
-              onClick={() => {
-                setShowSettings(true);
-                setFabOpen(false);
-              }}
+              onClick={() => setFabOpen((o) => !o)}
               style={{
                 width: 48,
                 height: 48,
                 borderRadius: 24,
                 border: "1px solid #ddd",
-                background: "transparent",
+                background: "#fff",
                 cursor: "pointer",
                 fontSize: 24,
                 lineHeight: "24px",
               }}
-              title="Nastavení"
+              title="Menu"
             >
-              ⚙️
+              {fabOpen ? "✖️" : "➕"}
             </button>
-            <button
-              onClick={() => {
-                setShowGallery(true);
-                setFabOpen(false);
-              }}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                border: "1px solid #ddd",
-                background: "transparent",
-                cursor: "pointer",
-                fontSize: 24,
-                lineHeight: "24px",
-              }}
-              title="Galerie"
-            >
-              🖼️
-            </button>
-            <button
-              onClick={() => {
-                setShowChatList(true);
-                setFabOpen(false);
-              }}
-              className="fab-chat"
-              title="Minulé chaty"
-            >
-              💬
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => setFabOpen((o) => !o)}
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            border: "1px solid #ddd",
-            background: "#fff",
-            cursor: "pointer",
-            fontSize: 24,
-            lineHeight: "24px",
-          }}
-          title="Menu"
-        >
-          {fabOpen ? "✖️" : "➕"}
-        </button>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
