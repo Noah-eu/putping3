@@ -595,6 +595,12 @@ export default function App() {
     const usersRef = ref(db, "users");
     const unsub = onValue(usersRef, (snap) => {
       const data = snap.val() || {};
+      // Firebase RTDB may return arrays as objects; ensure photos are arrays
+      Object.values(data).forEach((u) => {
+        if (u && u.photos && !Array.isArray(u.photos)) {
+          u.photos = Object.values(u.photos);
+        }
+      });
       setUsers(data);
 
       // aktualizace / přidání markerů
