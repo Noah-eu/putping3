@@ -984,13 +984,13 @@ export default function App() {
     if (!mk) return;
     const el = mk.getElement();
     const btn = el.querySelector(`#btnAction_${uid}`);
-    if (btn)
+    if (btn) {
+      let mode = btn.dataset.action || "ping";
       btn.onclick = (e) => {
         e.stopPropagation();
-        if (btn.dataset.action === "chat") {
-          openChat(uid);
-        } else {
+        if (mode === "ping") {
           sendPing(uid);
+          mode = "chat";
           btn.dataset.action = "chat";
           btn
             .querySelector(".ping-btn__text--ping")
@@ -998,8 +998,11 @@ export default function App() {
           btn
             .querySelector(".ping-btn__text--chat")
             ?.classList.add("visible");
+        } else if (mode === "chat") {
+          openChat(uid); // UID druhého uživatele
         }
       };
+    }
   }
 
   /* ─────────────────────────────── Ping / zvuk ──────────────────────────── */
