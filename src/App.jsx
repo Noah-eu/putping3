@@ -428,6 +428,7 @@ export default function App() {
     document.getElementById('btnSettings')?.addEventListener('click', openSettingsModal);
     document.getElementById('btnCloseChats')?.addEventListener('click', ()=>closeSheet('chatsModal'));
     document.getElementById('btnCloseSettings')?.addEventListener('click', ()=>closeSheet('settingsModal'));
+    document.getElementById('btnCancelChat')?.addEventListener('click', cancelChat);
 
     // změna po auth redirectu
     getRedirectResult(auth).finally(refreshPrimary);
@@ -1094,6 +1095,31 @@ export default function App() {
       delete copy[uid];
       return copy;
     });
+  }
+
+  function closeChat() {
+    setOpenChatWith(null);
+  }
+
+  async function cancelChat() {
+    const meUid = auth.currentUser?.uid;
+    const peerUid = openChatWith;
+    if (!meUid || !peerUid) return;
+    if (
+      !confirm(
+        'Opravdu zrušit chat? Pro druhého uživatele se konverzace ukončí.'
+      )
+    )
+      return;
+
+    const pid = pairIdOf(meUid, peerUid);
+
+    // ukonči pár
+    await remove(ref(db, `pairs/${pid}`));
+    await remove(ref(db, `pairPings/${pid}`));
+
+    // volitelně: nech zprávy (nebo je také smaž: await remove(ref(db, `messages/${pid}`)))
+    closeChat();
   }
 
   function onPickChatPhoto(e) {
