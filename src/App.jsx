@@ -28,7 +28,7 @@ import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, getRedirectRe
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-const ONLINE_TTL_MS = 30 * 60_000;  // 30 minut (můžeš snížit později)
+const ONLINE_TTL_MS = 10 * 60_000; // 10 minut
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
