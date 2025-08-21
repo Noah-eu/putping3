@@ -238,6 +238,7 @@ export default function App() {
   }
 
   function openChatsModal(){ buildChats(); openSheet('chatsModal'); }
+  function closeChatsModal(){ closeSheet('chatsModal'); }
 
   async function buildChats(){
     const box = document.getElementById('chatsList'); if(!box) return;
@@ -272,9 +273,15 @@ export default function App() {
     });
     document.querySelectorAll('.conv-item').forEach(el => {
       const peer = el.getAttribute('data-uid');
-      el.onclick = () => openChat(peer);
+      el.onclick = () => { openChat(peer); closeChatsModal(); };
     });
   }
+
+  useEffect(() => {
+    const btnClose = document.getElementById('btnCloseChats');
+    btnClose?.addEventListener('click', closeChatsModal);
+    return () => btnClose?.removeEventListener('click', closeChatsModal);
+  }, []);
 
   function openSettingsModal(){
     const chk = document.getElementById('chkSound');
