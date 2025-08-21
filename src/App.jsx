@@ -445,10 +445,10 @@ export default function App() {
       setUsers(data);
 
       // aktualizace / přidání markerů
-      console.log('viewerUid', (auth.currentUser && auth.currentUser.uid) || null, me);
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
-        const viewerUid = (auth.currentUser && auth.currentUser.uid) || (me && me.uid) || null;
+        const viewerUid = auth.currentUser?.uid || me?.uid || null;
+        const isMe = viewerUid && uid === viewerUid;
         const isDevBot = !!u?.isDevBot;
         const isPrivateBotForSomeoneElse =
           isDevBot && u?.privateTo && u.privateTo !== viewerUid;
@@ -459,8 +459,6 @@ export default function App() {
           }
           return;
         }
-
-        const isMe = viewerUid && uid === viewerUid;
         const isOnline =
           u.online &&
           u.lastActive &&
@@ -474,15 +472,18 @@ export default function App() {
           return;
         }
 
+        // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
+        if (!markers.current[uid] && isMe && (!u.lat || !u.lng)) {
+          const c = map.getCenter();
+          u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
+        }
+
         const highlight = markerHighlightsRef.current[uid];
         const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
         const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
         const draggable = false;
 
         if (!markers.current[uid]) {
-          // bezpečnost: bez souřadnic marker nevytvářej
-          if (!u.lat || !u.lng) return;
-
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
           wrapper.style.transformOrigin = "bottom center";
