@@ -386,7 +386,7 @@ export default function App() {
 
     btnRecover  && (btnRecover.onclick  = withClose(async () => { const o = prompt('Vlož staré UID:'); if (o) await recoverAccount(o); }));
     btnSignOut  && (btnSignOut.onclick  = withClose(async () => { await signOut(auth); }));
-    btnGallery  && (btnGallery.onclick  = withClose(() => openGalleryModal()));
+    btnGallery  && (btnGallery.onclick  = withClose(() => setShowGallery(true)));
     btnChats    && (btnChats.onclick    = withClose(() => openChatsModal()));
     btnSettings && (btnSettings.onclick = withClose(() => openSettingsModal()));
     btnEnable   && (btnEnable.onclick   = withClose(() => {
