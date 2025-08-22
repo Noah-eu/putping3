@@ -201,7 +201,14 @@ export default function App() {
   function openGalleryModal(){ buildGrid(); openSheet('galleryModal'); }
   function closeGalleryModal(){ closeSheet('galleryModal'); }
 
-  function openSheet(id){ const el=document.getElementById(id); el?.classList.add('open'); document.documentElement.classList.add('sheet-open'); }
+  function openSheet(id){
+    const sheet = document.getElementById(id);
+    sheet?.classList.add('open');
+    document.documentElement.classList.add('sheet-open');
+    const stop = (e) => e.stopPropagation();
+    sheet?.addEventListener('pointerdown', stop);
+    sheet?.addEventListener('click', stop);
+  }
   function closeSheet(id){ const el=document.getElementById(id); el?.classList.remove('open'); document.documentElement.classList.remove('sheet-open'); }
 
   function buildGrid(list){
