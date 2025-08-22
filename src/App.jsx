@@ -201,8 +201,8 @@ export default function App() {
   function openGalleryModal(){ buildGrid(); openSheet('galleryModal'); }
   function closeGalleryModal(){ closeSheet('galleryModal'); }
 
-  function openSheet(id){ const el=document.getElementById(id); el?.classList.add('open'); }
-  function closeSheet(id){ const el=document.getElementById(id); el?.classList.remove('open'); }
+  function openSheet(id){ const el=document.getElementById(id); el?.classList.add('open'); document.documentElement.classList.add('sheet-open'); }
+  function closeSheet(id){ const el=document.getElementById(id); el?.classList.remove('open'); document.documentElement.classList.remove('sheet-open'); }
 
   function buildGrid(list){
     const grid = document.getElementById('galleryGrid'); if(!grid) return;

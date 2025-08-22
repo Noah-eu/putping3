@@ -613,7 +613,6 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 /* vrstvy: chat > menu > mapa */
 .chat-panel{ z-index:2400; }
 .gear-menu{ z-index:2200; }
-.fab-gear{  z-index:2100; }
 
 /* obecné položky v menu */
 .gear-menu button{
@@ -634,4 +633,22 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   inset: 0 !important;
   z-index: 2400 !important;
   pointer-events: auto !important;
+}
+
+/* FAB zůstává pod dialogy */
+.fab-gear{ z-index:2100; }
+
+/* všechny “sheet” panely (Nastavení, Chaty, Galerie) mají být NAD FAB */
+.sheet{ z-index:2350; }
+
+/* když je otevřen sheet, FAB skryj a vypni kliky (pro jistotu na všech browserch) */
+.sheet-open .fab-gear{
+  opacity:0;
+  transform:scale(0.9);
+  pointer-events:none;
+}
+
+/* Rezerva u dna, ať akční tlačítka nelezou do safe-area/FAB (když by byl vidět) */
+.sheet{
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
