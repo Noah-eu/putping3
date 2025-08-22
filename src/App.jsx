@@ -1077,15 +1077,16 @@ export default function App() {
       el.style.backgroundColor = baseColor || "#000";
     }
 
-    // výrazný rámeček: bílá separace + barevný prstenec + jemný stín
     const ring = ringColor || null;
     if (ring) {
-      el.style.boxShadow = `0 0 0 2px #fff, 0 0 0 6px ${ring}, 0 2px 6px rgba(0,0,0,.25)`;
+      // bílý separátor + BAREVNÝ prstenec + jemný stín (viditelné i na mapě)
+      el.style.boxShadow =
+        "0 0 0 2px #fff, 0 0 0 8px " + ring + ", 0 3px 8px rgba(0,0,0,.25)";
     } else {
-      el.style.boxShadow = `0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)`;
+      el.style.boxShadow =
+        "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
     }
-
-    // pulz necháme jen pro skutečný highlight (ping), ať neruší
+    // pulz nech jen pro skutečný highlight (ping)
     if (highlight && !ringColor) el.classList.add("marker-highlight");
     else el.classList.remove("marker-highlight");
   }
