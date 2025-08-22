@@ -627,3 +627,10 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   background:#111 !important;
   color:#fff !important;
 }
+
+#chatOverlay{
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2400 !important;
+  pointer-events: auto !important;
+}
