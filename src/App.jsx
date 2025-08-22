@@ -269,9 +269,9 @@ export default function App() {
     `;
       row.addEventListener('click', (e) => {
         e.preventDefault();
-        e.stopPropagation();        // ať klik neprobublá do zavírání sheetu
-        openChat(uid);              // UID protistrany už máš vypočítané výš
-        closeSheet('chatsModal');   // sheet zavři až po volbě
+        e.stopPropagation();          // ať klik neprobublá do zavírání sheetu
+        const ok = openChat(uid);     // UID protistrany už máš vypočítané výš
+        if (ok) closeSheet('chatsModal');  // zavři jen při úspěchu
       });
       box.appendChild(row);
     });
@@ -1495,7 +1495,7 @@ export default function App() {
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            zIndex: 2400, // nad mapou i FAB
+            zIndex: 2400,
           }}
         >
           <div
