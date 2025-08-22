@@ -344,6 +344,14 @@ export default function App() {
           <label><input type="radio" name="sAllowGender" value="f"  /> Pouze ženy</label>
           <label><input type="radio" name="sAllowGender" value="m"  /> Pouze muži</label>
         </fieldset>
+        <fieldset style="border:none;padding:0;margin-top:8px">
+          <legend>Poloha</legend>
+          <div id="geoStatus" class="hint" style="opacity:.8;margin-bottom:6px">Stav: zjišťuji…</div>
+          <button type="button" id="btnAskGeo"
+            style="border:none;border-radius:10px;padding:8px 12px;background:#111;color:#fff">
+            Povolit polohu
+          </button>
+        </fieldset>
         <div style="display:flex;gap:8px;align-items:end">
           <label style="flex:1">Věk od<br><input id="sMinAge" type="number" min="16" max="100" placeholder="18"/></label>
           <label style="flex:1">do<br><input id="sMaxAge" type="number" min="16" max="100" placeholder="99"/></label>
@@ -354,6 +362,36 @@ export default function App() {
         </div>
       </form>
     `;
+    const geoStatus = document.getElementById('geoStatus');
+    const btnAskGeo = document.getElementById('btnAskGeo');
+
+    async function refreshGeo(){
+      let state = 'unknown';
+      try{
+        const perm = await navigator.permissions?.query?.({ name:'geolocation' });
+        if (perm){
+          state = perm.state; // 'granted' | 'denied' | 'prompt'
+          perm.onchange = refreshGeo;
+        }
+      }catch(_){ }
+      const map = { granted:'povolena', denied:'zamítnuta', prompt:'zeptáme se', unknown:'neznámý' };
+      if (geoStatus) geoStatus.textContent = 'Stav: ' + (map[state] ?? 'neznámý');
+      if (btnAskGeo) btnAskGeo.disabled = (state === 'granted');
+    }
+
+    async function askGeo(){
+      try{
+        await new Promise((resolve, reject) => {
+          navigator.geolocation?.getCurrentPosition?.(resolve, reject, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+        });
+      }catch(_){ }
+      if (typeof acceptLocation === 'function') acceptLocation(); // tvoje existující funkce
+      refreshGeo();
+    }
+
+    btnAskGeo?.addEventListener('click', askGeo);
+    refreshGeo();
+
     const form   = document.getElementById('settingsForm');
     const btnSav = document.getElementById('btnSettingsSave');
     const getVal = (name) => {
