@@ -322,7 +322,7 @@ export default function App() {
         <h3>Nastavení</h3>
         <button id="btnCloseSettings">✕</button>
       </div>
-      <form id="settingsForm" style="display:flex;flex-direction:column;gap:12px">
+      <form id="settingsForm" novalidate style="display:flex;flex-direction:column;gap:12px">
         <label>Jméno<br><input id="sName" type="text" placeholder="Tvé jméno" /></label>
         <label>Věk<br><input id="sAge" type="number" inputmode="numeric" min="16" max="100" placeholder="např. 29"/></label>
         <fieldset style="border:none;padding:0">
@@ -343,7 +343,7 @@ export default function App() {
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
           <button type="button" id="btnSettingsCancel">Zavřít</button>
-          <button type="submit" id="btnSettingsSave" style="background:#111;color:#fff;border:none;border-radius:10px;padding:8px 12px">Uložit</button>
+          <button id="btnSettingsSave" type="submit">Uložit</button>
         </div>
       </form>
     `;
