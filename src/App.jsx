@@ -254,9 +254,9 @@ export default function App() {
     const users = usersSnap.val() || {};
 
     box.innerHTML = '';
+    const viewerUid = auth.currentUser?.uid || me?.uid || null;
     myPairs.forEach(pid => {
       const [a,b] = pid.split('_'); const uid = a===my ? b : a;
-      const viewerUid = auth.currentUser?.uid || me?.uid || null;
       const u = users[uid] || {};
       if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
         return; // přeskoč cizího dev-bota
@@ -620,12 +620,21 @@ export default function App() {
           u.photos = Object.values(u.photos);
         }
       });
+      const viewerUid = auth.currentUser?.uid || me?.uid || null;
+
+      // Odeber cizí dev-boty dříve, než je uložíme do stavu
+      Object.keys(data).forEach((uid) => {
+        const u = data[uid];
+        if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
+          delete data[uid];
+        }
+      });
+
       setUsers(data);
 
       // aktualizace / přidání markerů
       Object.entries(data).forEach(([uid, u]) => {
         // u = data daného uživatele, uid = jeho UID
-        const viewerUid = auth.currentUser?.uid || me?.uid || null;
         const isMe = viewerUid && uid === viewerUid;
         const isDevBot = !!u?.isDevBot;
 
