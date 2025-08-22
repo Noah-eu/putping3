@@ -347,9 +347,46 @@ export default function App() {
         </div>
       </form>
     `;
+    const form   = document.getElementById('settingsForm');
+    const btnSav = document.getElementById('btnSettingsSave');
+    const getVal = (name) => {
+      const el = form?.querySelector(`input[name="${name}"]:checked`);
+      return el ? el.value : '';
+    };
+
+    async function handleSave(e){
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      if (!form) return;
+      const name = (document.getElementById('sName')?.value || '').trim();
+      const a    = parseInt(document.getElementById('sAge')?.value || '', 10);
+      const minA = Math.max(16, parseInt(document.getElementById('sMinAge')?.value || '16', 10) || 16);
+      const maxA = Math.min(100, parseInt(document.getElementById('sMaxAge')?.value || '100', 10) || 100);
+      const clean = {
+        name,
+        age: Number.isFinite(a) ? a : null,
+        gender: (g => (g==='m'||g==='f')?g:'')(getVal('sGender')),
+        pingPrefs: {
+          gender: (g => (['any','m','f'].includes(g)?g:'any'))(getVal('sAllowGender')),
+          minAge: Math.min(minA, maxA),
+          maxAge: Math.max(minA, maxA),
+        }
+      };
+      try{
+        await update(ref(db, `users/${me.uid}`), clean);
+        users[me.uid] = { ...(users[me.uid]||{}), ...clean };
+        closeSheet('settingsModal');
+      }catch(err){
+        console.error('Settings save failed', err);
+        alert('Uložení se nepovedlo. Zkuste to prosím znovu.');
+      }
+    }
+
+    form?.addEventListener('submit', handleSave);
+    btnSav?.addEventListener('click', handleSave);
+
     const u = users?.[me?.uid] || {};
     const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
-    const form = document.getElementById('settingsForm');
     if(form){
       form.querySelector('#sName').value = u.name || '';
       form.querySelector('#sAge').value = u.age ?? '';
@@ -362,41 +399,6 @@ export default function App() {
       form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
       form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
       document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
-      const btnSave = document.getElementById('btnSettingsSave');
-      btnSave?.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (typeof form.requestSubmit === 'function') {
-          form.requestSubmit();
-        } else {
-          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-        }
-      });
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const name = form.querySelector('#sName').value;
-        const age = form.querySelector('#sAge').value;
-        const gender = form.querySelector('input[name="sGender"]:checked')?.value;
-        const allowGender = form.querySelector('input[name="sAllowGender"]:checked')?.value;
-        const minAge = form.querySelector('#sMinAge').value;
-        const maxAge = form.querySelector('#sMaxAge').value;
-        const a = parseInt(age||'',10);
-        const minA = Math.max(16, parseInt(minAge||'16',10));
-        const maxA = Math.min(100, parseInt(maxAge||'100',10));
-        const clean = {
-          name: (name||'').trim(),
-          age:  isFinite(a) ? a : null,
-          gender: (gender==='m'||gender==='f') ? gender : '',
-          pingPrefs: {
-            gender: (['any','m','f'].includes(allowGender) ? allowGender : 'any'),
-            minAge: Math.min(minA, maxA),
-            maxAge: Math.max(minA, maxA)
-          }
-        };
-        await update(ref(db, `users/${me.uid}`), clean);
-        closeSheet('settingsModal');
-        users[me.uid] = { ...users[me.uid], ...clean };
-        setUsers({ ...users });
-      };
     }
     document.getElementById('btnCloseSettings')?.addEventListener('click', () => closeSheet('settingsModal'));
     openSheet('settingsModal');
