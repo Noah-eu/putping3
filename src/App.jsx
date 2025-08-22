@@ -362,6 +362,15 @@ export default function App() {
       form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
       form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
       document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+      const btnSave = document.getElementById('btnSettingsSave');
+      btnSave?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      });
       form.onsubmit = async (e) => {
         e.preventDefault();
         const name = form.querySelector('#sName').value;
