@@ -369,6 +369,8 @@ export default function App() {
       const a    = parseInt(document.getElementById('sAge')?.value || '', 10);
       const minA = Math.max(16, parseInt(document.getElementById('sMinAge')?.value || '16', 10) || 16);
       const maxA = Math.min(100, parseInt(document.getElementById('sMaxAge')?.value || '100', 10) || 100);
+      const uid = auth.currentUser?.uid || me?.uid || null;
+      if (!uid) { alert('Nejsi přihlášen – zkus akci za pár sekund znovu.'); return; }
       const clean = {
         name,
         age: Number.isFinite(a) ? a : null,
@@ -380,8 +382,8 @@ export default function App() {
         }
       };
       try{
-        await update(ref(db, `users/${me.uid}`), clean);
-        users[me.uid] = { ...(users[me.uid]||{}), ...clean };
+        await update(ref(db, `users/${uid}`), clean);
+        users[uid] = { ...(users[uid]||{}), ...clean };
         closeSheet('settingsModal');
       }catch(err){
         console.error('Settings save failed', err);
