@@ -275,6 +275,20 @@ export default function App() {
       });
       box.appendChild(row);
     });
+
+    const listEl = document.getElementById('chatsList');
+    if (!listEl.__wired) {
+      listEl.__wired = true;
+      listEl.addEventListener('click', (e) => {
+        const row = e.target.closest('.chat-row');
+        if (!row) return;
+        e.preventDefault(); e.stopPropagation();
+        const uid = row.getAttribute('data-uid');
+        console.log('[chats] click →', uid);
+        openChat(uid);
+        closeSheet('chatsModal');
+      }, { capture: true });
+    }
   }
 
   useEffect(() => {
