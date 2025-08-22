@@ -1203,7 +1203,7 @@ export default function App() {
       const avatarEl = markers.current[uid]?.getElement()?.querySelector('.marker-avatar');
       if (avatarEl) {
         const picked = list[idx] || photoURL;
-        setMarkerAppearance(avatarEl, picked, avatarEl.style.backgroundColor || "#147af3");
+        setMarkerAppearance(avatarEl, picked, avatarEl.style.backgroundColor || '#147af3', false, getGenderRing(users[uid]));
       }
     };
 
