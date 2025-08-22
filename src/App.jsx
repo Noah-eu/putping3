@@ -392,7 +392,8 @@ export default function App() {
     form?.addEventListener('submit', handleSave);
     btnSav?.addEventListener('click', handleSave);
 
-    const u = users?.[me?.uid] || {};
+    const myUid = auth.currentUser?.uid || me?.uid || null;
+    const u = (myUid && users?.[myUid]) ? users[myUid] : {};
     const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
     if(form){
       form.querySelector('#sName').value = u.name || '';
