@@ -129,21 +129,6 @@ function canPing(viewer, target){
   return true;
 }
 
-function getGenderRing(u) {
-  const raw = (
-    u?.gender ?? u?.g ?? u?.sex ?? u?.pohlavi ?? u?.genderColor ?? ""
-  ).toString().trim().toLowerCase();
-
-  // uživatel může mít přímo barvu
-  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(raw) || raw.startsWith("rgb")) return raw;
-
-  if (["male","m","muz","muž","man","boy"].includes(raw))       return "#3B82F6"; // modrá
-  if (["female","f","zena","žena","woman","girl"].includes(raw))return "#EC4899"; // růžová
-  if (["nonbinary","nb","non-binary","nebinární","nebinari"].includes(raw)) return "#F59E0B"; // jantarová
-  if (["other","ostatni","neutral","neutrál","any"].includes(raw)) return "#10B981"; // zelená
-  return null; // bez změny (ponecháme default)
-}
-
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
@@ -818,14 +803,12 @@ export default function App() {
           avatar.className = "marker-avatar";
           const selIdx =
             markerPhotoIdxRef.current?.[uid] ?? 0;
-          const src =
-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
-            (Array.isArray(u.photos) && u.photos[0]) ||
-            u.photoURL;
 
           setMarkerAppearance(
             avatar,
-            src,
+            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+              (Array.isArray(u.photos) && u.photos[0]) ||
+              u.photoURL,
             baseColor,
             highlight,
             getGenderRing(u)
@@ -860,14 +843,12 @@ export default function App() {
           const avatar = wrapper.querySelector(".marker-avatar");
           const selIdx =
             markerPhotoIdxRef.current?.[uid] ?? 0;
-          const src =
-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
-            (Array.isArray(u.photos) && u.photos[0]) ||
-            u.photoURL;
 
           setMarkerAppearance(
             avatar,
-            src,
+            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+              (Array.isArray(u.photos) && u.photos[0]) ||
+              u.photoURL,
             baseColor,
             highlight,
             getGenderRing(u)
@@ -1074,31 +1055,47 @@ export default function App() {
     }
   }
 
+  function getGenderRing(u) {
+    const raw0 = (u?.gender ?? u?.g ?? u?.sex ?? u?.pohlavi ?? u?.genderColor ?? "")
+      .toString().trim().toLowerCase();
+
+    // přímé zadání barvy: "#ff00aa" / "rgb(...)" / "hsl(...)"
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(raw0) || raw0.startsWith("rgb") || raw0.startsWith("hsl")) {
+      return raw0;
+    }
+
+    // mapování – POZOR: dle tvého přání obráceně než obvykle
+    if (["male","m","muz","muž","man","boy","kluk"].includes(raw0))        return "#EC4899"; // muži: růžová
+    if (["female","f","zena","žena","woman","girl","holka"].includes(raw0)) return "#3B82F6"; // ženy: modrá
+    if (["nonbinary","nb","non-binary","jine","jiné","other","ostatni","ostatní","neutral","neutrální"].includes(raw0)) return "#10B981"; // jiné: zelená
+
+    // Fallback: když není nic zadané, ber „jiné“ → ať je to vždy vidět
+    return "#10B981";
+  }
+
   function setMarkerAppearance(el, photoURL, baseColor, highlight, ringColor) {
-    // podklad (fotka nebo barva)
+    // pozadí = fotka nebo barva
     if (photoURL && isSafeUrl(photoURL)) {
       el.style.backgroundImage = `url(${photoURL})`;
       el.style.backgroundColor = "";
+      el.style.backgroundSize = "cover";
+      el.style.backgroundPosition = "center";
     } else {
       el.style.backgroundImage = "";
       el.style.backgroundColor = baseColor || "#000";
     }
 
-    // viditelný rámeček – preferuj gender ring, jinak highlight, jinak default
-    const ring = ringColor || highlight || null;
+    // výrazný rámeček: bílá separace + barevný prstenec + jemný stín
+    const ring = ringColor || null;
     if (ring) {
       el.style.boxShadow = `0 0 0 2px #fff, 0 0 0 6px ${ring}, 0 2px 6px rgba(0,0,0,.25)`;
     } else {
-      el.style.boxShadow = "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
+      el.style.boxShadow = `0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)`;
     }
 
-    // pulzující efekt nech jen pro skutečný highlight (ping),
-    // ať to nebliká pořád jen kvůli gender barvě
-    if (highlight && !ringColor) {
-      el.classList.add("marker-highlight");
-    } else {
-      el.classList.remove("marker-highlight");
-    }
+    // pulz necháme jen pro skutečný highlight (ping), ať neruší
+    if (highlight && !ringColor) el.classList.add("marker-highlight");
+    else el.classList.remove("marker-highlight");
   }
 
   function freezeMap(center) {

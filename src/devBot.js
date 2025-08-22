@@ -32,6 +32,7 @@ export async function spawnDevBot(ownerUid){
     name: "Kontrolní bot",
     photoURL: "https://i.pravatar.cc/200?img=12",
     photos: [],
+    gender: "muz",
     lat, lng,
     online: true,
     lastActive: Date.now(),
