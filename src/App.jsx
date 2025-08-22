@@ -129,6 +129,21 @@ function canPing(viewer, target){
   return true;
 }
 
+function getGenderRing(u) {
+  const raw = (
+    u?.gender ?? u?.g ?? u?.sex ?? u?.pohlavi ?? u?.genderColor ?? ""
+  ).toString().trim().toLowerCase();
+
+  // uživatel může mít přímo barvu
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(raw) || raw.startsWith("rgb")) return raw;
+
+  if (["male","m","muz","muž","man","boy"].includes(raw))       return "#3B82F6"; // modrá
+  if (["female","f","zena","žena","woman","girl"].includes(raw))return "#EC4899"; // růžová
+  if (["nonbinary","nb","non-binary","nebinární","nebinari"].includes(raw)) return "#F59E0B"; // jantarová
+  if (["other","ostatni","neutral","neutrál","any"].includes(raw)) return "#10B981"; // zelená
+  return null; // bez změny (ponecháme default)
+}
+
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
@@ -808,7 +823,13 @@ export default function App() {
             (Array.isArray(u.photos) && u.photos[0]) ||
             u.photoURL;
 
-          setMarkerAppearance(avatar, src, baseColor, highlight);
+          setMarkerAppearance(
+            avatar,
+            src,
+            baseColor,
+            highlight,
+            getGenderRing(u)
+          );
           wrapper.appendChild(avatar);
 
           const bubble = getBubbleContent({
@@ -844,7 +865,13 @@ export default function App() {
             (Array.isArray(u.photos) && u.photos[0]) ||
             u.photoURL;
 
-          setMarkerAppearance(avatar, src, baseColor, highlight);
+          setMarkerAppearance(
+            avatar,
+            src,
+            baseColor,
+            highlight,
+            getGenderRing(u)
+          );
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
           const scrollLeft =
@@ -1028,7 +1055,13 @@ export default function App() {
         (Array.isArray(u.photos) && u.photos[0]) ||
         u.photoURL;
 
-      setMarkerAppearance(avatar, src, baseColor, highlight);
+      setMarkerAppearance(
+        avatar,
+        src,
+        baseColor,
+        highlight,
+        getGenderRing(u)
+      );
     });
   }, [pairPings, chatPairs, users, me, markerHighlights]);
 
@@ -1041,19 +1074,27 @@ export default function App() {
     }
   }
 
-  function setMarkerAppearance(el, photoURL, baseColor, highlight) {
-    const color = highlight || baseColor;
+  function setMarkerAppearance(el, photoURL, baseColor, highlight, ringColor) {
+    // podklad (fotka nebo barva)
     if (photoURL && isSafeUrl(photoURL)) {
       el.style.backgroundImage = `url(${photoURL})`;
       el.style.backgroundColor = "";
     } else {
       el.style.backgroundImage = "";
-      el.style.backgroundColor = color;
+      el.style.backgroundColor = baseColor || "#000";
     }
-    el.style.boxShadow = highlight
-      ? `0 0 0 2px #fff, 0 0 0 4px ${highlight}`
-      : "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.1)";
-    if (highlight) {
+
+    // viditelný rámeček – preferuj gender ring, jinak highlight, jinak default
+    const ring = ringColor || highlight || null;
+    if (ring) {
+      el.style.boxShadow = `0 0 0 2px #fff, 0 0 0 6px ${ring}, 0 2px 6px rgba(0,0,0,.25)`;
+    } else {
+      el.style.boxShadow = "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
+    }
+
+    // pulzující efekt nech jen pro skutečný highlight (ping),
+    // ať to nebliká pořád jen kvůli gender barvě
+    if (highlight && !ringColor) {
       el.classList.add("marker-highlight");
     } else {
       el.classList.remove("marker-highlight");
