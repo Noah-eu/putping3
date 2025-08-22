@@ -325,45 +325,49 @@ export default function App() {
     const modal = document.getElementById('settingsModal');
     if(!modal) return;
     modal.innerHTML = `
-      <div class="sheet-head">
-        <h3>Nastavení</h3>
-        <button id="btnCloseSettings">✕</button>
+      <div class="settings-head">
+        <div class="title">Nastavení</div>
+        <div class="spacer"></div>
+        <button type="button" id="btnAskGeo" class="btn btn-primary small">Povolit polohu</button>
+        <button type="button" id="btnCloseSettings" class="btn btn-icon" aria-label="Zavřít">×</button>
       </div>
-      <form id="settingsForm" novalidate style="display:flex;flex-direction:column;gap:12px">
-        <label>Jméno<br><input id="sName" type="text" placeholder="Tvé jméno" /></label>
-        <label>Věk<br><input id="sAge" type="number" inputmode="numeric" min="16" max="100" placeholder="např. 29"/></label>
-        <fieldset style="border:none;padding:0">
+
+      <form id="settingsForm" novalidate class="settings-form">
+        <label class="field">
+          <span>Jméno</span>
+          <input id="sName" type="text" placeholder="Tvé jméno" />
+        </label>
+        <label class="field">
+          <span>Věk</span>
+          <input id="sAge" type="number" inputmode="numeric" min="16" max="100" placeholder="např. 29"/>
+        </label>
+        <fieldset class="field">
           <legend>Pohlaví</legend>
-          <label><input type="radio" name="sGender" value="m" /> Muž</label>
-          <label><input type="radio" name="sGender" value="f" /> Žena</label>
-          <label><input type="radio" name="sGender" value=""  /> Nechci uvádět</label>
+          <div class="segmented">
+            <label><input type="radio" name="sGender" value="m"/><span>Muž</span></label>
+            <label><input type="radio" name="sGender" value="f"/><span>Žena</span></label>
+            <label><input type="radio" name="sGender" value=""/><span>Nechci uvádět</span></label>
+          </div>
         </fieldset>
-        <fieldset style="border:none;padding:0">
+        <fieldset class="field">
           <legend>Kdo mě může pingnout</legend>
-          <label><input type="radio" name="sAllowGender" value="any" checked/> Kdokoliv</label>
-          <label><input type="radio" name="sAllowGender" value="f"  /> Pouze ženy</label>
-          <label><input type="radio" name="sAllowGender" value="m"  /> Pouze muži</label>
+          <div class="segmented">
+            <label><input type="radio" name="sAllowGender" value="any"/><span>Kdokoliv</span></label>
+            <label><input type="radio" name="sAllowGender" value="f"/><span>Pouze ženy</span></label>
+            <label><input type="radio" name="sAllowGender" value="m"/><span>Pouze muži</span></label>
+          </div>
         </fieldset>
-        <fieldset style="border:none;padding:0;margin-top:8px">
-          <legend>Poloha</legend>
-          <div id="geoStatus" class="hint" style="opacity:.8;margin-bottom:6px">Stav: zjišťuji…</div>
-          <button type="button" id="btnAskGeo"
-            style="border:none;border-radius:10px;padding:8px 12px;background:#111;color:#fff">
-            Povolit polohu
-          </button>
-        </fieldset>
-        <div style="display:flex;gap:8px;align-items:end">
-          <label style="flex:1">Věk od<br><input id="sMinAge" type="number" min="16" max="100" placeholder="18"/></label>
-          <label style="flex:1">do<br><input id="sMaxAge" type="number" min="16" max="100" placeholder="99"/></label>
+        <div class="row2">
+          <label class="field"><span>Věk od</span><input id="sMinAge" type="number" min="16" max="100" placeholder="16"/></label>
+          <label class="field"><span>do</span><input id="sMaxAge" type="number" min="16" max="100" placeholder="100"/></label>
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-          <button type="button" id="btnSettingsCancel">Zavřít</button>
-          <button id="btnSettingsSave" type="submit">Uložit</button>
+        <div class="settings-actions">
+          <button type="button" id="btnSettingsCancel" class="btn">Zavřít</button>
+          <button id="btnSettingsSave" type="submit" class="btn btn-primary">Uložit</button>
         </div>
       </form>
     `;
     const geoStatus = document.getElementById('geoStatus');
-    const btnAskGeo = document.getElementById('btnAskGeo');
 
     async function refreshGeo(){
       let state = 'unknown';
@@ -389,8 +393,10 @@ export default function App() {
       refreshGeo();
     }
 
+    const btnAskGeo = document.getElementById('btnAskGeo');
     btnAskGeo?.addEventListener('click', askGeo);
     refreshGeo();
+    document.getElementById('btnCloseSettings')?.addEventListener('click', (e)=>{ e.preventDefault(); closeSheet(); });
 
     const form   = document.getElementById('settingsForm');
     const btnSav = document.getElementById('btnSettingsSave');
@@ -448,7 +454,6 @@ export default function App() {
       form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
       document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
     }
-    document.getElementById('btnCloseSettings')?.addEventListener('click', () => closeSheet('settingsModal'));
     openSheet('settingsModal');
   }
 
