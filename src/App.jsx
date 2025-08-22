@@ -624,14 +624,15 @@ export default function App() {
         const viewerUid = auth.currentUser?.uid || me?.uid || null;
         const isMe = viewerUid && uid === viewerUid;
         const isDevBot = !!u?.isDevBot;
-        const isPrivateBotForSomeoneElse =
-          isDevBot && u?.privateTo && u.privateTo !== viewerUid;
-        if (isPrivateBotForSomeoneElse || (isDevBot && !viewerUid)) {
+
+        // HIDE rule: jakýkoli dev-bot, který není explicitně můj, se n_renderuje
+        const hideDevBot = isDevBot && (!viewerUid || u?.privateTo !== viewerUid);
+        if (hideDevBot) {
           if (markers.current[uid]) {
             markers.current[uid].remove();
             delete markers.current[uid];
           }
-          return;
+          return; // nepokračuj renderem markeru bota
         }
         const isOnline =
           u.online &&
