@@ -160,6 +160,7 @@ export default function App() {
 
   // map markers cache
   const markers = useRef({}); // uid -> marker
+  const markerPhotoIdxRef = useRef({}); // { [uid]: number } – vybraný snímek v bublině + pro avatar
   const openBubble = useRef(null); // uid otevřené bubliny
   const centeredOnMe = useRef(false);
 
@@ -677,12 +678,14 @@ export default function App() {
           wrapper.style.transformOrigin = "bottom center";
           const avatar = document.createElement("div");
           avatar.className = "marker-avatar";
-          setMarkerAppearance(
-            avatar,
-            (u.photos && u.photos[0]) || u.photoURL,
-            baseColor,
-            highlight
-          );
+          const selIdx =
+            markerPhotoIdxRef.current?.[uid] ?? 0;
+          const src =
+            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+            (Array.isArray(u.photos) && u.photos[0]) ||
+            u.photoURL;
+
+          setMarkerAppearance(avatar, src, baseColor, highlight);
           wrapper.appendChild(avatar);
 
           const bubble = getBubbleContent({
@@ -711,12 +714,14 @@ export default function App() {
 
           const wrapper = markers.current[uid].getElement();
           const avatar = wrapper.querySelector(".marker-avatar");
-          setMarkerAppearance(
-            avatar,
-            (u.photos && u.photos[0]) || u.photoURL,
-            baseColor,
-            highlight
-          );
+          const selIdx =
+            markerPhotoIdxRef.current?.[uid] ?? 0;
+          const src =
+            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+            (Array.isArray(u.photos) && u.photos[0]) ||
+            u.photoURL;
+
+          setMarkerAppearance(avatar, src, baseColor, highlight);
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
           const scrollLeft =
@@ -894,12 +899,13 @@ export default function App() {
       const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
       const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
       const avatar = wrapper.querySelector(".marker-avatar");
-      setMarkerAppearance(
-        avatar,
-        (u.photos && u.photos[0]) || u.photoURL,
-        baseColor,
-        highlight
-      );
+      const selIdx = markerPhotoIdxRef.current?.[uid] ?? 0;
+      const src =
+        (Array.isArray(u.photos) && u.photos[selIdx]) ||
+        (Array.isArray(u.photos) && u.photos[0]) ||
+        u.photoURL;
+
+      setMarkerAppearance(avatar, src, baseColor, highlight);
     });
   }, [pairPings, chatPairs, users, me, markerHighlights]);
 
@@ -1012,6 +1018,53 @@ export default function App() {
       });
     }
     root.appendChild(gallery);
+
+    // --- inicializuj galerii na dříve zvolenou fotku ---
+    const initialIdx = Math.min(
+      markerPhotoIdxRef.current?.[uid] ?? 0,
+      Math.max(0, list.length - 1)
+    );
+    queueMicrotask(() => {
+      // po vykreslení má gallery šířku -> lze nastavit posun
+      const w = gallery.clientWidth || 1;
+      if (initialIdx > 0) gallery.scrollLeft = initialIdx * w;
+    });
+
+    // --- debounce scrollu a aktualizace avatara ---
+    let scrollT = null;
+    const commitIndex = () => {
+      const w = gallery.clientWidth || 1;
+      const idx = Math.max(0, Math.min(list.length - 1, Math.round(gallery.scrollLeft / w)));
+      markerPhotoIdxRef.current[uid] = idx;
+
+      // sync avataru v map pin špendlíku
+      const avatarEl = markers.current[uid]?.getElement()?.querySelector('.marker-avatar');
+      if (avatarEl) {
+        const picked = list[idx] || photoURL;
+        setMarkerAppearance(avatarEl, picked, avatarEl.style.backgroundColor || "#147af3");
+      }
+    };
+
+    gallery.addEventListener('scroll', () => {
+      clearTimeout(scrollT);
+      scrollT = setTimeout(commitIndex, 180);
+    });
+    ['pointerup','touchend','mouseup'].forEach(ev =>
+      gallery.addEventListener(ev, () => {
+        clearTimeout(scrollT);
+        scrollT = setTimeout(commitIndex, 120);
+      })
+    );
+
+    // Fallback: starší WebView bez CSS aspect-ratio
+    try{
+      if (!(window.CSS && CSS.supports && CSS.supports('aspect-ratio: 1 / 1'))) {
+        const fit = () => { gallery.style.height = gallery.clientWidth + 'px'; };
+        fit();
+        window.addEventListener('resize', fit, { passive:true });
+        root.addEventListener('DOMNodeRemoved', () => window.removeEventListener('resize', fit), { once:true });
+      }
+    }catch(_){ }
 
     const bottom = document.createElement("div");
     bottom.className = "bubble-bottom";

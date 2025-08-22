@@ -138,11 +138,12 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   border-radius: 4px;
 }
 .bubble-photo{
+  flex: 0 0 100%;
   width:100%; height:100%;
   object-fit:cover;
   border-radius:50%;
   border:3px solid #fff;   /* bylo 4px → zjemníme */
-  box-shadow:none;
+  scroll-snap-align:center;
 }
 .bubble-photo.empty{
   background:#f3f4f6; border:4px dashed rgba(255,255,255,.8);
