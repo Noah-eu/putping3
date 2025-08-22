@@ -257,8 +257,8 @@ export default function App() {
     myPairs.forEach(pid => {
       const [a,b] = pid.split('_'); const uid = a===my ? b : a;
       const u = users[uid] || { name:'Neznámý uživatel' };
-      const row = document.createElement('button');
-      row.className = 'chat-row conv-item';
+      const row = document.createElement('div');
+      row.className = 'row chat-row';
       row.setAttribute('data-uid', uid);
       row.innerHTML = `
       <img class="avatar" src="${(u.photos&&u.photos[0])||u.photoURL||''}" alt="">
