@@ -1143,9 +1143,17 @@ export default function App() {
     const pair = pairPings[pid] || {};
     const canChat = (pair[me.uid] && pair[uid]) || chatPairs[pid];
 
-    const root = document.createElement("div");
-    root.className = "marker-bubble";
-    root.addEventListener("click", (e) => e.stopPropagation());
+    const bubble = document.createElement("div");
+    bubble.className = "marker-bubble";
+    bubble.addEventListener("click", (e) => e.stopPropagation());
+    (function applyBubbleRing(){
+      const ring = getGenderRing(users[uid]);
+      if (ring) {
+        bubble.style.boxShadow = 'inset 0 0 0 2px rgba(255,255,255,.95), 0 0 0 10px ' + ring + ', 0 4px 18px rgba(0,0,0,.18)';
+      } else {
+        bubble.style.boxShadow = 'inset 0 0 0 2px rgba(255,255,255,.95), 0 4px 18px rgba(0,0,0,.18)';
+      }
+    })();
 
     const list = Array.isArray(photos) && photos.length
       ? photos
@@ -1171,7 +1179,7 @@ export default function App() {
         gallery.appendChild(img);
       });
     }
-    root.appendChild(gallery);
+    bubble.appendChild(gallery);
 
     // --- inicializuj galerii na dříve zvolenou fotku ---
     const initialIdx = Math.min(
@@ -1216,7 +1224,7 @@ export default function App() {
         const fit = () => { gallery.style.height = gallery.clientWidth + 'px'; };
         fit();
         window.addEventListener('resize', fit, { passive:true });
-        root.addEventListener('DOMNodeRemoved', () => window.removeEventListener('resize', fit), { once:true });
+        bubble.addEventListener('DOMNodeRemoved', () => window.removeEventListener('resize', fit), { once:true });
       }
     }catch(_){ }
 
@@ -1271,9 +1279,9 @@ export default function App() {
       bottom.appendChild(actions);
     }
 
-    root.appendChild(bottom);
+    bubble.appendChild(bottom);
 
-    return root;
+    return bubble;
   }
 
   function wireBubbleButtons(uid) {
