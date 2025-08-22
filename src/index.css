@@ -655,3 +655,44 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 .sheet, .sheet * { pointer-events: auto; }
 #btnSettingsSave[disabled]{ opacity:.7; }
+
+/* ===== Settings polish ===== */
+.settings-head{
+  position: sticky; top: 0;
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px;
+  background:#fff; z-index:1;
+  border-bottom:1px solid rgba(17,17,17,.06);
+  border-top-left-radius:16px; border-top-right-radius:16px;
+}
+.settings-head .title{ font-size:18px; font-weight:800; letter-spacing:.2px; }
+.settings-head .spacer{ flex:1; }
+.btn{ border:1px solid rgba(17,17,17,.12); background:#fff; border-radius:10px; padding:8px 12px; }
+.btn-icon{ width:36px; height:36px; display:grid; place-items:center; font-size:20px; }
+.btn-primary{ background:#111; color:#fff; border-color:#111; }
+.btn.small{ padding:6px 10px; font-size:13px; }
+
+.settings-form{ display:flex; flex-direction:column; gap:12px; padding:12px 16px 20px; }
+.field>span{ display:block; font-size:13px; opacity:.8; margin-bottom:6px; }
+.field input[type="text"], .field input[type="number"]{
+  width:100%; border:1px solid rgba(17,17,17,.14); border-radius:10px;
+  padding:10px 12px; font-size:16px; background:#fff;
+}
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* „pill“ rádia */
+.segmented{ display:flex; gap:8px; flex-wrap:wrap; }
+.segmented input{ position:absolute; opacity:0; pointer-events:none; }
+.segmented label{ position:relative; }
+.segmented label span{
+  display:inline-block; padding:8px 12px; border-radius:999px;
+  border:1px solid rgba(17,17,17,.14); background:#fff;
+}
+.segmented input:checked + span{
+  background:#111; color:#fff; border-color:#111;
+}
+
+.settings-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+
+/* Rezerva u dna proti safe-area */
+.sheet{ padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
