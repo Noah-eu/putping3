@@ -193,12 +193,11 @@ export default function App() {
 
   function buildGrid(list){
     const grid = document.getElementById('galleryGrid'); if(!grid) return;
-    const user = me ? users[me.uid] : null;
-    const current = list ?? (Array.isArray(user?.photos) && user.photos.length
-      ? user.photos
-      : (user?.photoURL ? [user.photoURL] : []));
+    const arr = list ?? ((users?.[me?.uid]?.photos && Array.isArray(users[me.uid].photos))
+      ? users[me.uid].photos
+      : (me?.photoURL ? [me.photoURL] : []));
     grid.innerHTML = '';
-    current.forEach((url, i)=>{
+    arr.forEach((url, i)=>{
       const item = document.createElement('div');
       item.className = 'tile'; item.draggable = true; item.dataset.index = String(i);
       item.innerHTML = `
