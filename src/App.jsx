@@ -1482,6 +1482,7 @@ export default function App() {
       {/* Chat panel */}
       {openChatWith && (
         <div
+          id="chatOverlay"
           style={{
             position: "fixed",
             inset: 0,
