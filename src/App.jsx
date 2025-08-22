@@ -1147,18 +1147,20 @@ export default function App() {
     }
   }, [chatMsgs, openChatWith]);
 
-  function openChat(uid) {
-    if (!me) return false;
-    const pid = getPairId(me.uid, uid);
+  function openChat(peerUid) {
+    console.log('[openChat] peer =', peerUid, 'me =', auth.currentUser?.uid || me?.uid);
+    const meUid = auth.currentUser?.uid || me?.uid || null;
+    if (!peerUid) return;
+    setOpenChatWith(peerUid);
+    const pid = getPairId(meUid, peerUid);
     const pair = pairPings[pid] || {};
-    if (!((pair[me.uid] && pair[uid]) || chatPairs[pid])) {
+    if (!((pair[meUid] && pair[peerUid]) || chatPairs[pid])) {
       alert("Chat je dostupný až po vzájemném pingnutí.");
       return false;
     }
-    setOpenChatWith(uid);
     setMarkerHighlights((prev) => {
       const copy = { ...prev };
-      delete copy[uid];
+      delete copy[peerUid];
       return copy;
     });
     return true;
