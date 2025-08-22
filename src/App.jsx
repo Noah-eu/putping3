@@ -256,7 +256,11 @@ export default function App() {
     box.innerHTML = '';
     myPairs.forEach(pid => {
       const [a,b] = pid.split('_'); const uid = a===my ? b : a;
-      const u = users[uid] || { name:'Neznámý uživatel' };
+      const viewerUid = auth.currentUser?.uid || me?.uid || null;
+      const u = users[uid] || {};
+      if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
+        return; // přeskoč cizího dev-bota
+      }
       const row = document.createElement('div');
       row.className = 'row chat-row';
       row.setAttribute('data-uid', uid);
