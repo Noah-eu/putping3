@@ -473,9 +473,6 @@ export default function App() {
     const btnGallery  = document.getElementById('btnGallery');
     const btnChats    = document.getElementById('btnChats');
     const btnSettings = document.getElementById('btnSettings');
-    const btnEnable   = document.getElementById('btnEnableLoc');
-    const btnZoomIn   = document.getElementById('btnZoomIn');
-    const btnZoomOut  = document.getElementById('btnZoomOut');
 
     if (!primary) return;
 
@@ -510,12 +507,6 @@ export default function App() {
     btnGallery  && (btnGallery.onclick  = withClose(() => setShowGallery(true)));
     btnChats    && (btnChats.onclick    = withClose(() => openChatsModal()));
     btnSettings && (btnSettings.onclick = withClose(() => openSettingsModal()));
-    btnEnable   && (btnEnable.onclick   = withClose(() => {
-      navigator.geolocation?.getCurrentPosition?.(()=>{},()=>{});
-      if (typeof acceptLocation === 'function') acceptLocation();
-    }));
-    btnZoomIn   && (btnZoomIn.onclick   = withClose(() => map.zoomIn()));
-    btnZoomOut  && (btnZoomOut.onclick  = withClose(() => map.zoomOut()));
   }, []);
 
   useEffect(() => {
@@ -577,26 +568,6 @@ export default function App() {
 
     });
     return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const enable = document.getElementById('btnEnableLoc');
-    if (!enable) return;
-
-    const show = (v) => (enable.style.display = v ? 'inline-flex' : 'none');
-    if ('permissions' in navigator && navigator.permissions.query) {
-      navigator.permissions
-        .query({ name: 'geolocation' })
-        .then((status) => {
-          show(status.state !== 'granted');
-          status.onchange = () => show(status.state !== 'granted');
-        })
-        .catch(() => {
-          show(true);
-        });
-    } else {
-      show(true);
-    }
   }, []);
 
 
@@ -1627,9 +1598,6 @@ export default function App() {
         <button id="btnGallery" role="menuitem">Galerie fotek</button>
         <button id="btnChats" role="menuitem">Chaty</button>
         <button id="btnSettings" role="menuitem">Nastavení</button>
-        <button id="btnEnableLoc" role="menuitem">Povolit polohu</button>
-        <button id="btnZoomIn" role="menuitem">Přiblížit mapu</button>
-        <button id="btnZoomOut" role="menuitem">Oddálit mapu</button>
       </div>
 
       {showChatList && (
