@@ -1615,13 +1615,13 @@ export default function App() {
         <div
           onClick={() => setShowGallery(false)}
           style={{
-            position: "absolute",
+            position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,.25)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 30,
+            zIndex: 2400,
           }}
         >
           <div
