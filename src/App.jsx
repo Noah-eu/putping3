@@ -117,6 +117,18 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
   return blob;
 }
 
+function canPing(viewer, target){
+  if (!target) return true;
+  const prefs = target.pingPrefs || { gender:'any', minAge:16, maxAge:100 };
+  if (prefs.gender === 'm' && viewer?.gender !== 'm') return false;
+  if (prefs.gender === 'f' && viewer?.gender !== 'f') return false;
+  const age = viewer?.age;
+  if (typeof age !== 'number') return false;
+  if (age < (prefs.minAge ?? 16)) return false;
+  if (age > (prefs.maxAge ?? 100)) return false;
+  return true;
+}
+
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
@@ -303,13 +315,81 @@ export default function App() {
   }, []);
 
   function openSettingsModal(){
-    const chk = document.getElementById('chkSound');
-    const on = localStorage.getItem('soundEnabled') !== '0';
-    if (chk){
-      chk.checked = on;
-      chk.onchange = () =>
-        localStorage.setItem('soundEnabled', chk.checked ? '1' : '0');
+    const modal = document.getElementById('settingsModal');
+    if(!modal) return;
+    modal.innerHTML = `
+      <div class="sheet-head">
+        <h3>Nastavení</h3>
+        <button id="btnCloseSettings">✕</button>
+      </div>
+      <form id="settingsForm" style="display:flex;flex-direction:column;gap:12px">
+        <label>Jméno<br><input id="sName" type="text" placeholder="Tvé jméno" /></label>
+        <label>Věk<br><input id="sAge" type="number" inputmode="numeric" min="16" max="100" placeholder="např. 29"/></label>
+        <fieldset style="border:none;padding:0">
+          <legend>Pohlaví</legend>
+          <label><input type="radio" name="sGender" value="m" /> Muž</label>
+          <label><input type="radio" name="sGender" value="f" /> Žena</label>
+          <label><input type="radio" name="sGender" value=""  /> Nechci uvádět</label>
+        </fieldset>
+        <fieldset style="border:none;padding:0">
+          <legend>Kdo mě může pingnout</legend>
+          <label><input type="radio" name="sAllowGender" value="any" checked/> Kdokoliv</label>
+          <label><input type="radio" name="sAllowGender" value="f"  /> Pouze ženy</label>
+          <label><input type="radio" name="sAllowGender" value="m"  /> Pouze muži</label>
+        </fieldset>
+        <div style="display:flex;gap:8px;align-items:end">
+          <label style="flex:1">Věk od<br><input id="sMinAge" type="number" min="16" max="100" placeholder="18"/></label>
+          <label style="flex:1">do<br><input id="sMaxAge" type="number" min="16" max="100" placeholder="99"/></label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+          <button type="button" id="btnSettingsCancel">Zavřít</button>
+          <button type="submit" id="btnSettingsSave" style="background:#111;color:#fff;border:none;border-radius:10px;padding:8px 12px">Uložit</button>
+        </div>
+      </form>
+    `;
+    const u = users?.[me?.uid] || {};
+    const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
+    const form = document.getElementById('settingsForm');
+    if(form){
+      form.querySelector('#sName').value = u.name || '';
+      form.querySelector('#sAge').value = u.age ?? '';
+      const g = u.gender || '';
+      const gEl = form.querySelector(`input[name="sGender"][value="${g}"]`);
+      if(gEl) gEl.checked = true;
+      const ag = prefs.gender || 'any';
+      const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
+      if(agEl) agEl.checked = true;
+      form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
+      form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
+      document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = form.querySelector('#sName').value;
+        const age = form.querySelector('#sAge').value;
+        const gender = form.querySelector('input[name="sGender"]:checked')?.value;
+        const allowGender = form.querySelector('input[name="sAllowGender"]:checked')?.value;
+        const minAge = form.querySelector('#sMinAge').value;
+        const maxAge = form.querySelector('#sMaxAge').value;
+        const a = parseInt(age||'',10);
+        const minA = Math.max(16, parseInt(minAge||'16',10));
+        const maxA = Math.min(100, parseInt(maxAge||'100',10));
+        const clean = {
+          name: (name||'').trim(),
+          age:  isFinite(a) ? a : null,
+          gender: (gender==='m'||gender==='f') ? gender : '',
+          pingPrefs: {
+            gender: (['any','m','f'].includes(allowGender) ? allowGender : 'any'),
+            minAge: Math.min(minA, maxA),
+            maxAge: Math.max(minA, maxA)
+          }
+        };
+        await update(ref(db, `users/${me.uid}`), clean);
+        closeSheet('settingsModal');
+        users[me.uid] = { ...users[me.uid], ...clean };
+        setUsers({ ...users });
+      };
     }
+    document.getElementById('btnCloseSettings')?.addEventListener('click', () => closeSheet('settingsModal'));
     openSheet('settingsModal');
   }
 
@@ -1078,11 +1158,15 @@ export default function App() {
       const actions = document.createElement("div");
       actions.className = "bubble-actions";
 
+      const u = users[uid];
+      const allowed = canPing(users[me?.uid], u);
+
       const actionBtn = document.createElement("button");
       actionBtn.id = `btnAction_${uid}`;
-      actionBtn.className = "ping-btn";
-      actionBtn.dataset.action = canChat ? "chat" : "ping";
-      actionBtn.innerHTML =
+      if (allowed) {
+        actionBtn.className = "ping-btn";
+        actionBtn.dataset.action = canChat ? "chat" : "ping";
+        actionBtn.innerHTML =
         '<span class="ping-btn__text ping-btn__text--ping">'+
           '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 22a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"/></svg>'+
           '<span>Ping</span>'+
@@ -1092,16 +1176,21 @@ export default function App() {
           '<span>Chat</span>'+
         '</span>';
 
-      const pingText = actionBtn.querySelector(
-        ".ping-btn__text--ping"
-      );
-      const chatText = actionBtn.querySelector(
-        ".ping-btn__text--chat"
-      );
-      if (canChat) {
-        chatText.classList.add("visible");
+        const pingText = actionBtn.querySelector(
+          ".ping-btn__text--ping"
+        );
+        const chatText = actionBtn.querySelector(
+          ".ping-btn__text--chat"
+        );
+        if (canChat) {
+          chatText.classList.add("visible");
+        } else {
+          pingText.classList.add("visible");
+        }
       } else {
-        pingText.classList.add("visible");
+        actionBtn.disabled = true;
+        actionBtn.textContent = "Ping nedostupný";
+        actionBtn.title = "Mimo povolené nastavení uživatele";
       }
 
       actions.appendChild(actionBtn);
@@ -1118,11 +1207,13 @@ export default function App() {
     if (!mk) return;
     const el = mk.getElement();
     const btn = el.querySelector(`#btnAction_${uid}`);
-    if (btn) {
+    if (btn && !btn.disabled) {
       let mode = btn.dataset.action || "ping";
       btn.onclick = (e) => {
         e.stopPropagation();
         if (mode === "ping") {
+          const u = users[uid];
+          if (!canPing(users[me?.uid], u)) { return; }
           sendPing(uid);
           mode = "chat";
           btn.dataset.action = "chat";
@@ -1490,16 +1581,7 @@ export default function App() {
         <div id="chatsList"></div>
       </div>
 
-      <div id="settingsModal" className="sheet" aria-hidden="true">
-        <div className="sheet-head">
-          <h3>Nastavení</h3>
-          <button id="btnCloseSettings">✕</button>
-        </div>
-        <label className="switch">
-          <input id="chkSound" type="checkbox" />
-          <span>Přehrávat zvuky</span>
-        </label>
-      </div>
+      <div id="settingsModal" className="sheet" aria-hidden="true"></div>
 
       <button
         id="btnGear"
