@@ -346,7 +346,7 @@ export default function App() {
           <div class="segmented">
             <label><input type="radio" name="sGender" value="m"/><span>Muž</span></label>
             <label><input type="radio" name="sGender" value="f"/><span>Žena</span></label>
-            <label><input type="radio" name="sGender" value=""/><span>Nechci uvádět</span></label>
+            <label><input type="radio" name="sGender" value="x"/><span>Jiné</span></label>
           </div>
         </fieldset>
         <fieldset class="field">
@@ -367,20 +367,28 @@ export default function App() {
         </div>
       </form>
     `;
-    const geoStatus = document.getElementById('geoStatus');
-
     async function refreshGeo(){
       let state = 'unknown';
       try{
         const perm = await navigator.permissions?.query?.({ name:'geolocation' });
-        if (perm){
-          state = perm.state; // 'granted' | 'denied' | 'prompt'
-          perm.onchange = refreshGeo;
-        }
+        if (perm){ state = perm.state; perm.onchange = refreshGeo; }
       }catch(_){ }
-      const map = { granted:'povolena', denied:'zamítnuta', prompt:'zeptáme se', unknown:'neznámý' };
-      if (geoStatus) geoStatus.textContent = 'Stav: ' + (map[state] ?? 'neznámý');
-      if (btnAskGeo) btnAskGeo.disabled = (state === 'granted');
+      if (btnAskGeo){
+        btnAskGeo.classList.remove('granted','denied','prompt');
+        if (state === 'granted'){
+          btnAskGeo.classList.add('granted');
+          btnAskGeo.disabled = true;
+          btnAskGeo.innerHTML = '<span class="icon">✅</span>Poloha povolena';
+        }else if (state === 'denied'){
+          btnAskGeo.classList.add('denied');
+          btnAskGeo.disabled = false;
+          btnAskGeo.innerHTML = '<span class="icon">📍</span>Povolit polohu';
+        }else{
+          btnAskGeo.classList.add('prompt');
+          btnAskGeo.disabled = false;
+          btnAskGeo.innerHTML = '<span class="icon">📍</span>Povolit polohu';
+        }
+      }
     }
 
     async function askGeo(){
@@ -394,6 +402,7 @@ export default function App() {
     }
 
     const btnAskGeo = document.getElementById('btnAskGeo');
+    btnAskGeo?.classList.add('btn-geo'); // základní třída pro styl
     btnAskGeo?.addEventListener('click', askGeo);
     refreshGeo();
     document.getElementById('btnCloseSettings')?.addEventListener('click', (e)=>{ e.preventDefault(); closeSheet(); });
@@ -418,7 +427,7 @@ export default function App() {
       const clean = {
         name,
         age: Number.isFinite(a) ? a : null,
-        gender: (g => (g==='m'||g==='f')?g:'')(getVal('sGender')),
+        gender: (g => (g==='m'||g==='f'||g==='x') ? g : 'x')(getVal('sGender')),
         pingPrefs: {
           gender: (g => (['any','m','f'].includes(g)?g:'any'))(getVal('sAllowGender')),
           minAge: Math.min(minA, maxA),
@@ -444,9 +453,8 @@ export default function App() {
     if(form){
       form.querySelector('#sName').value = u.name || '';
       form.querySelector('#sAge').value = u.age ?? '';
-      const g = u.gender || '';
-      const gEl = form.querySelector(`input[name="sGender"][value="${g}"]`);
-      if(gEl) gEl.checked = true;
+      const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
+      form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
       const ag = prefs.gender || 'any';
       const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
       if(agEl) agEl.checked = true;
