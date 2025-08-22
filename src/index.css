@@ -652,3 +652,6 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .sheet{
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
+
+.sheet, .sheet * { pointer-events: auto; }
+#btnSettingsSave[disabled]{ opacity:.7; }
