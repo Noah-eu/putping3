@@ -1056,21 +1056,13 @@ export default function App() {
   }
 
   function getGenderRing(u) {
-    const raw0 = (u?.gender ?? u?.g ?? u?.sex ?? u?.pohlavi ?? u?.genderColor ?? "")
+    const raw = (u?.gender ?? u?.g ?? u?.sex ?? u?.pohlavi ?? u?.genderColor ?? '')
       .toString().trim().toLowerCase();
-
-    // přímé zadání barvy: "#ff00aa" / "rgb(...)" / "hsl(...)"
-    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(raw0) || raw0.startsWith("rgb") || raw0.startsWith("hsl")) {
-      return raw0;
-    }
-
-    // mapování – POZOR: dle tvého přání obráceně než obvykle
-    if (["male","m","muz","muž","man","boy","kluk"].includes(raw0))        return "#EC4899"; // muži: růžová
-    if (["female","f","zena","žena","woman","girl","holka"].includes(raw0)) return "#3B82F6"; // ženy: modrá
-    if (["nonbinary","nb","non-binary","jine","jiné","other","ostatni","ostatní","neutral","neutrální"].includes(raw0)) return "#10B981"; // jiné: zelená
-
-    // Fallback: když není nic zadané, ber „jiné“ → ať je to vždy vidět
-    return "#10B981";
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(raw) || raw.startsWith('rgb') || raw.startsWith('hsl')) return raw;
+    if (['male','m','muz','muž','man','boy','kluk'].includes(raw)) return '#EC4899';   // muži = růžová
+    if (['female','f','zena','žena','woman','girl','holka'].includes(raw)) return '#3B82F6'; // ženy = modrá
+    if (['nonbinary','nb','non-binary','jine','jiné','other','ostatni','ostatní','neutral','neutrální'].includes(raw)) return '#10B981'; // jiné = zelená
+    return '#10B981'; // fallback = zelená
   }
 
   function setMarkerAppearance(el, photoURL, baseColor, highlight, ringColor) {
