@@ -1483,6 +1483,7 @@ export default function App() {
         <div
           style={{
             position: "fixed",
+            inset: 0,
             right: "calc(12px + env(safe-area-inset-right))",
             bottom: "calc(12px + env(safe-area-inset-bottom))",
             width: "min(92vw, 360px)",
