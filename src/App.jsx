@@ -255,11 +255,11 @@ export default function App() {
 
     box.innerHTML = '';
     myPairs.forEach(pid => {
-      const [a,b] = pid.split('_'); const otherUid = a===my ? b : a;
-      const u = users[otherUid] || { name:'Neznámý uživatel' };
+      const [a,b] = pid.split('_'); const uid = a===my ? b : a;
+      const u = users[uid] || { name:'Neznámý uživatel' };
       const row = document.createElement('button');
       row.className = 'chat-row conv-item';
-      row.setAttribute('data-uid', otherUid);
+      row.setAttribute('data-uid', uid);
       row.innerHTML = `
       <img class="avatar" src="${(u.photos&&u.photos[0])||u.photoURL||''}" alt="">
       <div class="meta">
@@ -267,11 +267,13 @@ export default function App() {
         <div class="sub">Klepni pro otevření konverzace</div>
       </div>
     `;
+      row.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();        // ať klik neprobublá do zavírání sheetu
+        openChat(uid);              // UID protistrany už máš vypočítané výš
+        closeSheet('chatsModal');   // sheet zavři až po volbě
+      });
       box.appendChild(row);
-    });
-    document.querySelectorAll('.conv-item').forEach(el => {
-      const peer = el.getAttribute('data-uid');
-      el.onclick = () => { if (openChat(peer)) closeChatsModal(); };
     });
   }
 
