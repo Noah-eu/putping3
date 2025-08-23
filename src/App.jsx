@@ -799,6 +799,10 @@ export default function App() {
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
           wrapper.style.transformOrigin = "bottom center";
+          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          const ring = document.createElement('div');
+          ring.className = 'marker-ring';
+          wrapper.appendChild(ring);
           const avatar = document.createElement("div");
           avatar.className = "marker-avatar";
           const selIdx =
@@ -840,6 +844,12 @@ export default function App() {
           }
 
           const wrapper = markers.current[uid].getElement();
+          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          if (!wrapper.querySelector('.marker-ring')) {
+            const ring = document.createElement('div');
+            ring.className = 'marker-ring';
+            wrapper.prepend(ring);
+          }
           const avatar = wrapper.querySelector(".marker-avatar");
           const selIdx =
             markerPhotoIdxRef.current?.[uid] ?? 0;
@@ -997,6 +1007,12 @@ export default function App() {
       const u = users[uid];
       if (!u) return;
       const wrapper = mk.getElement();
+      wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+      if (!wrapper.querySelector('.marker-ring')) {
+        const ring = document.createElement('div');
+        ring.className = 'marker-ring';
+        wrapper.prepend(ring);
+      }
       const oldBubble = wrapper.querySelector(".marker-bubble");
       const newBubble = getBubbleContent({
         uid,
@@ -1077,17 +1093,10 @@ export default function App() {
       el.style.backgroundColor = baseColor || "#000";
     }
 
-    const ring = ringColor || null;
-    if (ring) {
-      // bílý separátor + BAREVNÝ prstenec + jemný stín (viditelné i na mapě)
-      el.style.boxShadow =
-        "0 0 0 2px #fff, 0 0 0 8px " + ring + ", 0 3px 8px rgba(0,0,0,.25)";
-    } else {
-      el.style.boxShadow =
-        "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
-    }
+    el.style.boxShadow =
+      "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
     // pulz nech jen pro skutečný highlight (ping)
-    if (highlight && !ringColor) el.classList.add("marker-highlight");
+    if (highlight) el.classList.add("marker-highlight");
     else el.classList.remove("marker-highlight");
   }
 
