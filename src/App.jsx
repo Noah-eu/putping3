@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, getRedirectResult, signOut } from "firebase/auth";
 import {
   ref,
   set,
@@ -21,7 +21,6 @@ import {
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
 import { spawnDevBot } from './devBot';
-import { getRedirectResult, signOut } from "firebase/auth";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -176,32 +175,45 @@ export default function App() {
   const [showGallery, setShowGallery] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
-  const [showIntro, setShowIntro] = useState(true);
-  const [fadeIntro, setFadeIntro] = useState(false);
+  // --- Onboarding step logic (single source of truth) ---
   const recomputeStep = () => {
     const consented = localStorage.getItem('pp_consent_v1') === '1';
     const finished  = localStorage.getItem('pp_onboard_v1') === '1';
     const loggedIn  = !!auth.currentUser;
-    if (finished) return 0;          // onboarding dokončen
-    if (!consented) return 1;        // nejdřív souhlas
-    if (!loggedIn) return 2;         // pak přihlášení
-    return 3;                        // potom nastavení profilu
+
+    if (finished) return 0;         // onboarding hotový → mapa
+    if (!consented) return 1;       // krok 1: souhlas
+    if (!loggedIn) return 2;        // krok 2: přihlášení
+    return 3;                       // krok 3: nastavení profilu
   };
-  const [step, setStep] = useState(recomputeStep);
-  const finishOnboard = () => {
-    localStorage.setItem('pp_onboard_v1', '1');
-    setStep(0);
-  };
+
+  // inicializace stavu: žádný „blik“ (počkáme na první výpočet)
+  const [step, setStep] = useState(() => -1); // -1 = nevíme ještě
+
   useEffect(() => {
-    if (step === 0 && showIntro) {
-      setFadeIntro(true);
-      const t = setTimeout(() => setShowIntro(false), 500);
-      return () => clearTimeout(t);
-    }
-  }, [step, showIntro]);
+    // spočítej po prvním renderu
+    setStep(recomputeStep());
+    // po redirectu Google i při změně auth přepočítej znovu
+    getRedirectResult(auth).finally(() => setStep(recomputeStep()));
+    const unsub = onAuthStateChanged(auth, () => setStep(recomputeStep()));
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     document.documentElement.classList.toggle('sheet-open', showSettings);
   }, [showSettings]);
+
+  const onboardingActive = step > 0;
+
+  // inicializace mapy jen když onboarding skončil
+  const mapInitedRef = useRef(false);
+  useEffect(() => {
+    if (onboardingActive || mapInitedRef.current) return;
+    const cleanup = initMapOnce();
+    mapInitedRef.current = true;
+    return cleanup;
+  }, [onboardingActive]);
+
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
@@ -254,17 +266,29 @@ export default function App() {
 
   function applyGenderRingInstant(uid, genderValue){
     const ring = getGenderRing({ gender: genderValue }) || 'transparent';
-    const wrapper = document.querySelector(`.marker-wrapper[data-uid="${uid}"]`);
-    if (wrapper) wrapper.style.setProperty('--ring-color', ring);
-    const bubble = document.querySelector(`.marker-wrapper[data-uid="${uid}"] .marker-bubble`);
-    if (bubble) bubble.style.setProperty('--ring-color', ring);
+    const wrappers = document.querySelectorAll(`.marker-wrapper[data-uid="${uid}"]`);
+    wrappers.forEach(w => w.style.setProperty('--ring-color', ring));
+    document.querySelectorAll('.marker-bubble').forEach(b => {
+      const owner = b.closest(`.marker-wrapper[data-uid="${uid}"]`);
+      if (owner) b.style.setProperty('--ring-color', ring);
+    });
   }
 
   function selectGender(val){
     setMe(m => ({...m, gender: val}));
+    applyGenderRingInstant(me?.uid, val);          // okamžitý efekt
     writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), gender: val});
-    applyGenderRingInstant(me?.uid, val);
-    saveProfileDebounced(me?.uid, { gender: val });
+    saveProfileDebounced(me?.uid, { gender: val }); // ulož do DB
+  }
+
+  function acceptTerms(){
+    localStorage.setItem('pp_consent_v1','1');
+    setStep(recomputeStep());
+  }
+
+  function finishOnboard(){
+    localStorage.setItem('pp_onboard_v1','1');
+    setStep(recomputeStep());
   }
 
   function RenderSettingsFields(){
@@ -609,11 +633,9 @@ export default function App() {
     refreshPrimary();
     getRedirectResult(auth).finally(() => {
       refreshPrimary();
-      setStep(recomputeStep());
     });
     onAuthStateChanged(auth, () => {
       refreshPrimary();
-      setStep(recomputeStep());
     });
 
     btnRecover  && (btnRecover.onclick  = withClose(async () => { const o = prompt('Vlož staré UID:'); if (o) await recoverAccount(o); }));
@@ -654,12 +676,8 @@ export default function App() {
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        const cred = await signInAnonymously(auth);
-        u = cred.user;
-      }
-      if(!u){ setMe(null); setStep(recomputeStep()); return; }
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) { setMe(null); return; }
       const uid = u.uid;
       const cached = readProfileCache(uid);
       setMe({ uid, ...cached });
@@ -671,7 +689,6 @@ export default function App() {
         });
       });
       if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
-      setStep(recomputeStep());
     });
     return () => unsub();
   }, []);
@@ -755,11 +772,8 @@ export default function App() {
     return () => navigator.geolocation.clearWatch(id);
   }, [me, locationConsent]);
 
-  /* ───────────────────────────── Init mapy ──────────────────────────────── */
-
-  useEffect(() => {
+  function initMapOnce(){
     if (map || !me) return;
-
     let m;
     (async () => {
       // Start at last known position from DB if available, otherwise Prague
@@ -781,9 +795,8 @@ export default function App() {
       });
       setMap(m);
     })();
-
     return () => m && m.remove();
-  }, [me]);
+  }
 
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
 
@@ -1582,10 +1595,52 @@ export default function App() {
     setDeleteIdx(null);
   }
 
+  function Onboarding({ step, setStep }){
+    return (
+      <div className="onboard">
+        <div className="onboard-card">
+          {step===1 && (
+            <>
+              <h1>PutPing</h1>
+              <p>Souhlas s podmínkami a zásadami ochrany soukromí</p>
+              <button className="btn btn-dark" onClick={acceptTerms}>Souhlasím</button>
+            </>
+          )}
+          {step===2 && (
+            <>
+              <h1>Přihlášení</h1>
+              <div className="row">
+                <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
+                <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
+              </div>
+            </>
+          )}
+          {step===3 && (
+            <>
+              <h1>Nastavení profilu</h1>
+              <RenderSettingsFields />
+              <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>
+                Uložit a pokračovat
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   /* ──────────────────────────────── Render UI ───────────────────────────── */
+  if (step !== 0) {
+    return (
+      <>
+        {step > 0 && <Onboarding step={step} setStep={setStep} />}
+        <div className="intro-screen" style={{ backgroundImage: "url(/splash.jpg)" }} />
+      </>
+    );
+  }
 
   return (
-    <div>
+    <div id="appRoot" aria-hidden={step>0}>
       {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
@@ -2102,46 +2157,6 @@ export default function App() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {showIntro && (
-        <div
-          className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
-          style={{ backgroundImage: "url(/splash.jpg)" }}
-        />
-      )}
-
-      {step>0 && (
-        <div className="onboard">
-          <div className="onboard-card">
-            {step===1 && (
-              <>
-                <h1>PutPing</h1>
-                <p>Pokračováním souhlasíš s podmínkami používání a zásadami ochrany soukromí.</p>
-                <button className="btn btn-dark" onClick={() => {
-                  localStorage.setItem('pp_consent_v1','1');
-                  setStep(recomputeStep());
-                }}>Souhlasím</button>
-              </>
-            )}
-            {step===2 && (
-              <>
-                <h1>Přihlášení</h1>
-                <div className="row">
-                  <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
-                  <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
-                </div>
-              </>
-            )}
-            {step===3 && (
-              <>
-                <h1>Nastavení profilu</h1>
-                <RenderSettingsFields />
-                <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
-              </>
-            )}
-          </div>
         </div>
       )}
     </div>
