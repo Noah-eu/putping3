@@ -186,7 +186,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
   // krok se počítá vždy z aktuálních flagů + auth + profilu
-  const [step, setStep] = useState(() => 99); // 99 = initial, vykreslíme loader
+  const [step, setStep] = useState(() => 99); // 99 = init (jen intro, než víme víc)
+  const [introState, setIntroState] = useState('show'); // 'show' | 'fade' | 'hide'
 
   function computeStep(me) {
     if (forceOnboard()) return (auth.currentUser ? 3 : 1);
@@ -224,6 +225,18 @@ export default function App() {
   useEffect(() => {
     setStep(computeStep(me));
   }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
+
+  // 4) Když jsme ve „staré“ cestě (step === 0), nech intro chvilku a fade-out
+  useEffect(() => {
+    if (step === 0 && introState === 'show') {
+      setIntroState('fade');
+      const t = setTimeout(() => setIntroState('hide'), 700);
+      return () => clearTimeout(t);
+    }
+    if (step > 0 && introState === 'show') {
+      setIntroState('hide');
+    }
+  }, [step, introState]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('sheet-open', showSettings);
@@ -291,12 +304,12 @@ export default function App() {
 
   function applyGenderRingInstant(uid, genderValue){
     const ring = getGenderRing({ gender: genderValue }) || 'transparent';
-    const wrappers = document.querySelectorAll(`.marker-wrapper[data-uid="${uid}"]`);
-    wrappers.forEach(w => w.style.setProperty('--ring-color', ring));
-    document.querySelectorAll('.marker-bubble').forEach(b => {
-      const owner = b.closest(`.marker-wrapper[data-uid="${uid}"]`);
-      if (owner) b.style.setProperty('--ring-color', ring);
-    });
+    document.querySelectorAll(`.marker-wrapper[data-uid="${uid}"]`).forEach(w =>
+      w.style.setProperty('--ring-color', ring)
+    );
+    document.querySelectorAll(`.marker-wrapper[data-uid="${uid}"] .marker-bubble`).forEach(b =>
+      b.style.setProperty('--ring-color', ring)
+    );
   }
 
   function selectGender(val){
@@ -1620,41 +1633,35 @@ export default function App() {
     setDeleteIdx(null);
   }
 
-  function Onboarding({ step, setStep }){
-    if (![1,2,3].includes(step)) return null;
+  function Onboarding({ step }){
     return (
-      <>
-        <div className="intro-screen" style={{ backgroundImage: "url(/splash.jpg)" }} />
-        <div className="onboard">
-          <div className="onboard-card">
-            {step===1 && (
-              <>
-                <h1>PutPing</h1>
-                <p>Souhlas s podmínkami a zásadami ochrany soukromí</p>
-                <button className="btn btn-dark" onClick={acceptTerms}>Souhlasím</button>
-              </>
-            )}
-            {step===2 && (
-              <>
-                <h1>Přihlášení</h1>
-                <div className="row">
-                  <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
-                  <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
-                </div>
-              </>
-            )}
-            {step===3 && (
-              <>
-                <h1>Nastavení profilu</h1>
-                <RenderSettingsFields />
-                <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>
-                  Uložit a pokračovat
-                </button>
-              </>
-            )}
-          </div>
+      <div className="onboard">
+        <div className="onboard-card">
+          {step===1 && (
+            <>
+              <h1>PutPing</h1>
+              <p>Souhlas s podmínkami a zásadami ochrany soukromí</p>
+              <button className="btn btn-dark" onClick={acceptTerms}>Souhlasím</button>
+            </>
+          )}
+          {step===2 && (
+            <>
+              <h1>Přihlášení</h1>
+              <div className="row">
+                <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
+                <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
+              </div>
+            </>
+          )}
+          {step===3 && (
+            <>
+              <h1>Nastavení profilu</h1>
+              <RenderSettingsFields/>
+              <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
+            </>
+          )}
         </div>
-      </>
+      </div>
     );
   }
 
@@ -1667,6 +1674,13 @@ export default function App() {
 
   return (
     <>
+      {/* Intro je VŽDY – u „starých“ fade-out po ~0.7s */}
+      {introState !== 'hide' && (
+        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}>
+          <img className="intro-logo" src="/logo.svg" alt="PutPing"/>
+        </div>
+      )}
+
       {/* app (mapa, FAB, markery…) až když step === 0 */}
       {step === 0 && (
         <div id="appRoot" aria-hidden={false} style={{ pointerEvents:'auto' }}>
@@ -2191,11 +2205,8 @@ export default function App() {
     </div>
     )}
 
-    {/* první vykreslení / načítání */}
-    {step === 99 && <div className="intro-screen" />}
-
-    {/* onboarding (souhlas → login → nastavení) */}
-    {step > 0 && <Onboarding step={step} setStep={setStep} />}
+    {/* Wizard když je potřeba */}
+    {step > 0 && step < 99 && <Onboarding step={step} />}
   </>
   );
 }
