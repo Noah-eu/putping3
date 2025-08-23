@@ -132,7 +132,11 @@ function canPing(viewer = {}, target = {}) {
   if (prefs.gender === 'f' && vg !== 'f') return false;
 
   // věk – když není známý, NEblokuj tlačítko (předtím to vracelo false)
-  const age = Number(viewer.age);
+  // Number(null) a Number('') vrací 0 → je potřeba ošetřit prázdné hodnoty
+  const ageRaw = viewer.age;
+  if (ageRaw === undefined || ageRaw === null || ageRaw === '') return true;
+
+  const age = Number(ageRaw);
   if (!Number.isFinite(age)) return true;
 
   // věkové hranice
