@@ -12,7 +12,6 @@ import {
   push,
   serverTimestamp,
   get,
-  onDisconnect,
 } from "firebase/database";
 import {
   ref as sref,
@@ -143,6 +142,26 @@ function canPing(viewer = {}, target = {}) {
 
   return true;
 }
+
+// --- profil: cache + DB sync ---
+const profileKey = (uid)=>`pp_profile_${uid}`;
+const readProfileCache = (uid)=> {
+  try { return JSON.parse(localStorage.getItem(profileKey(uid))||'{}'); } catch { return {}; }
+};
+const writeProfileCache = (uid,data)=> {
+  try { localStorage.setItem(profileKey(uid), JSON.stringify(data||{})); } catch {}
+};
+
+function saveProfile(uid, patch){
+  if(!uid||!patch) return;
+  import('firebase/database').then(({ref, update})=>{
+    update(ref(db, `users/${uid}`), patch).catch(console.warn);
+  });
+}
+
+// jednoduchý debounce
+const debounce=(fn,ms=400)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+const saveProfileDebounced = debounce(saveProfile, 500);
 
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
@@ -464,21 +483,56 @@ export default function App() {
 
     const myUid = auth.currentUser?.uid || me?.uid || null;
     const u = (myUid && users?.[myUid]) ? users[myUid] : {};
-    const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
-    if(form){
-      form.querySelector('#sName').value = u.name || '';
-      form.querySelector('#sAge').value = u.age ?? '';
-      const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
-      form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
-      const ag = prefs.gender || 'any';
-      const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
-      if(agEl) agEl.checked = true;
-      form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
-      form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
-      document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+      const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
+      if(form){
+        form.querySelector('#sName').value = u.name || '';
+        form.querySelector('#sAge').value = u.age ?? '';
+        const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
+        form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
+        const ag = prefs.gender || 'any';
+        const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
+        if(agEl) agEl.checked = true;
+        form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
+        form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
+        document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+        const uid = auth.currentUser?.uid || me?.uid || null;
+        form.querySelector('#sName')?.addEventListener('input', (e)=>{
+          const name = e.target.value;
+          setMe(m=>({...m, name}));
+          saveProfileDebounced(uid, { name });
+        });
+        form.querySelector('#sAge')?.addEventListener('input', (e)=>{
+          const age = parseInt(e.target.value,10);
+          setMe(m=>({...m, age: Number.isFinite(age) ? age : null}));
+          saveProfileDebounced(uid, { age: Number.isFinite(age) ? age : null });
+        });
+        form.querySelectorAll('input[name="sGender"]').forEach(el=>{
+          el.addEventListener('change', (ev)=>{
+            const gender = ev.target.value;
+            setMe(m=>({...m, gender}));
+            saveProfileDebounced(uid, { gender });
+          });
+        });
+        form.querySelectorAll('input[name="sAllowGender"]').forEach(el=>{
+          el.addEventListener('change', (ev)=>{
+            const gender = ev.target.value;
+            setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
+            saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), gender} });
+          });
+        });
+        form.querySelector('#sMinAge')?.addEventListener('input', (e)=>{
+          const minAge = parseInt(e.target.value,10);
+          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}}));
+          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16} });
+        });
+        form.querySelector('#sMaxAge')?.addEventListener('input', (e)=>{
+          const maxAge = parseInt(e.target.value,10);
+          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}}));
+          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100} });
+        });
+      }
+      openSheet('settingsModal');
     }
-    openSheet('settingsModal');
-  }
 
   // --- FAB/gear menu: otevření na první tap, klik uvnitř nemá zavírat, cleanup safe ---
   useEffect(() => {
@@ -606,32 +660,23 @@ export default function App() {
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      let u = user;
+    const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         const cred = await signInAnonymously(auth);
         u = cred.user;
       }
-      const name = u.displayName || localStorage.getItem('userName') || 'Anonym';
-      const photoURL = u.photoURL || null;
-      setMe({ uid: u.uid, name });
-
-      const myRef = ref(db, `users/${u.uid}`);
-      onDisconnect(myRef).update({ online: false, lastActive: serverTimestamp() });
-      window.addEventListener("beforeunload", () => {
-        update(myRef, { online: false, lastActive: Date.now() });
+      if(!u){ setMe(null); return; }
+      const uid = u.uid;
+      const cached = readProfileCache(uid);
+      setMe({ uid, ...cached });
+      import('firebase/database').then(({ref, onValue})=>{
+        onValue(ref(db, `users/${uid}`), (snap)=>{
+          const server = snap.val() || {};
+          writeProfileCache(uid, server);
+          setMe({ uid, ...server });
+        });
       });
-
-      await update(myRef, {
-        name,
-        photoURL,
-        lastActive: Date.now(),
-        online: true,
-      });
-
-      // Spawn a development bot for the current user when enabled
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(u.uid);
-
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
     });
     return () => unsub();
   }, []);
