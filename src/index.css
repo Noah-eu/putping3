@@ -15,17 +15,19 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 /* Intro splash */
 .intro-screen{
-  position: fixed !important;
-  inset: 0 !important;
+  position: fixed;
+  inset: 0;
   width: 100vw; height: 100vh;
-  display: flex; align-items: center; justify-content: center;
-  background-size: cover; background-position: center;
-  z-index: 2700;
+  background: var(--pp-pink);
+  display:flex; align-items:center; justify-content:center;
+  z-index: 2700;           /* pod onboarding panelem */
   pointer-events: none;
-  transition: opacity 0.5s ease;
-  padding: 0;
 }
-.intro-screen--hidden { opacity: 0; }
+.intro-logo{ width: 180px; height:auto; opacity:.98; }
+
+/* Fade-out animace */
+.intro--fade{ animation: introFade .65s ease forwards; }
+@keyframes introFade{ to { opacity:0; } }
 
 /* Location consent modal */
 .consent-modal {
@@ -747,11 +749,6 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 
 /* Onboarding = bottom sheet laděný do starorůžové */
-:root{
-  --pp-pink: #f4a7bd;
-  --pp-plum: #7a2845;
-  --pp-cream: #fff7fa;
-}
 
 .onboard{
   position: fixed; inset: 0; z-index: 2800;
