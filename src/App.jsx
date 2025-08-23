@@ -175,27 +175,32 @@ export default function App() {
   const [showGallery, setShowGallery] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
-  // --- Onboarding step logic (single source of truth) ---
-  const recomputeStep = () => {
+  // --- Onboarding: výpočet kroku podle flagů a auth ---
+  const getOnboardStep = () => {
     const consented = localStorage.getItem('pp_consent_v1') === '1';
     const finished  = localStorage.getItem('pp_onboard_v1') === '1';
     const loggedIn  = !!auth.currentUser;
 
-    if (finished) return 0;         // onboarding hotový → mapa
-    if (!consented) return 1;       // krok 1: souhlas
-    if (!loggedIn) return 2;        // krok 2: přihlášení
-    return 3;                       // krok 3: nastavení profilu
+    if (finished) return 0;       // hotovo -> app
+    if (!consented) return 1;     // 1) souhlas
+    if (!loggedIn) return 2;      // 2) přihlášení
+    return 3;                     // 3) nastavení
   };
 
-  // inicializace stavu: žádný „blik“ (počkáme na první výpočet)
-  const [step, setStep] = useState(() => -1); // -1 = nevíme ještě
+  // Pozn.: inicializuj rovnou konkrétním krokem (žádný -1 problik)
+  const [step, setStep] = useState(getOnboardStep);
 
   useEffect(() => {
-    // spočítej po prvním renderu
-    setStep(recomputeStep());
-    // po redirectu Google i při změně auth přepočítej znovu
-    getRedirectResult(auth).finally(() => setStep(recomputeStep()));
-    const unsub = onAuthStateChanged(auth, () => setStep(recomputeStep()));
+    // přepočítej hned po mountu
+    setStep(getOnboardStep());
+
+    // po návratu z Google redirectu
+    getRedirectResult(auth)
+      .catch(() => {})
+      .finally(() => setStep(getOnboardStep()));
+
+    // při jakékoli změně auth
+    const unsub = onAuthStateChanged(auth, () => setStep(getOnboardStep()));
     return () => unsub();
   }, []);
 
@@ -203,17 +208,15 @@ export default function App() {
     document.documentElement.classList.toggle('sheet-open', showSettings);
   }, [showSettings]);
 
-  const onboardingActive = step > 0;
-
   // inicializace mapy jen když onboarding skončil
   const mapInitedRef = useRef(false);
   useEffect(() => {
-    if (onboardingActive || mapInitedRef.current) return;
-    if (!me) return;                 // ⬅ počkej, dokud neznáme uživatele
-    mapInitedRef.current = true;     // ⬅ teprve teď označ „spuštěno“
-    const cleanup = initMapOnce();
+    if (step > 0 || mapInitedRef.current) return;
+    if (!me) return;                 // ⬅ počkej na uživatele
+    mapInitedRef.current = true;     // ⬅ označ „spuštěno“ až teď
+    const cleanup = initMapOnce();   // ⬅ tvoje původní inicializace
     return cleanup;
-  }, [onboardingActive, me]);         // ⬅ přidej i `me` do závislostí
+  }, [step, me]);
 
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
@@ -284,12 +287,12 @@ export default function App() {
 
   function acceptTerms(){
     localStorage.setItem('pp_consent_v1','1');
-    setStep(recomputeStep());
+    setStep(getOnboardStep());
   }
 
   function finishOnboard(){
     localStorage.setItem('pp_onboard_v1','1');
-    setStep(recomputeStep());
+    setStep(getOnboardStep());
   }
 
   function RenderSettingsFields(){
@@ -1598,152 +1601,160 @@ export default function App() {
 
   function Onboarding({ step, setStep }){
     return (
-      <div className="onboard">
-        <div className="onboard-card">
-          {step===1 && (
-            <>
-              <h1>PutPing</h1>
-              <p>Souhlas s podmínkami a zásadami ochrany soukromí</p>
-              <button className="btn btn-dark" onClick={acceptTerms}>Souhlasím</button>
-            </>
-          )}
-          {step===2 && (
-            <>
-              <h1>Přihlášení</h1>
-              <div className="row">
-                <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
-                <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
-              </div>
-            </>
-          )}
-          {step===3 && (
-            <>
-              <h1>Nastavení profilu</h1>
-              <RenderSettingsFields />
-              <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>
-                Uložit a pokračovat
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  /* ──────────────────────────────── Render UI ───────────────────────────── */
-  if (step !== 0) {
-    return (
       <>
-        {step > 0 && <Onboarding step={step} setStep={setStep} />}
         <div className="intro-screen" style={{ backgroundImage: "url(/splash.jpg)" }} />
+        <div className="onboard">
+          <div className="onboard-card">
+            {step===1 && (
+              <>
+                <h1>PutPing</h1>
+                <p>Souhlas s podmínkami a zásadami ochrany soukromí</p>
+                <button className="btn btn-dark" onClick={acceptTerms}>Souhlasím</button>
+              </>
+            )}
+            {step===2 && (
+              <>
+                <h1>Přihlášení</h1>
+                <div className="row">
+                  <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
+                  <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
+                </div>
+              </>
+            )}
+            {step===3 && (
+              <>
+                <h1>Nastavení profilu</h1>
+                <RenderSettingsFields />
+                <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>
+                  Uložit a pokračovat
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </>
     );
   }
 
+  /* ──────────────────────────────── Render UI ───────────────────────────── */
+
+  if (location.hash === '#reset') {
+    localStorage.removeItem('pp_consent_v1');
+    localStorage.removeItem('pp_onboard_v1');
+  }
+
   return (
-    <div id="appRoot" aria-hidden={step>0}>
-      {isIOS && !locationConsent && (
-        <div className="consent-modal">
-          <div className="consent-modal__content">
-            <h2>Souhlas se sdílením polohy</h2>
-            <p>Chceme zobrazit tvoji pozici na mapě.</p>
-            <button className="btn" onClick={acceptLocation}>
-              Souhlasím
-            </button>
-          </div>
-        </div>
-      )}
-      {false && (
-        <>
-          {/* Plovoucí menu (FAB) */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 10,
-              right: 10,
-              zIndex: 10,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 8,
-            }}
-          >
-            {fabOpen && (
+    <>
+      {/* App (mapa, markery, FAB…) jen když onboarding skončil */}
+      <div
+        id="appRoot"
+        aria-hidden={step > 0}
+        style={{ pointerEvents: step > 0 ? 'none' : 'auto' }}
+      >
+        {step === 0 && (
+          <>
+            {isIOS && !locationConsent && (
+              <div className="consent-modal">
+                <div className="consent-modal__content">
+                  <h2>Souhlas se sdílením polohy</h2>
+                  <p>Chceme zobrazit tvoji pozici na mapě.</p>
+                  <button className="btn" onClick={acceptLocation}>
+                    Souhlasím
+                  </button>
+                </div>
+              </div>
+            )}
+            {false && (
               <>
-                <button
-                  onClick={() => {
-                    setShowSettings(true);
-                    setFabOpen(false);
-                  }}
+                {/* Plovoucí menu (FAB) */}
+                <div
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    border: "1px solid #ddd",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 24,
-                    lineHeight: "24px",
+                    position: "absolute",
+                    bottom: 10,
+                    right: 10,
+                    zIndex: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 8,
                   }}
-                  title="Nastavení"
                 >
-                  ⚙️
-                </button>
-                <button
-                  onClick={() => {
-                    setShowGallery(true);
-                    setFabOpen(false);
-                  }}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    border: "1px solid #ddd",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 24,
-                    lineHeight: "24px",
-                  }}
-                  title="Galerie"
-                >
-                  🖼️
-                </button>
-                <button
-                  onClick={() => {
-                    setShowChatList(true);
-                    setFabOpen(false);
-                  }}
-                  className="fab-chat"
-                  title="Minulé chaty"
-                >
-                  💬
-                </button>
+                  {fabOpen && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowSettings(true);
+                          setFabOpen(false);
+                        }}
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                          border: "1px solid #ddd",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: 24,
+                          lineHeight: "24px",
+                        }}
+                        title="Nastavení"
+                      >
+                        ⚙️
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowGallery(true);
+                          setFabOpen(false);
+                        }}
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                          border: "1px solid #ddd",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: 24,
+                          lineHeight: "24px",
+                        }}
+                        title="Galerie"
+                      >
+                        🖼️
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowChatList(true);
+                          setFabOpen(false);
+                        }}
+                        className="fab-chat"
+                        title="Minulé chaty"
+                      >
+                        💬
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setFabOpen((o) => !o)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 24,
+                      border: "1px solid #ddd",
+                      background: "#fff",
+                      cursor: "pointer",
+                      fontSize: 24,
+                      lineHeight: "24px",
+                    }}
+                    title="Menu"
+                  >
+                    {fabOpen ? "✖️" : "➕"}
+                  </button>
+                </div>
               </>
             )}
-            <button
-              onClick={() => setFabOpen((o) => !o)}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                border: "1px solid #ddd",
-                background: "#fff",
-                cursor: "pointer",
-                fontSize: 24,
-                lineHeight: "24px",
-              }}
-              title="Menu"
-            >
-              {fabOpen ? "✖️" : "➕"}
-            </button>
-          </div>
-        </>
-      )}
 
-      {/* Mapa */}
-      <div id="map" style={{ width: "100vw", height: "100vh" }} />
+            {/* Mapa */}
+            <div id="map" style={{ width: "100vw", height: "100vh" }} />
 
-      <div id="chatPanel" className="chat-panel hidden" aria-hidden="true">
+            <div id="chatPanel" className="chat-panel hidden" aria-hidden="true">
         <div className="chat-header">
           <button id="btnCloseChat" title="Zpět">←</button>
           <div className="chat-title"></div>
@@ -2160,6 +2171,12 @@ export default function App() {
           )}
         </div>
       )}
+      </>
+    )}
     </div>
+
+    {/* Onboarding (splash+panel) jen když je aktivní */}
+    {step > 0 && <Onboarding step={step} setStep={setStep} />}
+  </>
   );
 }
