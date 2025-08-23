@@ -209,10 +209,11 @@ export default function App() {
   const mapInitedRef = useRef(false);
   useEffect(() => {
     if (onboardingActive || mapInitedRef.current) return;
+    if (!me) return;                 // ⬅ počkej, dokud neznáme uživatele
+    mapInitedRef.current = true;     // ⬅ teprve teď označ „spuštěno“
     const cleanup = initMapOnce();
-    mapInitedRef.current = true;
     return cleanup;
-  }, [onboardingActive]);
+  }, [onboardingActive, me]);         // ⬅ přidej i `me` do závislostí
 
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
@@ -772,9 +773,9 @@ export default function App() {
     return () => navigator.geolocation.clearWatch(id);
   }, [me, locationConsent]);
 
-  function initMapOnce(){
-    if (map || !me) return;
-    let m;
+    function initMapOnce(){
+      if (map) return;                 // ⬅ dříve bylo `if (map || !me) return;`
+      let m;
     (async () => {
       // Start at last known position from DB if available, otherwise Prague
       let center = [14.42076, 50.08804];
