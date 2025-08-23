@@ -226,16 +226,15 @@ export default function App() {
     setStep(computeStep(me));
   }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
 
-  // 4) Když jsme ve „staré“ cestě (step === 0), nech intro chvilku a fade-out
+  // 4) Neschovávej intro při step > 0 (zůstane jako pozadí wizardu)
   useEffect(() => {
     if (step === 0 && introState === 'show') {
+      // starý uživatel: krátký fade do mapy
       setIntroState('fade');
-      const t = setTimeout(() => setIntroState('hide'), 700);
+      const t = setTimeout(() => setIntroState('hide'), 800);
       return () => clearTimeout(t);
     }
-    if (step > 0 && introState === 'show') {
-      setIntroState('hide');
-    }
+    // POZN.: když step > 0 (wizard), intro necháme zůstat (žádný hide)
   }, [step, introState]);
 
   useEffect(() => {
@@ -669,9 +668,6 @@ export default function App() {
     };
 
     refreshPrimary();
-    getRedirectResult(auth).finally(() => {
-      refreshPrimary();
-    });
     onAuthStateChanged(auth, () => {
       refreshPrimary();
     });
