@@ -228,13 +228,19 @@ export default function App() {
 
   // 4) Neschovávej intro při step > 0 (zůstane jako pozadí wizardu)
   useEffect(() => {
+    let t1, t2;
     if (step === 0 && introState === 'show') {
-      // starý uživatel: krátký fade do mapy
-      setIntroState('fade');
-      const t = setTimeout(() => setIntroState('hide'), 800);
-      return () => clearTimeout(t);
+      // hotový uživatel: nech intro 2s a pak fade do mapy
+      t1 = setTimeout(() => setIntroState('fade'), 2000);
+    }
+    if (introState === 'fade') {
+      t2 = setTimeout(() => setIntroState('hide'), 800);
     }
     // POZN.: když step > 0 (wizard), intro necháme zůstat (žádný hide)
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [step, introState]);
 
   useEffect(() => {
