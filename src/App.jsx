@@ -624,9 +624,9 @@ export default function App() {
       gear.removeEventListener('pointerdown', onGearPointer);
       menu.removeEventListener('pointerdown', onMenuPointer);
       document.removeEventListener('pointerdown', onDocPointer);
-    document.removeEventListener('keydown', onKey);
-  };
-}, []);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [step]);
 
   // helper: proveď akci a zavři menu
   const withClose = (fn) => async (e) => {
