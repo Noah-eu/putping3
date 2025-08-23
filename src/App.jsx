@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import { onAuthStateChanged, getRedirectResult, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   ref,
   set,
@@ -30,6 +30,12 @@ window.shouldPlaySound = () =>
   localStorage.getItem("soundEnabled") !== "0";
 
 const ONLINE_TTL_MS = 10 * 60_000; // 10 minut
+
+// vynucení onboard přes URL: .../#onboard
+const forceOnboard = () => location.hash.includes('onboard');
+
+// profil považujeme za „hotový“, když je aspoň jméno NEBO gender
+const isProfileComplete = (p) => !!(p && (p.name || p.gender));
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
@@ -179,35 +185,45 @@ export default function App() {
   const [showGallery, setShowGallery] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
-  // --- Onboarding: výpočet kroku podle flagů a auth ---
-  const getOnboardStep = () => {
+  // krok se počítá vždy z aktuálních flagů + auth + profilu
+  const [step, setStep] = useState(() => 99); // 99 = initial, vykreslíme loader
+
+  function computeStep(me) {
+    if (forceOnboard()) return (auth.currentUser ? 3 : 1);
     const consented = localStorage.getItem('pp_consent_v1') === '1';
     const finished  = localStorage.getItem('pp_onboard_v1') === '1';
     const loggedIn  = !!auth.currentUser;
 
-    if (finished) return 0;       // hotovo -> app
-    if (!consented) return 1;     // 1) souhlas
-    if (!loggedIn) return 2;      // 2) přihlášení
-    return 3;                     // 3) nastavení
-  };
+    if (!consented) return 1;                  // 1) souhlas
+    if (!loggedIn)  return 2;                  // 2) přihlášení
+    if (!isProfileComplete(me)) return 3;      // 3) nastavení (dokud není jméno/gender)
+    return finished ? 0 : 3;                   // hotovo → 0, jinak zpět do nastavení
+  }
 
-  // Pozn.: inicializuj rovnou konkrétním krokem (žádný -1 problik)
-  // Funkci zavolej hned, aby se neuložila do stavu samotná reference
-  const [step, setStep] = useState(getOnboardStep());
-
+  // po mountu + hashchange → přepočítej
   useEffect(() => {
-    // přepočítej hned po mountu
-    setStep(getOnboardStep());
+    const onHash = () => setStep(s => computeStep(me));
+    window.addEventListener('hashchange', onHash);
+    setStep(computeStep(me));
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
-    // po návratu z Google redirectu
-    getRedirectResult(auth)
-      .catch(() => {})
-      .finally(() => setStep(getOnboardStep()));
+  // po návratu z Google redirectu
+  useEffect(() => {
+    import('firebase/auth').then(({ getRedirectResult }) => {
+      getRedirectResult(auth).finally(() => setStep(computeStep(me)));
+    });
+  }, []);
 
-    // při jakékoli změně auth
-    const unsub = onAuthStateChanged(auth, () => setStep(getOnboardStep()));
+  // při změně auth i dat profilu přepočítej
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(() => setStep(computeStep(me)));
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    setStep(computeStep(me));
+  }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
 
   useEffect(() => {
     document.documentElement.classList.toggle('sheet-open', showSettings);
@@ -292,12 +308,12 @@ export default function App() {
 
   function acceptTerms(){
     localStorage.setItem('pp_consent_v1','1');
-    setStep(getOnboardStep());
+    setStep(computeStep(me));
   }
 
   function finishOnboard(){
     localStorage.setItem('pp_onboard_v1','1');
-    setStep(getOnboardStep());
+    setStep(computeStep(me));
   }
 
   function RenderSettingsFields(){
@@ -1605,6 +1621,7 @@ export default function App() {
   }
 
   function Onboarding({ step, setStep }){
+    if (![1,2,3].includes(step)) return null;
     return (
       <>
         <div className="intro-screen" style={{ backgroundImage: "url(/splash.jpg)" }} />
@@ -1650,16 +1667,11 @@ export default function App() {
 
   return (
     <>
-      {/* App (mapa, markery, FAB…) jen když onboarding skončil */}
-      <div
-        id="appRoot"
-        aria-hidden={step > 0}
-        style={{ pointerEvents: step > 0 ? 'none' : 'auto' }}
-      >
-        {step === 0 && (
-          <>
-            {isIOS && !locationConsent && (
-              <div className="consent-modal">
+      {/* app (mapa, FAB, markery…) až když step === 0 */}
+      {step === 0 && (
+        <div id="appRoot" aria-hidden={false} style={{ pointerEvents:'auto' }}>
+          {isIOS && !locationConsent && (
+            <div className="consent-modal">
                 <div className="consent-modal__content">
                   <h2>Souhlas se sdílením polohy</h2>
                   <p>Chceme zobrazit tvoji pozici na mapě.</p>
@@ -2176,11 +2188,13 @@ export default function App() {
           )}
         </div>
       )}
-      </>
-    )}
     </div>
+    )}
 
-    {/* Onboarding (splash+panel) jen když je aktivní */}
+    {/* první vykreslení / načítání */}
+    {step === 99 && <div className="intro-screen" />}
+
+    {/* onboarding (souhlas → login → nastavení) */}
     {step > 0 && <Onboarding step={step} setStep={setStep} />}
   </>
   );
