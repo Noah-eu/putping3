@@ -191,6 +191,13 @@ export default function App() {
     localStorage.setItem('pp_onboard_v1', '1');
     setStep(0);
   };
+  useEffect(() => {
+    if (step === 0 && showIntro) {
+      setFadeIntro(true);
+      const t = setTimeout(() => setShowIntro(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [step, showIntro]);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
@@ -2135,13 +2142,8 @@ export default function App() {
       {showIntro && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
-          onClick={() => {
-            setFadeIntro(true);
-            setTimeout(() => setShowIntro(false), 500);
-          }}
-        >
-          <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
-        </div>
+          style={{ backgroundImage: "url(/splash.jpg)" }}
+        />
       )}
 
       {step>0 && (
@@ -2174,9 +2176,21 @@ export default function App() {
                   <input placeholder="Jméno" value={me?.name||''}
                     onChange={e=>{ const name=e.target.value; setMe(m=>({...m,name})); saveProfileDebounced(me?.uid,{name}); }}/>
                   <div className="row">
-                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'muz'})); saveProfileDebounced(me?.uid,{gender:'muz'}); }}>Muž</button>
-                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'žena'})); saveProfileDebounced(me?.uid,{gender:'žena'}); }}>Žena</button>
-                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'jine'})); saveProfileDebounced(me?.uid,{gender:'jine'}); }}>Jiné</button>
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='muz'?" active":""}`}
+                      onClick={()=>{ const gender='muz'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Muž</button>
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='žena'?" active":""}`}
+                      onClick={()=>{ const gender='žena'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Žena</button>
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='jine'?" active":""}`}
+                      onClick={()=>{ const gender='jine'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Jiné</button>
                   </div>
                   <input type="number" placeholder="Věk (volitelné)" value={me?.age||''}
                     onChange={e=>{ const age=Number(e.target.value)||null; setMe(m=>({...m,age})); saveProfileDebounced(me?.uid,{age}); }}/>
