@@ -117,15 +117,30 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
   return blob;
 }
 
-function canPing(viewer, target){
-  if (!target) return true;
-  const prefs = target.pingPrefs || { gender:'any', minAge:16, maxAge:100 };
-  if (prefs.gender === 'm' && viewer?.gender !== 'm') return false;
-  if (prefs.gender === 'f' && viewer?.gender !== 'f') return false;
-  const age = viewer?.age;
-  if (typeof age !== 'number') return false;
+function normGender(g) {
+  const s = (g ?? '').toString().trim().toLowerCase();
+  if (['m','male','man','muž','muz','kluk','boy'].includes(s)) return 'm';
+  if (['f','female','woman','žena','zena','holka','girl'].includes(s)) return 'f';
+  return 'any';
+}
+
+function canPing(viewer = {}, target = {}) {
+  // preferuj cílové preference, ale měj bezpečné defaulty
+  const prefs = target.pingPrefs || { gender: 'any', minAge: 16, maxAge: 100 };
+
+  // gender – normalizuj obě strany; 'any' nic neomezuje
+  const vg = normGender(viewer.gender);
+  if (prefs.gender === 'm' && vg !== 'm') return false;
+  if (prefs.gender === 'f' && vg !== 'f') return false;
+
+  // věk – když není známý, NEblokuj tlačítko (předtím to vracelo false)
+  const age = Number(viewer.age);
+  if (!Number.isFinite(age)) return true;
+
+  // věkové hranice
   if (age < (prefs.minAge ?? 16)) return false;
   if (age > (prefs.maxAge ?? 100)) return false;
+
   return true;
 }
 
