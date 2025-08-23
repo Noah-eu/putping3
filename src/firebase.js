@@ -1,7 +1,7 @@
 // src/firebase.js				
 import { initializeApp } from "firebase/app";				
 import { getDatabase } from "firebase/database";				
-import { getAuth } from "firebase/auth";
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
 				
 const firebaseConfig = {
@@ -19,9 +19,11 @@ const app = initializeApp(firebaseConfig);
 
 const db = getDatabase(app);
 const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
 export const storage = getStorage(app);
 
 const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
 
-export { db, auth, firebaseConfig, initSecondaryApp };
+export { db, firebaseConfig, initSecondaryApp };
+export { auth };
 export { sref, uploadBytes, getDownloadURL };
