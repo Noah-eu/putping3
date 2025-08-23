@@ -24,7 +24,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 
 /* Fade-out animace */
-.intro--fade{ animation: introFade .65s ease forwards; }
+.intro--fade{ animation: introFade 1s ease forwards; }
 @keyframes introFade{ to { opacity:0; } }
 
 /* Location consent modal */
