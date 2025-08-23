@@ -174,6 +174,7 @@ export default function App() {
   const [fabOpen, setFabOpen] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
@@ -198,6 +199,9 @@ export default function App() {
       return () => clearTimeout(t);
     }
   }, [step, showIntro]);
+  useEffect(() => {
+    document.documentElement.classList.toggle('sheet-open', showSettings);
+  }, [showSettings]);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
@@ -246,6 +250,136 @@ export default function App() {
   async function loginAnon() {
     const { signInAnonymously } = await import('firebase/auth');
     await signInAnonymously(auth);
+  }
+
+  function applyGenderRingInstant(uid, genderValue){
+    const ring = getGenderRing({ gender: genderValue }) || 'transparent';
+    const wrapper = document.querySelector(`.marker-wrapper[data-uid="${uid}"]`);
+    if (wrapper) wrapper.style.setProperty('--ring-color', ring);
+    const bubble = document.querySelector(`.marker-wrapper[data-uid="${uid}"] .marker-bubble`);
+    if (bubble) bubble.style.setProperty('--ring-color', ring);
+  }
+
+  function selectGender(val){
+    setMe(m => ({...m, gender: val}));
+    writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), gender: val});
+    applyGenderRingInstant(me?.uid, val);
+    saveProfileDebounced(me?.uid, { gender: val });
+  }
+
+  function RenderSettingsFields(){
+    return (
+      <div style={{display:'grid', gap:10}}>
+        {/* Jméno */}
+        <input
+          placeholder="Jméno"
+          value={me?.name || ''}
+          onChange={e => {
+            const name = e.target.value;
+            setMe(m => ({...m, name}));
+            writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), name});
+            saveProfileDebounced(me?.uid, { name });
+          }}
+        />
+
+        {/* Gender – tři pill tlačítka */}
+        <div className="row">
+          <button
+            type="button"
+            className={`pill ${ (me?.gender||'').toLowerCase().startsWith('mu') ? 'active' : ''}`}
+            onClick={() => selectGender('muz')}
+          >Muž</button>
+          <button
+            type="button"
+            className={`pill ${ (me?.gender||'').toLowerCase().startsWith('že') || (me?.gender||'').toLowerCase().startsWith('ze') ? 'active' : ''}`}
+            onClick={() => selectGender('žena')}
+          >Žena</button>
+          <button
+            type="button"
+            className={`pill ${ ['jine','jiné','other','any','neutral'].includes((me?.gender||'').toLowerCase()) ? 'active' : ''}`}
+            onClick={() => selectGender('jine')}
+          >Jiné</button>
+        </div>
+
+        {/* Věk (volitelné) */}
+        <input
+          type="number"
+          placeholder="Věk (volitelné)"
+          value={me?.age || ''}
+          onChange={e => {
+            const age = Number(e.target.value) || null;
+            setMe(m => ({...m, age}));
+            writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), age});
+            saveProfileDebounced(me?.uid, { age });
+          }}
+        />
+
+        {/* Ping prefs gender */}
+        <div className="row">
+          <button
+            type="button"
+            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'any' ? 'active' : ''}`}
+            onClick={() => {
+              const gender = 'any';
+              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
+              const cache = readProfileCache(me?.uid) || {};
+              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+            }}
+          >Kdokoliv</button>
+          <button
+            type="button"
+            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'f' ? 'active' : ''}`}
+            onClick={() => {
+              const gender = 'f';
+              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
+              const cache = readProfileCache(me?.uid) || {};
+              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+            }}
+          >Pouze ženy</button>
+          <button
+            type="button"
+            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'm' ? 'active' : ''}`}
+            onClick={() => {
+              const gender = 'm';
+              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
+              const cache = readProfileCache(me?.uid) || {};
+              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+            }}
+          >Pouze muži</button>
+        </div>
+
+        {/* Ping prefs age range */}
+        <div className="row">
+          <input
+            type="number"
+            placeholder="Věk od"
+            value={me?.pingPrefs?.minAge ?? 16}
+            onChange={e => {
+              const minAge = parseInt(e.target.value,10);
+              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}}));
+              const cache = readProfileCache(me?.uid) || {};
+              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
+              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
+            }}
+          />
+          <input
+            type="number"
+            placeholder="do"
+            value={me?.pingPrefs?.maxAge ?? 100}
+            onChange={e => {
+              const maxAge = parseInt(e.target.value,10);
+              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}}));
+              const cache = readProfileCache(me?.uid) || {};
+              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
+              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
+            }}
+          />
+        </div>
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -387,184 +521,6 @@ export default function App() {
     return () => btnClose?.removeEventListener('click', closeChatsModal);
   }, []);
 
-  function openSettingsModal(){
-    const modal = document.getElementById('settingsModal');
-    if(!modal) return;
-    modal.innerHTML = `
-      <div class="settings-head">
-        <div class="title">Nastavení</div>
-        <div class="spacer"></div>
-        <button type="button" id="btnAskGeo" class="btn btn-primary small">Povolit polohu</button>
-        <button type="button" id="btnCloseSettings" class="btn btn-icon" aria-label="Zavřít">×</button>
-      </div>
-
-      <form id="settingsForm" novalidate class="settings-form">
-        <label class="field">
-          <span>Jméno</span>
-          <input id="sName" type="text" placeholder="Tvé jméno" />
-        </label>
-        <label class="field">
-          <span>Věk</span>
-          <input id="sAge" type="number" inputmode="numeric" min="16" max="100" placeholder="např. 29"/>
-        </label>
-        <fieldset class="field">
-          <legend>Pohlaví</legend>
-          <div class="segmented">
-            <label><input type="radio" name="sGender" value="m"/><span>Muž</span></label>
-            <label><input type="radio" name="sGender" value="f"/><span>Žena</span></label>
-            <label><input type="radio" name="sGender" value="x"/><span>Jiné</span></label>
-          </div>
-        </fieldset>
-        <fieldset class="field">
-          <legend>Kdo mě může pingnout</legend>
-          <div class="segmented">
-            <label><input type="radio" name="sAllowGender" value="any"/><span>Kdokoliv</span></label>
-            <label><input type="radio" name="sAllowGender" value="f"/><span>Pouze ženy</span></label>
-            <label><input type="radio" name="sAllowGender" value="m"/><span>Pouze muži</span></label>
-          </div>
-        </fieldset>
-        <div class="row2">
-          <label class="field"><span>Věk od</span><input id="sMinAge" type="number" min="16" max="100" placeholder="16"/></label>
-          <label class="field"><span>do</span><input id="sMaxAge" type="number" min="16" max="100" placeholder="100"/></label>
-        </div>
-        <div class="settings-actions">
-          <button type="button" id="btnSettingsCancel" class="btn">Zavřít</button>
-          <button id="btnSettingsSave" type="submit" class="btn btn-primary">Uložit</button>
-        </div>
-      </form>
-    `;
-    async function refreshGeo(){
-      let state = 'unknown';
-      try{
-        const perm = await navigator.permissions?.query?.({ name:'geolocation' });
-        if (perm){ state = perm.state; perm.onchange = refreshGeo; }
-      }catch(_){ }
-      if (btnAskGeo){
-        btnAskGeo.classList.remove('granted','denied','prompt');
-        if (state === 'granted'){
-          btnAskGeo.classList.add('granted');
-          btnAskGeo.disabled = true;
-          btnAskGeo.innerHTML = '<span class="icon">✅</span>Poloha povolena';
-        }else if (state === 'denied'){
-          btnAskGeo.classList.add('denied');
-          btnAskGeo.disabled = false;
-          btnAskGeo.innerHTML = '<span class="icon">📍</span>Povolit polohu';
-        }else{
-          btnAskGeo.classList.add('prompt');
-          btnAskGeo.disabled = false;
-          btnAskGeo.innerHTML = '<span class="icon">📍</span>Povolit polohu';
-        }
-      }
-    }
-
-    async function askGeo(){
-      try{
-        await new Promise((resolve, reject) => {
-          navigator.geolocation?.getCurrentPosition?.(resolve, reject, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
-        });
-      }catch(_){ }
-      if (typeof acceptLocation === 'function') acceptLocation(); // tvoje existující funkce
-      refreshGeo();
-    }
-
-    const btnAskGeo = document.getElementById('btnAskGeo');
-    btnAskGeo?.classList.add('btn-geo'); // základní třída pro styl
-    btnAskGeo?.addEventListener('click', askGeo);
-    refreshGeo();
-    document.getElementById('btnCloseSettings')?.addEventListener('click', (e)=>{ e.preventDefault(); closeSheet(); });
-
-    const form   = document.getElementById('settingsForm');
-    const btnSav = document.getElementById('btnSettingsSave');
-    const getVal = (name) => {
-      const el = form?.querySelector(`input[name="${name}"]:checked`);
-      return el ? el.value : '';
-    };
-
-    async function handleSave(e){
-      e?.preventDefault?.();
-      e?.stopPropagation?.();
-      if (!form) return;
-      const name = (document.getElementById('sName')?.value || '').trim();
-      const a    = parseInt(document.getElementById('sAge')?.value || '', 10);
-      const minA = Math.max(16, parseInt(document.getElementById('sMinAge')?.value || '16', 10) || 16);
-      const maxA = Math.min(100, parseInt(document.getElementById('sMaxAge')?.value || '100', 10) || 100);
-      const uid = auth.currentUser?.uid || me?.uid || null;
-      if (!uid) { alert('Nejsi přihlášen – zkus akci za pár sekund znovu.'); return; }
-      const clean = {
-        name,
-        age: Number.isFinite(a) ? a : null,
-        gender: (g => (g==='m'||g==='f'||g==='x') ? g : 'x')(getVal('sGender')),
-        pingPrefs: {
-          gender: (g => (['any','m','f'].includes(g)?g:'any'))(getVal('sAllowGender')),
-          minAge: Math.min(minA, maxA),
-          maxAge: Math.max(minA, maxA),
-        }
-      };
-      try{
-        await update(ref(db, `users/${uid}`), clean);
-        users[uid] = { ...(users[uid]||{}), ...clean };
-        closeSheet('settingsModal');
-      }catch(err){
-        console.error('Settings save failed', err);
-        alert('Uložení se nepovedlo. Zkuste to prosím znovu.');
-      }
-    }
-
-    form?.addEventListener('submit', handleSave);
-    btnSav?.addEventListener('click', handleSave);
-
-    const myUid = auth.currentUser?.uid || me?.uid || null;
-    const u = (myUid && users?.[myUid]) ? users[myUid] : {};
-      const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
-      if(form){
-        form.querySelector('#sName').value = u.name || '';
-        form.querySelector('#sAge').value = u.age ?? '';
-        const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
-        form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
-        const ag = prefs.gender || 'any';
-        const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
-        if(agEl) agEl.checked = true;
-        form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
-        form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
-        document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
-        const uid = auth.currentUser?.uid || me?.uid || null;
-        form.querySelector('#sName')?.addEventListener('input', (e)=>{
-          const name = e.target.value;
-          setMe(m=>({...m, name}));
-          saveProfileDebounced(uid, { name });
-        });
-        form.querySelector('#sAge')?.addEventListener('input', (e)=>{
-          const age = parseInt(e.target.value,10);
-          setMe(m=>({...m, age: Number.isFinite(age) ? age : null}));
-          saveProfileDebounced(uid, { age: Number.isFinite(age) ? age : null });
-        });
-        form.querySelectorAll('input[name="sGender"]').forEach(el=>{
-          el.addEventListener('change', (ev)=>{
-            const gender = ev.target.value;
-            setMe(m=>({...m, gender}));
-            saveProfileDebounced(uid, { gender });
-          });
-        });
-        form.querySelectorAll('input[name="sAllowGender"]').forEach(el=>{
-          el.addEventListener('change', (ev)=>{
-            const gender = ev.target.value;
-            setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
-            saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), gender} });
-          });
-        });
-        form.querySelector('#sMinAge')?.addEventListener('input', (e)=>{
-          const minAge = parseInt(e.target.value,10);
-          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}}));
-          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16} });
-        });
-        form.querySelector('#sMaxAge')?.addEventListener('input', (e)=>{
-          const maxAge = parseInt(e.target.value,10);
-          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}}));
-          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100} });
-        });
-      }
-      openSheet('settingsModal');
-    }
 
   // --- FAB/gear menu: otevření na první tap, klik uvnitř nemá zavírat, cleanup safe ---
   useEffect(() => {
@@ -664,7 +620,7 @@ export default function App() {
     btnSignOut  && (btnSignOut.onclick  = withClose(async () => { await signOut(auth); }));
     btnGallery  && (btnGallery.onclick  = withClose(() => setShowGallery(true)));
     btnChats    && (btnChats.onclick    = withClose(() => openChatsModal()));
-    btnSettings && (btnSettings.onclick = withClose(() => openSettingsModal()));
+    btnSettings && (btnSettings.onclick = withClose(() => setShowSettings(true)));
   }, []);
 
   useEffect(() => {
@@ -1772,7 +1728,17 @@ export default function App() {
         <div id="chatsList"></div>
       </div>
 
-      <div id="settingsModal" className="sheet" aria-hidden="true"></div>
+      {showSettings && (
+        <div id="settingsModal" className="sheet open" aria-hidden="false">
+          <div className="sheet-head">
+            <h3>Nastavení</h3>
+            <button id="btnCloseSettings" onClick={() => setShowSettings(false)} aria-label="Zavřít">✕</button>
+          </div>
+          <div style={{padding:16}}>
+            <RenderSettingsFields />
+          </div>
+        </div>
+      )}
 
       <button
         id="btnGear"
@@ -2166,35 +2132,12 @@ export default function App() {
                   <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
                   <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
                 </div>
-                <button className="btn btn-light" onClick={() => setStep(3)} style={{marginTop:16}}>Mám účet, nastavit profil</button>
               </>
             )}
             {step===3 && (
               <>
                 <h1>Nastavení profilu</h1>
-                <div style={{display:'grid',gap:8}}>
-                  <input placeholder="Jméno" value={me?.name||''}
-                    onChange={e=>{ const name=e.target.value; setMe(m=>({...m,name})); saveProfileDebounced(me?.uid,{name}); }}/>
-                  <div className="row">
-                    <button
-                      type="button"
-                      className={`pill${me?.gender==='muz'?" active":""}`}
-                      onClick={()=>{ const gender='muz'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
-                    >Muž</button>
-                    <button
-                      type="button"
-                      className={`pill${me?.gender==='žena'?" active":""}`}
-                      onClick={()=>{ const gender='žena'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
-                    >Žena</button>
-                    <button
-                      type="button"
-                      className={`pill${me?.gender==='jine'?" active":""}`}
-                      onClick={()=>{ const gender='jine'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
-                    >Jiné</button>
-                  </div>
-                  <input type="number" placeholder="Věk (volitelné)" value={me?.age||''}
-                    onChange={e=>{ const age=Number(e.target.value)||null; setMe(m=>({...m,age})); saveProfileDebounced(me?.uid,{age}); }}/>
-                </div>
+                <RenderSettingsFields />
                 <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
               </>
             )}
