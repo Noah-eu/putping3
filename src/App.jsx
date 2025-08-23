@@ -1154,6 +1154,7 @@ export default function App() {
 
     const bubble = document.createElement("div");
     bubble.className = "marker-bubble";
+    bubble.style.setProperty('--ring-color', getGenderRing(users[uid]) || 'transparent');
     bubble.addEventListener("click", (e) => e.stopPropagation());
     (function applyBubbleRing(){
       const ring = getGenderRing(users[uid]);
