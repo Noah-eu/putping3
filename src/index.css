@@ -719,3 +719,29 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 }
 /* Rezerva pro malé displeje + safe-area, ať nic „neuteče“ pod okraj */
 .sheet{ padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+/* --- GENDER RING: malý pin --- */
+.marker-wrapper { position: relative; }
+.marker-ring{
+  position:absolute; inset:0;
+  clip-path: path('M16 0C24.8 0 32 7.2 32 16C32 29.2 16 44 16 44C16 44 0 29.2 0 16C0 7.2 7.2 0 16 0Z');
+  transform-origin: bottom center;
+  transform: scale(1.18);          /* tloušťka prstence */
+  background: var(--ring-color, transparent);
+  box-shadow: 0 0 0 2px #fff;      /* bílá separace od mapy */
+  z-index: 0;
+  pointer-events: none;
+}
+.marker-avatar{ position: relative; z-index: 1; }
+
+/* --- GENDER RING: velká bublina --- */
+.marker-bubble{ position: absolute; z-index: 10; }
+.marker-bubble::before{
+  content:""; position:absolute; inset:0;
+  clip-path: path('M120 0C186 0 240 54 240 120C240 220 120 320 120 320C120 320 0 220 0 120C0 54 54 0 120 0Z');
+  transform-origin: bottom center;
+  transform: scale(1.06);          /* mírně větší než bublina */
+  background: var(--ring-color, transparent);
+  box-shadow: 0 0 0 2px #fff;      /* vnitřní bílý lem */
+  z-index: -1;                     /* pod obsahem bubliny */
+  pointer-events: none;
+}
