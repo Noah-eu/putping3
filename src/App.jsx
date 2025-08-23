@@ -188,7 +188,8 @@ export default function App() {
   };
 
   // Pozn.: inicializuj rovnou konkrétním krokem (žádný -1 problik)
-  const [step, setStep] = useState(getOnboardStep);
+  // Funkci zavolej hned, aby se neuložila do stavu samotná reference
+  const [step, setStep] = useState(getOnboardStep());
 
   useEffect(() => {
     // přepočítej hned po mountu
