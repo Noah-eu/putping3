@@ -177,6 +177,13 @@ export default function App() {
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
+  const [step, setStep] = useState(() =>
+    localStorage.getItem('pp_onboard_v1') ? 0 : 1
+  );
+  const finishOnboard = () => {
+    localStorage.setItem('pp_onboard_v1', '1');
+    setStep(0);
+  };
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
@@ -215,6 +222,17 @@ export default function App() {
   const messagesLoaded = useRef(false);
   const galleryRef = useRef(null);
   const sortableRef = useRef(null);
+
+  // Google login (redirect – funguje i na iPhone)
+  async function loginGoogle() {
+    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+    await signInWithRedirect(auth, new GoogleAuthProvider());
+  }
+  // anonymně (lze kdykoli později propojit s Googlem)
+  async function loginAnon() {
+    const { signInAnonymously } = await import('firebase/auth');
+    await signInAnonymously(auth);
+  }
 
   useEffect(() => {
     markerHighlightsRef.current = markerHighlights;
@@ -2109,6 +2127,47 @@ export default function App() {
           }}
         >
           <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
+        </div>
+      )}
+
+      {step>0 && (
+        <div className="onboard">
+          <div className="onboard-card">
+            {step===1 && (
+              <>
+                <h1>PutPing</h1>
+                <p>Pokračováním souhlasíš s podmínkami používání a zásadami ochrany soukromí.</p>
+                <button className="btn btn-dark" onClick={() => setStep(2)}>Souhlasím</button>
+              </>
+            )}
+            {step===2 && (
+              <>
+                <h1>Přihlášení</h1>
+                <div className="row">
+                  <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
+                  <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
+                </div>
+                <button className="btn btn-light" onClick={() => setStep(3)} style={{marginTop:16}}>Mám účet, nastavit profil</button>
+              </>
+            )}
+            {step===3 && (
+              <>
+                <h1>Nastavení profilu</h1>
+                <div style={{display:'grid',gap:8}}>
+                  <input placeholder="Jméno" value={me?.name||''}
+                    onChange={e=>{ const name=e.target.value; setMe(m=>({...m,name})); saveProfileDebounced(me?.uid,{name}); }}/>
+                  <div className="row">
+                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'muz'})); saveProfileDebounced(me?.uid,{gender:'muz'}); }}>Muž</button>
+                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'žena'})); saveProfileDebounced(me?.uid,{gender:'žena'}); }}>Žena</button>
+                    <button className="btn btn-light" onClick={()=>{ setMe(m=>({...m,gender:'jine'})); saveProfileDebounced(me?.uid,{gender:'jine'}); }}>Jiné</button>
+                  </div>
+                  <input type="number" placeholder="Věk (volitelné)" value={me?.age||''}
+                    onChange={e=>{ const age=Number(e.target.value)||null; setMe(m=>({...m,age})); saveProfileDebounced(me?.uid,{age}); }}/>
+                </div>
+                <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
