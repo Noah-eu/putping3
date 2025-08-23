@@ -177,9 +177,16 @@ export default function App() {
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
-  const [step, setStep] = useState(() =>
-    localStorage.getItem('pp_onboard_v1') ? 0 : 1
-  );
+  const recomputeStep = () => {
+    const consented = localStorage.getItem('pp_consent_v1') === '1';
+    const finished  = localStorage.getItem('pp_onboard_v1') === '1';
+    const loggedIn  = !!auth.currentUser;
+    if (finished) return 0;          // onboarding dokončen
+    if (!consented) return 1;        // nejdřív souhlas
+    if (!loggedIn) return 2;         // pak přihlášení
+    return 3;                        // potom nastavení profilu
+  };
+  const [step, setStep] = useState(recomputeStep);
   const finishOnboard = () => {
     localStorage.setItem('pp_onboard_v1', '1');
     setStep(0);
@@ -637,8 +644,14 @@ export default function App() {
     };
 
     refreshPrimary();
-    getRedirectResult(auth).finally(refreshPrimary);
-    onAuthStateChanged(auth, refreshPrimary);
+    getRedirectResult(auth).finally(() => {
+      refreshPrimary();
+      setStep(recomputeStep());
+    });
+    onAuthStateChanged(auth, () => {
+      refreshPrimary();
+      setStep(recomputeStep());
+    });
 
     btnRecover  && (btnRecover.onclick  = withClose(async () => { const o = prompt('Vlož staré UID:'); if (o) await recoverAccount(o); }));
     btnSignOut  && (btnSignOut.onclick  = withClose(async () => { await signOut(auth); }));
@@ -683,7 +696,7 @@ export default function App() {
         const cred = await signInAnonymously(auth);
         u = cred.user;
       }
-      if(!u){ setMe(null); return; }
+      if(!u){ setMe(null); setStep(recomputeStep()); return; }
       const uid = u.uid;
       const cached = readProfileCache(uid);
       setMe({ uid, ...cached });
@@ -695,6 +708,7 @@ export default function App() {
         });
       });
       if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
+      setStep(recomputeStep());
     });
     return () => unsub();
   }, []);
@@ -2137,7 +2151,10 @@ export default function App() {
               <>
                 <h1>PutPing</h1>
                 <p>Pokračováním souhlasíš s podmínkami používání a zásadami ochrany soukromí.</p>
-                <button className="btn btn-dark" onClick={() => setStep(2)}>Souhlasím</button>
+                <button className="btn btn-dark" onClick={() => {
+                  localStorage.setItem('pp_consent_v1','1');
+                  setStep(recomputeStep());
+                }}>Souhlasím</button>
               </>
             )}
             {step===2 && (
