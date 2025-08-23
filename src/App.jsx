@@ -1672,9 +1672,7 @@ export default function App() {
     <>
       {/* Intro je VŽDY – u „starých“ fade-out po ~0.7s */}
       {introState !== 'hide' && (
-        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}>
-          <img className="intro-logo" src="/logo.svg" alt="PutPing"/>
-        </div>
+        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}></div>
       )}
 
       {/* app (mapa, FAB, markery…) až když step === 0 */}
