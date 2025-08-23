@@ -18,12 +18,10 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   position: fixed;
   inset: 0;
   width: 100vw; height: 100vh;
-  background: var(--pp-pink);
-  display:flex; align-items:center; justify-content:center;
+  background: center / cover no-repeat url('/splash.jpg');
   z-index: 2700;           /* pod onboarding panelem */
   pointer-events: none;
 }
-.intro-logo{ width: 180px; height:auto; opacity:.98; }
 
 /* Fade-out animace */
 .intro--fade{ animation: introFade .65s ease forwards; }
