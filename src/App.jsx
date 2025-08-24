@@ -170,13 +170,16 @@ const writeProfileCache = (uid,data)=> {
 
 function upsertPublicProfile(uid, partial) {
   if (!uid) return Promise.resolve();
-  const safe = {};
-  if ('name' in partial) safe.name = partial.name ?? '';
-  if ('gender' in partial) safe.gender = partial.gender ?? 'any';
-  if ('photoURL' in partial) safe.photoURL = partial.photoURL ?? '';
-  if ('lat' in partial) safe.lat = partial.lat ?? 0;
-  if ('lng' in partial) safe.lng = partial.lng ?? 0;
-  safe.lastSeen = Date.now();
+  const ready = (partial.name?.trim()?.length > 0) && (partial.gender || partial.photoURL);
+  if (!ready) return Promise.resolve(); // nepiš polotvary
+  const safe = {
+    lastSeen: Date.now()
+  };
+  if (partial.name     !== undefined) safe.name = partial.name;
+  if (partial.gender   !== undefined) safe.gender = partial.gender;
+  if (partial.photoURL !== undefined) safe.photoURL = partial.photoURL;
+  if (partial.lat      !== undefined) safe.lat = partial.lat;
+  if (partial.lng      !== undefined) safe.lng = partial.lng;
   return update(ref(db, `publicProfiles/${uid}`), safe);
 }
 
@@ -199,18 +202,16 @@ async function saveProfile(uid, patch) {
   if (!uid || !patch) return Promise.resolve();
 
   const userRef = ref(db, `users/${uid}`);
-  const pubRef = ref(db, `publicProfiles/${uid}`);
   const { name, gender, photoURL, lat, lng } = patch;
 
-  const pubPatch = { name, gender, photoURL, lat, lng, lastSeen: Date.now() };
+  const pubPatch = { name, gender, photoURL, lat, lng };
   Object.keys(pubPatch).forEach((k) => pubPatch[k] === undefined && delete pubPatch[k]);
 
   try {
     await Promise.all([
       update(userRef, patch),
-      update(pubRef, pubPatch),
+      upsertPublicProfile(uid, pubPatch),
     ]);
-    await upsertPublicProfile(uid, { name, gender, photoURL, lat, lng });
   } catch (err) {
     console.warn(err);
   }
@@ -861,7 +862,13 @@ export default function App() {
         lastSeen: Date.now(),
         online: true,
       });
-      await upsertPublicProfile(me.uid, { lat: latitude, lng: longitude });
+      await upsertPublicProfile(me.uid, {
+        name: me.name,
+        gender: me.gender,
+        photoURL: me.photoURL,
+        lat: latitude,
+        lng: longitude,
+      });
     };
     const handleErr = (err) => {
       console.warn("Geolocation error", err);
@@ -928,6 +935,13 @@ export default function App() {
         if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
           delete data[uid];
         }
+      });
+
+      // Odfiltruj nekompletní profily
+      Object.keys(data).forEach((uid) => {
+        const u = data[uid];
+        const ok = u && u.name && u.gender && (u.photoURL || true);
+        if (!ok) delete data[uid];
       });
 
       setUsers(data);
