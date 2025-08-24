@@ -788,3 +788,9 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 /* Bezpečí: skryté vrstvy, které nejsou otevřené, nesmí chytat události */
 .gear-menu:not(.open), .chat-panel.hidden { pointer-events: none; }
 
+/* Onboarding musí být nad vším a klikatelný */
+.onboard{ z-index:3000; }
+.onboard, .onboard * { pointer-events:auto !important; touch-action: manipulation; }
+
+/* Splash nesmí chytat události (když by se náhodou vykreslil) */
+.intro-screen{ pointer-events:none; }
