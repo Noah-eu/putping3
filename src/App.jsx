@@ -7,7 +7,9 @@ import {
   signOut,
   getAuth,
   GoogleAuthProvider,
+  signInWithPopup,
   signInWithRedirect,
+  getRedirectResult,
   signInAnonymously,
 } from "firebase/auth";
 import {
@@ -43,8 +45,10 @@ const forceOnboard = () => location.hash.includes('onboard');
 
 // helper
 function isProfileComplete(u) {
-  return !!(u && u.name && u.gender && (u.photoURL && u.photoURL.length > 0));
+  return !!(u && u.name && u.gender && u.photoURL);
 }
+
+let meGlobal = null;
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
@@ -170,11 +174,10 @@ const writeProfileCache = (uid,data)=> {
 
 function upsertPublicProfile(uid, partial) {
   if (!uid) return Promise.resolve();
-  const ready = (partial.name?.trim()?.length > 0) && (partial.gender || partial.photoURL);
-  if (!ready) return Promise.resolve(); // nepiš polotvary
-  const safe = {
-    lastSeen: Date.now()
-  };
+  const base = uid === auth.currentUser?.uid ? (meGlobal || {}) : {};
+  const merged = partial && { ...base, ...partial };
+  if (!isProfileComplete(merged)) return Promise.resolve();
+  const safe = { lastSeen: Date.now() };
   if (partial.name     !== undefined) safe.name = partial.name;
   if (partial.gender   !== undefined) safe.gender = partial.gender;
   if (partial.photoURL !== undefined) safe.photoURL = partial.photoURL;
@@ -226,7 +229,7 @@ const saveProfileDebounced = debounce(saveProfile, 500);
 export default function App() {
   const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL}
-  const [meLoaded, setMeLoaded] = useState(false);
+  const [authed, setAuthed] = useState(false);
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
   const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
@@ -239,13 +242,13 @@ export default function App() {
   const [step, setStep] = useState(() => 99); // 99 = init (jen intro, než víme víc)
   const [introState, setIntroState] = useState('show'); // 'show' | 'fade' | 'hide'
 
+  useEffect(() => { meGlobal = me; }, [me]);
+
   function computeStep() {
-    if (forceOnboard()) return (auth.currentUser ? 3 : 1);
+    if (forceOnboard()) return (authed ? 3 : 1);
     const consent = localStorage.getItem('pp_consent_v1') === '1';
-    const authed  = !!auth.currentUser;
     if (!consent) return 1;      // 1) souhlas
     if (!authed)  return 2;      // 2) přihlášení
-    if (!meLoaded) return 3;     // dočasně nastavení, než se načte profil
     if (!isProfileComplete(me)) return 3; // 3) nastavení
     return 0;                     // mapa
   }
@@ -258,28 +261,40 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // po návratu z Google redirectu
+  // consume redirect result on start
   useEffect(() => {
-    import('firebase/auth').then(({ getRedirectResult }) => {
-      getRedirectResult(auth).finally(() => setStep(computeStep()));
+    const a = auth || getAuth();
+    getRedirectResult(a).catch(e => {
+      console.error('getRedirectResult', e);
+      alert(e.code || e.message);
     });
   }, []);
 
-  // při změně auth setni krok na 3 dokud není profil hotový
+  // auth state → create stubs and go to setup
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        setStep(() => 3); // dočasně do nastavení
-      } else {
-        setStep(computeStep());
+    const a = auth || getAuth();
+    const unsub = onAuthStateChanged(a, async (user) => {
+      setAuthed(!!user);
+      if (!user) { setStep(2); return; }
+      const uid = user.uid;
+      const uRef = ref(db, 'users/'+uid);
+      const us = await get(uRef);
+      if (!us.exists()) {
+        await set(uRef, { name:'', gender:'any', photoURL:'', lat:0, lng:0, createdAt:Date.now(), lastSeen:Date.now() });
       }
+      const pRef = ref(db, 'publicProfiles/'+uid);
+      const ps = await get(pRef);
+      if (!ps.exists()) {
+        await update(pRef, { name:'', gender:'any', photoURL:'', lat:0, lng:0, lastSeen:Date.now() });
+      }
+      setStep(3);
     });
     return () => unsub();
   }, []);
 
   useEffect(() => {
     setStep(computeStep());
-  }, [me, meLoaded]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
+  }, [me, authed]);
 
   useEffect(() => {
     if (step === 0 && introState === 'show') {
@@ -359,25 +374,17 @@ export default function App() {
   const galleryRef = useRef(null);
   const sortableRef = useRef(null);
 
-  // Google login (redirect – funguje i na iPhone)
+  // Google login with popup fallback to redirect
   async function loginGoogle() {
-    try {
-      const a = auth || getAuth();
-      await signInWithRedirect(a, new GoogleAuthProvider());
-    } catch (e) {
-      console.error('loginGoogle', e);
-      alert(e.code || e.message);
-    }
+    const a = auth || getAuth();
+    const p = new GoogleAuthProvider();
+    try { await signInWithPopup(a, p); }
+    catch { await signInWithRedirect(a, p); }
   }
-  // anonymně (lze kdykoli později propojit s Googlem)
+  // anonymous login
   async function loginAnon() {
-    try {
-      const a = auth || getAuth();
-      await signInAnonymously(a);
-    } catch (e) {
-      console.error('loginAnon', e);
-      alert(e.code || e.message);
-    }
+    const a = auth || getAuth();
+    await signInAnonymously(a);
   }
 
   function applyGenderRingInstant(uid, genderValue){
@@ -784,16 +791,19 @@ export default function App() {
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
   useEffect(() => {
-    if (!auth.currentUser) { setMe(null); setMeLoaded(false); return; }
+    if (!auth.currentUser) { setMe(null); meGlobal = null; return; }
     const uid = auth.currentUser.uid;
     const cached = readProfileCache(uid);
-    setMe({ uid, ...cached });
-    setMeLoaded(false);
+    const initial = { uid, ...cached };
+    setMe(initial);
+    meGlobal = initial;
     const unsub = onValue(ref(db, `users/${uid}`), (snap) => {
       const server = snap.val() || {};
+      const m = { uid, ...server };
       writeProfileCache(uid, server);
-      setMe({ uid, ...server });
-      setMeLoaded(true);
+      setMe(m);
+      meGlobal = m;
+      if (isProfileComplete(m)) setStep(0); else setStep(3);
     });
     if (import.meta.env.VITE_DEV_BOT === '1') spawnAndSyncDevBot(uid);
     return () => unsub();
