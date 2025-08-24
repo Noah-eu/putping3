@@ -285,6 +285,23 @@ export default function App() {
     document.documentElement.classList.toggle('sheet-open', showSettings);
   }, [showSettings]);
 
+  // jednorázový backfill publicProfiles
+  useEffect(() => {
+    const uid = auth.currentUser?.uid; if (!uid) return;
+    get(ref(db, `publicProfiles/${uid}`)).then(s => {
+      if (s.exists()) return;
+      return get(ref(db, `users/${uid}`)).then(s2 => {
+        const u = s2.val() || {};
+        return upsertPublicProfile(uid, {
+          name: u.name || 'Anonym',
+          gender: u.gender || 'any',
+          photoURL: u.photoURL || '',
+          lat: u.lat ?? 0, lng: u.lng ?? 0
+        });
+      });
+    }).catch(console.error);
+  }, [auth.currentUser?.uid]);
+
   const mapInitedRef = useRef(false);
   useEffect(() => {
     if (step > 0 || mapInitedRef.current) return;
