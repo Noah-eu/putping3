@@ -28,6 +28,8 @@ export async function spawnDevBot(ownerUid){
   }
 
   const userRef = ref(db2, `users/${botUid}`);
+  const pubRef  = ref(db2, `publicProfiles/${botUid}`);
+  const now = Date.now();
   await set(userRef, {
     name: "Kontrolní bot",
     photoURL: "https://i.pravatar.cc/200?img=12",
@@ -35,9 +37,16 @@ export async function spawnDevBot(ownerUid){
     gender: "muz",
     lat, lng,
     online: true,
-    lastSeen: Date.now(),
+    lastSeen: now,
     isDevBot: true,
     privateTo: ownerUid,
+  });
+  await update(pubRef, {
+    name: "Kontrolní bot",
+    gender: "muz",
+    photoURL: "https://i.pravatar.cc/200?img=12",
+    lat, lng,
+    lastSeen: now,
   });
 
   // Reakce na pingy → spáruj pár a pošli zprávu
@@ -64,7 +73,9 @@ export async function spawnDevBot(ownerUid){
   setInterval(() => {
     const jitter = () => (Math.random()-0.5) * 0.0003; // ~±30 m
     lat += jitter(); lng += jitter();
-    update(userRef, { lastSeen: Date.now(), lat, lng });
+    const t = Date.now();
+    update(userRef, { lastSeen: t, lat, lng });
+    update(pubRef,  { lastSeen: t, lat, lng });
   }, 15000);
 
   return botUid;
