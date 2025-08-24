@@ -226,22 +226,15 @@ export default function App() {
     setStep(0);
   }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
 
-  // 4) Neschovávej intro při step > 0 (zůstane jako pozadí wizardu)
+  // jednoduché fade-out intro
   useEffect(() => {
-    let t1, t2;
-    if (step === 0 && introState === 'show') {
-      // hotový uživatel: nech intro 2s a pak fade do mapy
-      t1 = setTimeout(() => setIntroState('fade'), 2000);
-    }
-    if (introState === 'fade') {
-      t2 = setTimeout(() => setIntroState('hide'), 800);
-    }
-    // POZN.: když step > 0 (wizard), intro necháme zůstat (žádný hide)
+    const t1 = setTimeout(() => setIntroState('fade'), 800);
+    const t2 = setTimeout(() => setIntroState('hide'), 1700);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [step, introState]);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('sheet-open', showSettings);
@@ -1676,9 +1669,11 @@ export default function App() {
 
   return (
     <>
-      {/* Intro je VŽDY – u „starých“ fade-out po ~0.7s */}
-      {introState !== 'hide' && (
-        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}></div>
+      {/* Intro splash */}
+      {(step === 0 && introState !== 'hide') && (
+        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}>
+          <div className="intro-logo">PutPing</div>
+        </div>
       )}
 
       {/* app (mapa, FAB, markery…) až když step === 0 */}

@@ -13,20 +13,6 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 /* Map container */
 .map { width: 100vw; height: 100vh; }
 
-/* Intro splash */
-.intro-screen{
-  position: fixed;
-  inset: 0;
-  width: 100vw; height: 100vh;
-  background: center / cover no-repeat url('/splash.jpg');
-  z-index: 2700;           /* pod onboarding panelem */
-  pointer-events: none;
-}
-
-/* Fade-out animace */
-.intro--fade{ animation: introFade 1s ease forwards; }
-@keyframes introFade{ to { opacity:0; } }
-
 /* Location consent modal */
 .consent-modal {
   position: fixed;
@@ -776,3 +762,14 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 .pill{ padding:10px 12px; border-radius:12px; border:1px solid rgba(122,40,69,.25); cursor:pointer; background:#fff; }
 .pill.active{ box-shadow: 0 0 0 2px #fff, 0 0 0 4px #EC4899; border-color: transparent; } /* MUŽ = růžový obdélník */
+
+/* --- Simple intro splash --- */
+.intro-screen{
+  position:fixed; inset:0; z-index:5;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(180deg,#f5a4b3 0%,#f2a0af 100%);
+  opacity:1; transition:opacity .7s ease;
+  pointer-events:none; /* nikdy neblokuje kliky */
+}
+.intro-screen.intro--fade{ opacity:0; }
+.intro-logo{ font-size:40px; font-weight:800; color:#1a1a1a; letter-spacing:.5px; }
