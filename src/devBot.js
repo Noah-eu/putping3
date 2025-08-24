@@ -1,6 +1,7 @@
 import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
-import { initSecondaryApp } from "./firebase.js";
+import { initSecondaryApp, db } from "./firebase.js";
+import { upsertPublicProfile } from "./publicProfiles";
 
 function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
 
@@ -39,6 +40,8 @@ export async function spawnDevBot(ownerUid){
     isDevBot: true,
     privateTo: ownerUid,
   });
+  await upsertPublicProfile(botUid, { name: "Kontrolní bot", gender: "muz", photoURL: "https://i.pravatar.cc/200?img=12", lat, lng });
+  await update(ref(db, `publicProfiles/${botUid}`), { isDevBot: true, privateTo: ownerUid });
 
   // Reakce na pingy → spáruj pár a pošli zprávu
   const inboxRef = ref(db2, `pings/${botUid}`);
