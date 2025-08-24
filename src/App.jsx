@@ -71,6 +71,7 @@ export default function App() {
   const [draftName, setDraftName] = useState(
     localStorage.getItem("userName") || ""
   );
+  const [step, setStep] = useState(0);
   const [fabOpen, setFabOpen] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -1056,7 +1057,7 @@ export default function App() {
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
 
-      {showChatList && (
+      {false && showChatList && (
         <div className="chat-list">
           <div className="chat-list__header">Minulé chaty</div>
           <div className="chat-list__items">
@@ -1091,7 +1092,7 @@ export default function App() {
       )}
 
       {/* Chat panel */}
-      {openChatWith && (
+      {false && openChatWith && (
         <div
           style={{
             position: "absolute",
@@ -1206,7 +1207,7 @@ export default function App() {
       )}
 
       {/* Galerie (modal) */}
-      {showGallery && (
+      {false && showGallery && (
         <div
           onClick={() => setShowGallery(false)}
           style={{
@@ -1318,7 +1319,7 @@ export default function App() {
               </button>
             </div>
           </div>
-          {deleteIdx !== null && (
+          {false && deleteIdx !== null && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -1380,7 +1381,7 @@ export default function App() {
       )}
 
       {/* Nastavení (modal) */}
-      {showSettings && (
+      {false && showSettings && (
         <div
           onClick={() => setShowSettings(false)}
           style={{
@@ -1468,7 +1469,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {showIntro && (
+      {false && showIntro && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
           onClick={() => {
