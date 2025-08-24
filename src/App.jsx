@@ -162,7 +162,7 @@ function saveProfile(uid, patch) {
 
   const userRef = ref(db, `users/${uid}`);
   const pubRef  = ref(db, `publicProfiles/${uid}`);
-  const pubPatch = { lastSeen: Date.now() };
+  const pubPatch = { lastSeen: patch.lastSeen ?? Date.now() };
 
   if (patch.name !== undefined) pubPatch.name = patch.name;
   if (patch.gender !== undefined) pubPatch.gender = patch.gender;
