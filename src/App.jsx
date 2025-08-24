@@ -843,7 +843,7 @@ export default function App() {
   useEffect(() => {
     if (!map || !me) return;
 
-    const usersRef = ref(db, "users");
+    const usersRef = ref(db, "publicProfiles");
     const unsub = onValue(usersRef, (snap) => {
       const data = snap.val() || {};
       // Firebase RTDB may return arrays as objects; ensure photos are arrays
