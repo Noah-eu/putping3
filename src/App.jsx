@@ -232,13 +232,12 @@ export default function App() {
     document.documentElement.classList.toggle('sheet-open', showSettings);
   }, [showSettings]);
 
-  // inicializace mapy jen když onboarding skončil
   const mapInitedRef = useRef(false);
   useEffect(() => {
     if (step > 0 || mapInitedRef.current) return;
-    if (!me) return;                 // ⬅ počkej na uživatele
-    mapInitedRef.current = true;     // ⬅ označ „spuštěno“ až teď
-    const cleanup = initMapOnce();   // ⬅ tvoje původní inicializace
+    if (!me) return;
+    mapInitedRef.current = true;
+    const cleanup = initMapOnce();
     return cleanup;
   }, [step, me]);
 
@@ -1682,9 +1681,12 @@ export default function App() {
         <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}></div>
       )}
 
-      {/* app (mapa, FAB, markery…) až když step === 0 */}
-      {step === 0 && (
-        <div id="appRoot" aria-hidden={false} style={{ pointerEvents:'auto' }}>
+      {/* app (mapa, FAB, markery…) */}
+      <div
+        id="appRoot"
+        aria-hidden={step > 0}
+        style={{ pointerEvents: step === 0 ? 'auto' : 'none' }}
+      >
           {isIOS && !locationConsent && (
             <div className="consent-modal">
                 <div className="consent-modal__content">
@@ -1716,52 +1718,52 @@ export default function App() {
                       onClick={() => {
                         setShowSettings(true);
                         setFabOpen(false);
-                        }}
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 24,
-                          border: "1px solid #ddd",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: 24,
-                          lineHeight: "24px",
-                        }}
-                        title="Nastavení"
-                      >
-                        ⚙️
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowGallery(true);
-                          setFabOpen(false);
-                        }}
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 24,
-                          border: "1px solid #ddd",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: 24,
-                          lineHeight: "24px",
-                        }}
-                        title="Galerie"
-                      >
-                        🖼️
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowChatList(true);
-                          setFabOpen(false);
-                        }}
-                       className="fab-chat"
-                       title="Minulé chaty"
-                     >
-                       💬
-                     </button>
-                   </>
-                 )}
+                      }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        border: "1px solid #ddd",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 24,
+                        lineHeight: "24px",
+                      }}
+                      title="Nastavení"
+                    >
+                      ⚙️
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowGallery(true);
+                        setFabOpen(false);
+                      }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        border: "1px solid #ddd",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 24,
+                        lineHeight: "24px",
+                      }}
+                      title="Galerie"
+                    >
+                      🖼️
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowChatList(true);
+                        setFabOpen(false);
+                      }}
+                      className="fab-chat"
+                      title="Minulé chaty"
+                    >
+                      💬
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setFabOpen((o) => !o)}
                   style={{
@@ -2202,7 +2204,6 @@ export default function App() {
         </div>
       )}
     </div>
-    )}
 
     {/* Wizard když je potřeba */}
     {step > 0 && step < 99 && <Onboarding step={step} />}
