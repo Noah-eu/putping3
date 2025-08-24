@@ -225,7 +225,7 @@ export default function App() {
       const t = setTimeout(() => setIntroState('hide'), 800);
       return () => clearTimeout(t);
     }
-    // Když step > 0 (wizard), intro neschovávej – zůstává jako pozadí.
+    // Když step > 0 (wizard), intro neschovávat.
   }, [step, introState]);
 
   useEffect(() => {
