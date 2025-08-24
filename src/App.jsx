@@ -41,8 +41,10 @@ const ONLINE_TTL_MS = 10 * 60_000; // 10 minut
 // vynucení onboard přes URL: .../#onboard
 const forceOnboard = () => location.hash.includes('onboard');
 
-// profil považujeme za „hotový“, když je aspoň jméno NEBO gender
-const isProfileComplete = (p) => !!(p && (p.name || p.gender));
+// helper
+function isProfileComplete(u) {
+  return !!(u && u.name && u.gender && (u.photoURL && u.photoURL.length > 0));
+}
 
 /* ───────────────────────────── Pomocné funkce ───────────────────────────── */
 
@@ -223,6 +225,7 @@ const saveProfileDebounced = debounce(saveProfile, 500);
 export default function App() {
   const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL}
+  const [meLoaded, setMeLoaded] = useState(false);
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
   const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
@@ -235,42 +238,41 @@ export default function App() {
   const [step, setStep] = useState(() => 99); // 99 = init (jen intro, než víme víc)
   const [introState, setIntroState] = useState('show'); // 'show' | 'fade' | 'hide'
 
-  function computeStep(me) {
+  function computeStep() {
     if (forceOnboard()) return (auth.currentUser ? 3 : 1);
-    const consented = localStorage.getItem('pp_consent_v1') === '1';
-    const finished  = localStorage.getItem('pp_onboard_v1') === '1';
-    const loggedIn  = !!auth.currentUser;
-
-    if (!consented) return 1;                  // 1) souhlas
-    if (!loggedIn)  return 2;                  // 2) přihlášení
-    if (!isProfileComplete(me)) return 3;      // 3) nastavení (dokud není jméno/gender)
-    return finished ? 0 : 3;                   // hotovo → 0, jinak zpět do nastavení
+    const consent = localStorage.getItem('pp_consent_v1') === '1';
+    const authed  = !!auth.currentUser;
+    if (!consent) return 1;      // 1) souhlas
+    if (!authed)  return 2;      // 2) přihlášení
+    if (!meLoaded) return 2;     // počkej, než se /users načte
+    if (!isProfileComplete(me)) return 3; // 3) nastavení
+    return 0;                     // mapa
   }
 
   // po mountu + hashchange → přepočítej
   useEffect(() => {
-    const onHash = () => setStep(s => computeStep(me));
+    const onHash = () => setStep(computeStep());
     window.addEventListener('hashchange', onHash);
-    setStep(computeStep(me));
+    setStep(computeStep());
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   // po návratu z Google redirectu
   useEffect(() => {
     import('firebase/auth').then(({ getRedirectResult }) => {
-      getRedirectResult(auth).finally(() => setStep(computeStep(me)));
+      getRedirectResult(auth).finally(() => setStep(computeStep()));
     });
   }, []);
 
   // při změně auth i dat profilu přepočítej
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(() => setStep(computeStep(me)));
+    const unsub = auth.onAuthStateChanged(() => setStep(computeStep()));
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    setStep(computeStep(me));
-  }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
+    setStep(computeStep());
+  }, [me, meLoaded]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
 
   useEffect(() => {
     if (step === 0 && introState === 'show') {
@@ -390,12 +392,11 @@ export default function App() {
 
   function acceptTerms(){
     localStorage.setItem('pp_consent_v1','1');
-    setStep(computeStep(me));
+    setStep(computeStep());
   }
 
   function finishOnboard(){
-    localStorage.setItem('pp_onboard_v1','1');
-    setStep(computeStep(me));
+    setStep(computeStep());
   }
 
   function RenderSettingsFields(){
@@ -776,22 +777,20 @@ export default function App() {
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) { setMe(null); return; }
-      const uid = u.uid;
-      const cached = readProfileCache(uid);
-      setMe({ uid, ...cached });
-      import('firebase/database').then(({ref, onValue})=>{
-        onValue(ref(db, `users/${uid}`), (snap)=>{
-          const server = snap.val() || {};
-          writeProfileCache(uid, server);
-          setMe({ uid, ...server });
-        });
-      });
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnAndSyncDevBot(uid);
+    if (!auth.currentUser) { setMe(null); setMeLoaded(false); return; }
+    const uid = auth.currentUser.uid;
+    const cached = readProfileCache(uid);
+    setMe({ uid, ...cached });
+    setMeLoaded(false);
+    const unsub = onValue(ref(db, `users/${uid}`), (snap) => {
+      const server = snap.val() || {};
+      writeProfileCache(uid, server);
+      setMe({ uid, ...server });
+      setMeLoaded(true);
     });
+    if (import.meta.env.VITE_DEV_BOT === '1') spawnAndSyncDevBot(uid);
     return () => unsub();
-  }, []);
+  }, [auth.currentUser?.uid]);
 
 
   useEffect(() => {
@@ -1750,7 +1749,6 @@ export default function App() {
 
   if (location.hash === '#reset') {
     localStorage.removeItem('pp_consent_v1');
-    localStorage.removeItem('pp_onboard_v1');
   }
 
   return (
