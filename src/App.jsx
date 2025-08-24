@@ -868,13 +868,12 @@ export default function App() {
         lastSeen: Date.now(),
         online: true,
       });
-      await upsertPublicProfile(me.uid, {
-        name: me.name,
-        gender: me.gender,
-        photoURL: me.photoURL,
-        lat: latitude,
-        lng: longitude,
-      });
+      if (isProfileComplete(me)) {
+        await upsertPublicProfile(me.uid, {
+          lat: latitude,
+          lng: longitude,
+        });
+      }
     };
     const handleErr = (err) => {
       console.warn("Geolocation error", err);
