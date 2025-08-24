@@ -794,3 +794,10 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 
 /* Splash nesmí chytat události (když by se náhodou vykreslil) */
 .intro-screen{ pointer-events:none; }
+/* Onboarding nad vším a klikací */
+.onboard { z-index: 9999; pointer-events: auto; }
+.onboard-card { z-index: 10000; pointer-events: auto; position: relative; }
+.onboard-card * { pointer-events: auto; }
+
+/* Splash (intro) nesmí chytat události */
+.intro-screen { pointer-events: none !important; }
