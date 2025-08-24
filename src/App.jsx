@@ -97,7 +97,9 @@ async function recoverAccount(oldUid) {
 
   // 3) pings schválně nepřenášíme (historie pípnutí není potřeba)
 
-  if (import.meta.env.VITE_DEV_BOT === '1') await spawnDevBot(auth.currentUser.uid);
+  if (import.meta.env.VITE_DEV_BOT === '1') {
+    await spawnAndSyncDevBot(auth.currentUser.uid);
+  }
   alert('Účet byl obnoven na nové UID.');
 }
 
@@ -174,6 +176,21 @@ function upsertPublicProfile(uid, partial) {
   if ('lng' in partial) safe.lng = partial.lng ?? 0;
   safe.lastSeen = Date.now();
   return update(ref(db, `publicProfiles/${uid}`), safe);
+}
+
+async function spawnAndSyncDevBot(ownerUid) {
+  const devUid = await spawnDevBot(ownerUid);
+  const snap = await get(ref(db, `users/${devUid}`));
+  const { name: botName, gender: botGender, photoURL: botPhotoURL, lat: botLat, lng: botLng } = snap.val() || {};
+  await upsertPublicProfile(devUid, {
+    name: botName,
+    gender: botGender,
+    photoURL: botPhotoURL,
+    lat: botLat,
+    lng: botLng,
+  });
+  await update(ref(db, `publicProfiles/${devUid}`), { isDevBot: true, privateTo: ownerUid });
+  return devUid;
 }
 
 async function saveProfile(uid, patch) {
@@ -754,7 +771,7 @@ export default function App() {
           setMe({ uid, ...server });
         });
       });
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnAndSyncDevBot(uid);
     });
     return () => unsub();
   }, []);
