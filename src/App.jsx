@@ -398,10 +398,12 @@ export default function App() {
   }
 
   function selectGender(val){
-    setMe(m => ({...m, gender: val}));
-    applyGenderRingInstant(me?.uid, val);          // okamžitý efekt
-    writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), gender: val});
-    saveProfileDebounced(me?.uid, { gender: val }); // ulož do DB
+    const uid = me?.uid || auth.currentUser?.uid || '';
+    setMe(m => ({ ...(m||{}), gender: val }));
+    applyGenderRingInstant(uid, val);          // okamžitý efekt
+    const cache = readProfileCache(uid) || {};
+    writeProfileCache(uid, { ...cache, gender: val });
+    saveProfileDebounced(uid, { gender: val }); // ulož do DB
   }
 
   function acceptTerms(){
@@ -414,17 +416,20 @@ export default function App() {
   }
 
   function RenderSettingsFields(){
+    const uid = me?.uid || auth.currentUser?.uid || '';
+    const safeMe = me || { uid, pingPrefs:{} };
     return (
       <div style={{display:'grid', gap:10}}>
         {/* Jméno */}
         <input
           placeholder="Jméno"
-          value={me?.name || ''}
+          value={safeMe.name || ''}
           onChange={e => {
             const name = e.target.value;
-            setMe(m => ({...m, name}));
-            writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), name});
-            saveProfileDebounced(me?.uid, { name });
+            setMe(m => ({ ...(m||{}), name }));
+            const cache = readProfileCache(uid) || {};
+            writeProfileCache(uid, { ...cache, name });
+            saveProfileDebounced(uid, { name });
           }}
         />
 
@@ -432,17 +437,17 @@ export default function App() {
         <div className="row">
           <button
             type="button"
-            className={`pill ${ (me?.gender||'').toLowerCase().startsWith('mu') ? 'active' : ''}`}
+            className={`pill ${ (safeMe.gender||'').toLowerCase().startsWith('mu') ? 'active' : ''}`}
             onClick={() => selectGender('muz')}
           >Muž</button>
           <button
             type="button"
-            className={`pill ${ (me?.gender||'').toLowerCase().startsWith('že') || (me?.gender||'').toLowerCase().startsWith('ze') ? 'active' : ''}`}
+            className={`pill ${ (safeMe.gender||'').toLowerCase().startsWith('že') || (safeMe.gender||'').toLowerCase().startsWith('ze') ? 'active' : ''}`}
             onClick={() => selectGender('žena')}
           >Žena</button>
           <button
             type="button"
-            className={`pill ${ ['jine','jiné','other','any','neutral'].includes((me?.gender||'').toLowerCase()) ? 'active' : ''}`}
+            className={`pill ${ ['jine','jiné','other','any','neutral'].includes((safeMe.gender||'').toLowerCase()) ? 'active' : ''}`}
             onClick={() => selectGender('jine')}
           >Jiné</button>
         </div>
@@ -451,12 +456,13 @@ export default function App() {
         <input
           type="number"
           placeholder="Věk (volitelné)"
-          value={me?.age || ''}
+          value={safeMe.age || ''}
           onChange={e => {
             const age = Number(e.target.value) || null;
-            setMe(m => ({...m, age}));
-            writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), age});
-            saveProfileDebounced(me?.uid, { age });
+            setMe(m => ({ ...(m||{}), age }));
+            const cache = readProfileCache(uid) || {};
+            writeProfileCache(uid, { ...cache, age });
+            saveProfileDebounced(uid, { age });
           }}
         />
 
@@ -464,35 +470,35 @@ export default function App() {
         <div className="row">
           <button
             type="button"
-            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'any' ? 'active' : ''}`}
+            className={`pill ${ (safeMe.pingPrefs?.gender||'any') === 'any' ? 'active' : ''}`}
             onClick={() => {
               const gender = 'any';
-              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
-              const cache = readProfileCache(me?.uid) || {};
-              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
-              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+              setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), gender }}));
+              const cache = readProfileCache(uid) || {};
+              writeProfileCache(uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(uid,{ pingPrefs:{...(safeMe.pingPrefs||{}), gender}});
             }}
           >Kdokoliv</button>
           <button
             type="button"
-            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'f' ? 'active' : ''}`}
+            className={`pill ${ (safeMe.pingPrefs?.gender||'any') === 'f' ? 'active' : ''}`}
             onClick={() => {
               const gender = 'f';
-              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
-              const cache = readProfileCache(me?.uid) || {};
-              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
-              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+              setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), gender }}));
+              const cache = readProfileCache(uid) || {};
+              writeProfileCache(uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(uid,{ pingPrefs:{...(safeMe.pingPrefs||{}), gender}});
             }}
           >Pouze ženy</button>
           <button
             type="button"
-            className={`pill ${ (me?.pingPrefs?.gender||'any') === 'm' ? 'active' : ''}`}
+            className={`pill ${ (safeMe.pingPrefs?.gender||'any') === 'm' ? 'active' : ''}`}
             onClick={() => {
               const gender = 'm';
-              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
-              const cache = readProfileCache(me?.uid) || {};
-              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
-              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), gender}});
+              setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), gender }}));
+              const cache = readProfileCache(uid) || {};
+              writeProfileCache(uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), gender}});
+              saveProfileDebounced(uid,{ pingPrefs:{...(safeMe.pingPrefs||{}), gender}});
             }}
           >Pouze muži</button>
         </div>
@@ -502,25 +508,25 @@ export default function App() {
           <input
             type="number"
             placeholder="Věk od"
-            value={me?.pingPrefs?.minAge ?? 16}
+            value={safeMe.pingPrefs?.minAge ?? 16}
             onChange={e => {
               const minAge = parseInt(e.target.value,10);
-              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}}));
-              const cache = readProfileCache(me?.uid) || {};
-              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
-              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
+              setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16 }}));
+              const cache = readProfileCache(uid) || {};
+              writeProfileCache(uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
+              saveProfileDebounced(uid,{ pingPrefs:{...(safeMe.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}});
             }}
           />
           <input
             type="number"
             placeholder="do"
-            value={me?.pingPrefs?.maxAge ?? 100}
+            value={safeMe.pingPrefs?.maxAge ?? 100}
             onChange={e => {
               const maxAge = parseInt(e.target.value,10);
-              setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}}));
-              const cache = readProfileCache(me?.uid) || {};
-              writeProfileCache(me?.uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
-              saveProfileDebounced(me?.uid,{ pingPrefs:{...(me?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
+              setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100 }}));
+              const cache = readProfileCache(uid) || {};
+              writeProfileCache(uid,{...cache, pingPrefs:{...(cache.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
+              saveProfileDebounced(uid,{ pingPrefs:{...(safeMe.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}});
             }}
           />
         </div>
