@@ -282,13 +282,23 @@ export default function App() {
 
   // Google login (redirect – funguje i na iPhone)
   async function loginGoogle() {
-    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-    await signInWithRedirect(auth, new GoogleAuthProvider());
+    try {
+      const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+      await signInWithRedirect(auth, new GoogleAuthProvider());
+    } catch (err) {
+      console.error('loginGoogle', err);
+      alert(err.code || err.message);
+    }
   }
   // anonymně (lze kdykoli později propojit s Googlem)
   async function loginAnon() {
-    const { signInAnonymously } = await import('firebase/auth');
-    await signInAnonymously(auth);
+    try {
+      const { signInAnonymously } = await import('firebase/auth');
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error('loginAnon', err);
+      alert(err.code || err.message);
+    }
   }
 
   function applyGenderRingInstant(uid, genderValue){
