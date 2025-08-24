@@ -442,7 +442,8 @@ export default function App() {
         {/* Jméno */}
         <input
           placeholder="Jméno"
-          value={safeMe.name || ''}
+          autoFocus
+          value={safeMe.name}
           onFocus={e => scrollIntoViewOnFocus(e.target)}
           onChange={e => {
             const name = e.target.value;
