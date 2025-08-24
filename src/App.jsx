@@ -758,9 +758,19 @@ export default function App() {
   }, [me, users]);
 
   useEffect(() => {
-    if (!me || !locationConsent) return;
-    if (!("geolocation" in navigator)) return;
+    if (!me) return;
     const meRef = ref(db, `users/${me.uid}`);
+
+    if (!locationConsent || !("geolocation" in navigator)) {
+      update(meRef, {
+        lat: null,
+        lng: null,
+        lastSeen: Date.now(),
+        online: false,
+      });
+      return;
+    }
+
     const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
 
     const updatePos = (pos) => {
