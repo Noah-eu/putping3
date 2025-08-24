@@ -43,13 +43,6 @@ function pairIdOf(a, b) {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
 }
 
-function remapPairId(pid, oldUid, newUid) {
-  const [a, b] = pid.split("_");
-  const na = a === oldUid ? newUid : a;
-  const nb = b === oldUid ? newUid : b;
-  return pairIdOf(na, nb);
-}
-
 async function recoverAccount(oldUid) {
   if (!auth.currentUser) return alert('Nejsi přihlášen');
   const newUid = auth.currentUser.uid;
@@ -62,34 +55,34 @@ async function recoverAccount(oldUid) {
     name: oldUser.name || 'Anonym',
     photoURL: oldUser.photoURL || null,
     photos: oldUser.photos || [],
-    lastActive: Date.now(),
+    lastSeen: Date.now(),
     online: true,
   });
 
-  // 2) pairs/pairPings/messages – překlop všechna párová data
-  const allPairsSnap = await get(ref(db, `pairPings`));
-  const allPairs = allPairsSnap.val() || {};
-  const affected = Object.keys(allPairs).filter(pid => pid.includes(oldUid));
-  for (const pid of affected) {
-    const newPid = remapPairId(pid, oldUid, newUid);
+  // 2) pairs/messages – překlop všechna párová data
+  const pairsSnap = await get(ref(db, `pairs/${oldUid}`));
+  const pairsObj = pairsSnap.val() || {};
+  const partners = Object.keys(pairsObj);
+  for (const otherUid of partners) {
+    // založ nový pár
+    await set(ref(db, `pairs/${newUid}/${otherUid}`), true);
+    await set(ref(db, `pairs/${otherUid}/${newUid}`), true);
+    await remove(ref(db, `pairs/${otherUid}/${oldUid}`));
+  }
+  await remove(ref(db, `pairs/${oldUid}`));
 
-    // pairPings
-    const pp = (await get(ref(db, `pairPings/${pid}`))).val() || {};
-    if (pp[oldUid]) { pp[newUid] = pp[oldUid]; delete pp[oldUid]; }
-    await update(ref(db, `pairPings/${newPid}`), pp);
-
-    // pairs (stav „jsme spárovaní“)
-    const isPair = (await get(ref(db, `pairs/${pid}`))).val();
-    if (isPair) await set(ref(db, `pairs/${newPid}`), true);
-
-    // messages
-    const msgs = (await get(ref(db, `messages/${pid}`))).val() || {};
-    const entries = Object.entries(msgs);
-    for (const [mid, m] of entries) {
+  // messages
+  for (const otherUid of partners) {
+    const oldPid = pairIdOf(oldUid, otherUid);
+    const newPid = pairIdOf(newUid, otherUid);
+    const msgsSnap = await get(ref(db, `messages/${oldPid}`));
+    const msgs = msgsSnap.val() || {};
+    for (const [mid, m] of Object.entries(msgs)) {
       const m2 = { ...m };
-      if (m2.from === oldUid) m2.from = newUid;
+      if (m2.sender === oldUid) m2.sender = newUid;
       await set(ref(db, `messages/${newPid}/${mid}`), m2);
     }
+    await remove(ref(db, `messages/${oldPid}`));
   }
 
   // 3) pings schválně nepřenášíme (historie pípnutí není potřeba)
@@ -528,13 +521,10 @@ export default function App() {
   async function buildChats(){
     const box = document.getElementById('chatsList'); if(!box) return;
     box.innerHTML = '<p>Načítám…</p>';
-    const pairsSnap = await get(ref(db, 'pairs'));
-    const pairs = pairsSnap.val() || {};
     const my = auth.currentUser?.uid;
-    const myPairs = Object.keys(pairs).filter((pid) => {
-      const [a, b] = pid.split('_');
-      return a === my || b === my;
-    });
+    const pairsSnap = await get(ref(db, `pairs/${my}`));
+    const pairs = pairsSnap.val() || {};
+    const myPairs = Object.keys(pairs);
     if (!myPairs.length){ box.innerHTML = '<p>Žádné konverzace</p>'; return; }
 
     const usersSnap = await get(ref(db, 'users'));
@@ -542,8 +532,7 @@ export default function App() {
 
     box.innerHTML = '';
     const viewerUid = auth.currentUser?.uid || me?.uid || null;
-    myPairs.forEach(pid => {
-      const [a,b] = pid.split('_'); const uid = a===my ? b : a;
+    myPairs.forEach(uid => {
       const u = users[uid] || {};
       if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
         return; // přeskoč cizího dev-bota
@@ -702,7 +691,7 @@ export default function App() {
           await update(ref(db, `users/${me.uid}`), {
             photos: arr,
             photoURL: arr[0] || null,
-            lastActive: Date.now(),
+            lastSeen: Date.now(),
           });
         },
       });
@@ -781,7 +770,7 @@ export default function App() {
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
         update(meRef, {
-          lastActive: Date.now(),
+          lastSeen: Date.now(),
           online: true,
         });
         return;
@@ -791,7 +780,7 @@ export default function App() {
       update(meRef, {
         lat: latitude,
         lng: longitude,
-        lastActive: Date.now(),
+        lastSeen: Date.now(),
         online: true,
       });
     };
@@ -800,7 +789,7 @@ export default function App() {
       update(meRef, {
         lat: null,
         lng: null,
-        lastActive: Date.now(),
+        lastSeen: Date.now(),
         online: false,
       });
     };
@@ -881,8 +870,8 @@ export default function App() {
         }
         const isOnline =
           u.online &&
-          u.lastActive &&
-          Date.now() - u.lastActive < ONLINE_TTL_MS;
+          u.lastSeen &&
+          Date.now() - u.lastSeen < ONLINE_TTL_MS;
         if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           // remove & return
           if (markers.current[uid]) {
@@ -1028,33 +1017,15 @@ export default function App() {
     return () => map.off("click", handler);
   }, [map]);
 
-  // sledování vzájemných pingů
-  useEffect(() => {
-    if (!me) return;
-    const pairRef = ref(db, "pairPings");
-    const unsub = onValue(pairRef, (snap) => {
-      const data = snap.val() || {};
-      setPairPings(data);
-      Object.entries(data).forEach(([pid, obj]) => {
-        const uids = Object.keys(obj || {});
-        if (uids.length >= 2) {
-          set(ref(db, `pairs/${pid}`), true);
-        }
-      });
-    });
-    return () => unsub();
-  }, [me]);
-
   // sledování povolených chatů – záznamy, které přetrvají i po deploy
   useEffect(() => {
     if (!me) return;
-    const pairsRef = ref(db, "pairs");
+    const pairsRef = ref(db, `pairs/${me.uid}`);
     const unsub = onValue(pairsRef, (snap) => {
       const data = snap.val() || {};
       const relevant = {};
-      Object.keys(data).forEach((pid) => {
-        const [a, b] = pid.split("_");
-        if (a === me.uid || b === me.uid) relevant[pid] = true;
+      Object.keys(data).forEach((other) => {
+        relevant[pairIdOf(me.uid, other)] = true;
       });
       setChatPairs(relevant);
     });
@@ -1068,7 +1039,11 @@ export default function App() {
     const unsub = onValue(msgsRef, (snap) => {
       const data = snap.val() || {};
       Object.keys(data).forEach((pid) => {
-        set(ref(db, `pairs/${pid}`), true);
+        const [a, b] = pid.split("_");
+        if (a && b) {
+          set(ref(db, `pairs/${a}/${b}`), true);
+          set(ref(db, `pairs/${b}/${a}`), true);
+        }
       });
     });
     return () => unsub();
@@ -1088,18 +1063,18 @@ export default function App() {
         const [a, b] = pid.split("_");
         if (a !== me.uid && b !== me.uid) return;
         const arr = Object.entries(msgs)
-          .sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+          .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         const last = arr[arr.length - 1];
         if (!last) return;
         const [id, m] = last;
         if (
           messagesLoaded.current &&
           prev[pid] !== id &&
-          m.from !== me.uid &&
+          m.sender !== me.uid &&
           window.shouldPlaySound()
         ) {
           new Audio('/ping.mp3').play();
-          setMarkerHighlights((prev) => ({ ...prev, [m.from]: "purple" }));
+          setMarkerHighlights((prev) => ({ ...prev, [m.sender]: "purple" }));
         }
         next[pid] = id;
       });
@@ -1140,8 +1115,8 @@ export default function App() {
       const isMe = me && uid === me.uid;
       const isOnline =
         u.online &&
-        u.lastActive &&
-        Date.now() - u.lastActive < ONLINE_TTL_MS;
+        u.lastSeen &&
+        Date.now() - u.lastSeen < ONLINE_TTL_MS;
 
       if (!isOnline && !isMe) {
         if (openBubble.current === uid) openBubble.current = null;
@@ -1440,12 +1415,20 @@ export default function App() {
       if (!data) return;
 
       // každé dítě je ping od někoho
-      Object.entries(data).forEach(([fromUid, obj]) => {
-        // přehraj zvuk a smaž ping
+      Object.entries(data).forEach(([pingId, obj]) => {
+        const fromUid = obj?.from;
+        if (!fromUid) return;
         if (window.shouldPlaySound()) {
           new Audio('/ping.mp3').play();
         }
         setMarkerHighlights((prev) => ({ ...prev, [fromUid]: "red" }));
+        setPairPings((prev) => ({
+          ...prev,
+          [pairIdOf(me.uid, fromUid)]: {
+            ...(prev[pairIdOf(me.uid, fromUid)] || {}),
+            [fromUid]: Date.now(),
+          },
+        }));
         setTimeout(() => {
           setMarkerHighlights((prev) => {
             const copy = { ...prev };
@@ -1453,7 +1436,7 @@ export default function App() {
             return copy;
           });
         }, 5000);
-        remove(ref(db, `pings/${me.uid}/${fromUid}`));
+        remove(ref(db, `pings/${me.uid}/${pingId}`));
       });
     });
     return () => unsub();
@@ -1461,14 +1444,19 @@ export default function App() {
 
   async function sendPing(toUid) {
     if (!me) return;
-    await set(ref(db, `pings/${toUid}/${me.uid}`), {
-      time: serverTimestamp(),
-    });
     const pid = getPairId(me.uid, toUid);
-    await set(ref(db, `pairPings/${pid}/${me.uid}`), serverTimestamp());
-    const pair = pairPings[pid] || {};
-    if (pair[toUid]) {
-      await set(ref(db, `pairs/${pid}`), true);
+    const pingRef = push(ref(db, `pings/${toUid}`));
+    await set(pingRef, {
+      from: me.uid,
+      createdAt: serverTimestamp(),
+      type: 'ping',
+    });
+    const prevPair = pairPings[pid] || {};
+    const updatedPair = { ...prevPair, [me.uid]: Date.now() };
+    setPairPings((prev) => ({ ...prev, [pid]: updatedPair }));
+    if (prevPair[toUid]) {
+      await set(ref(db, `pairs/${me.uid}/${toUid}`), true);
+      await set(ref(db, `pairs/${toUid}/${me.uid}`), true);
     }
     // také krátké pípnutí odesílateli, aby věděl, že kliknul
     if (window.shouldPlaySound()) {
@@ -1489,7 +1477,7 @@ export default function App() {
       const data = snap.val() || {};
       const arr = Object.entries(data)
         .map(([id, m]) => ({ id, ...m }))
-        .sort((a, b) => (a.time || 0) - (b.time || 0));
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       setChatMsgs(arr);
     });
     chatUnsub.current = unsub;
@@ -1542,8 +1530,8 @@ export default function App() {
     const pid = getPairId(meUid, peerUid);
 
     // ukonči pár
-    await remove(ref(db, `pairs/${pid}`));
-    await remove(ref(db, `pairPings/${pid}`));
+    await remove(ref(db, `pairs/${meUid}/${peerUid}`));
+    await remove(ref(db, `pairs/${peerUid}/${meUid}`));
 
     // volitelně: nech zprávy (nebo je také smaž: await remove(ref(db, `messages/${pid}`)))
     closeChat();
@@ -1562,25 +1550,32 @@ export default function App() {
     const to = openChatWith;
     if (!me || !to) return;
     const pid = getPairId(me.uid, to);
-    const msg = {
-      from: me.uid,
-      to,
-      time: Date.now(),
-    };
-    if (chatText.trim()) msg.text = chatText.trim();
+    let msg = null;
     if (chatPhoto) {
       try {
         const small = await compressImage(chatPhoto.file, 1200, 0.8);
         const dest = sref(storage, `messages/${pid}/${Date.now()}.jpg`);
         await uploadBytes(dest, small, { contentType: "image/jpeg" });
         const url = await getDownloadURL(dest);
-        msg.photo = url;
+        msg = {
+          sender: me.uid,
+          text: url,
+          type: 'photo',
+          createdAt: serverTimestamp(),
+        };
       } catch (e2) {
         console.error(e2);
         alert("Nahrání fotky se nezdařilo.");
       }
+    } else if (chatText.trim()) {
+      msg = {
+        sender: me.uid,
+        text: chatText.trim(),
+        type: 'text',
+        createdAt: serverTimestamp(),
+      };
     }
-    if (!msg.text && !msg.photo) return;
+    if (!msg) return;
     await push(ref(db, `messages/${pid}`), msg);
     setChatText("");
     if (chatPhoto) {
@@ -1612,7 +1607,7 @@ export default function App() {
       await update(ref(db, `users/${me.uid}`), {
         photos: urls,
         photoURL: urls[0] || null,
-        lastActive: Date.now(),
+        lastSeen: Date.now(),
       });
       alert("🖼️ Fotky nahrány.");
     } catch (e2) {
@@ -1630,7 +1625,7 @@ export default function App() {
     await update(ref(db, `users/${me.uid}`), {
       photos: arr,
       photoURL: arr[0] || null,
-      lastActive: Date.now(),
+      lastSeen: Date.now(),
     });
     setDeleteIdx(null);
   }
@@ -1952,14 +1947,14 @@ export default function App() {
           </div>
           <div ref={chatBoxRef} className="chat__messages">
             {chatMsgs.map((m) => {
-              const mine = m.from === me?.uid;
+              const mine = m.sender === me?.uid;
               return (
                 <div key={m.id} className={`msg ${mine ? "msg--me" : "msg--peer"}`}>
                   <div className="msg__time">
-                    {new Date(m.time || Date.now()).toLocaleTimeString()}
+                    {new Date(m.createdAt || Date.now()).toLocaleTimeString()}
                   </div>
-                  {m.photo && <img src={m.photo} className="msg__image" />}
-                  {m.text && <div className="msg__bubble">{m.text}</div>}
+                  {m.type === 'photo' && <img src={m.text} className="msg__image" />}
+                  {m.type !== 'photo' && m.text && <div className="msg__bubble">{m.text}</div>}
                 </div>
               );
             })}

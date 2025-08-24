@@ -1,4 +1,4 @@
-import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get } from "firebase/database";
+import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get, remove } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { initSecondaryApp } from "./firebase.js";
 
@@ -19,7 +19,7 @@ export async function spawnDevBot(ownerUid){
     const users = Object.entries(usersSnap.val() || {})
       .map(([uid,u]) => ({ uid, ...(u||{}) }))
       .filter(u => !!u.uid)
-      .sort((a,b)=> (b.lastActive||0) - (a.lastActive||0));
+      .sort((a,b)=> (b.lastSeen||0) - (a.lastSeen||0));
     const other = users.find(u => u.uid !== botUid);
     if (other?.lat && other?.lng){
       lat = other.lat + (Math.random()-0.5)*0.001; // ~±100 m
@@ -35,7 +35,7 @@ export async function spawnDevBot(ownerUid){
     gender: "muz",
     lat, lng,
     online: true,
-    lastActive: Date.now(),
+    lastSeen: Date.now(),
     isDevBot: true,
     privateTo: ownerUid,
   });
@@ -43,17 +43,20 @@ export async function spawnDevBot(ownerUid){
   // Reakce na pingy → spáruj pár a pošli zprávu
   const inboxRef = ref(db2, `pings/${botUid}`);
   onChildAdded(inboxRef, async (snap) => {
-    const fromUid = snap.key;
+    const data = snap.val() || {};
+    const fromUid = data.from;
+    if (!fromUid) return;
     const pid = pairIdOf(fromUid, botUid);
 
-    await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-    const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
-    if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
+    await remove(ref(db2, `pings/${botUid}/${snap.key}`));
+    await set(ref(db2, `pairs/${botUid}/${fromUid}`), true);
+    await set(ref(db2, `pairs/${fromUid}/${botUid}`), true);
 
     await set(ref(db2, `messages/${pid}/${Date.now()}`), {
-      from: botUid,
+      sender: botUid,
       text: "Ahoj, testuju, že to funguje 🙂",
-      time: serverTimestamp(),
+      type: 'text',
+      createdAt: serverTimestamp(),
     });
   });
 
@@ -61,7 +64,7 @@ export async function spawnDevBot(ownerUid){
   setInterval(() => {
     const jitter = () => (Math.random()-0.5) * 0.0003; // ~±30 m
     lat += jitter(); lng += jitter();
-    update(userRef, { lastActive: Date.now(), lat, lng });
+    update(userRef, { lastSeen: Date.now(), lat, lng });
   }, 15000);
 
   return botUid;
