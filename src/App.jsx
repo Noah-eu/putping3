@@ -431,6 +431,11 @@ export default function App() {
     } catch(e){ console.error(e); alert(e.code||e.message); }
   }
 
+  function scrollIntoViewOnFocus(el){
+    if (!el) return;
+    setTimeout(() => { try { el.scrollIntoView({block:'center', behavior:'smooth'}); } catch{} }, 0);
+  }
+
   function RenderSettingsFields(){
     const uid = me?.uid || auth.currentUser?.uid || '';
     const safeMe = me || { uid, name:'', gender:'any', age:null, photoURL:'', pingPrefs:{} };
@@ -440,6 +445,7 @@ export default function App() {
         <input
           placeholder="Jméno"
           value={safeMe.name ?? ''}
+          onFocus={e => scrollIntoViewOnFocus(e.target)}
           onChange={e => {
             const name = e.target.value;
             setMe(m => ({ ...(m||{}), name }));
@@ -473,6 +479,7 @@ export default function App() {
           type="number"
           placeholder="Věk (volitelné)"
           value={safeMe.age ?? ''}
+          onFocus={e => scrollIntoViewOnFocus(e.target)}
           onChange={e => {
             const age = Number(e.target.value) || null;
             setMe(m => ({ ...(m||{}), age }));
@@ -525,6 +532,7 @@ export default function App() {
             type="number"
             placeholder="Věk od"
             value={safeMe.pingPrefs?.minAge ?? ''}
+            onFocus={e => scrollIntoViewOnFocus(e.target)}
             onChange={e => {
               const minAge = parseInt(e.target.value,10);
               setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16 }}));
@@ -537,6 +545,7 @@ export default function App() {
             type="number"
             placeholder="do"
             value={safeMe.pingPrefs?.maxAge ?? ''}
+            onFocus={e => scrollIntoViewOnFocus(e.target)}
             onChange={e => {
               const maxAge = parseInt(e.target.value,10);
               setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100 }}));
@@ -1938,6 +1947,7 @@ export default function App() {
             type="text"
             placeholder="Napiš zprávu…"
             autocomplete="off"
+            onFocus={e => scrollIntoViewOnFocus(e.target)}
           />
           <button id="chatSend" type="submit">Odeslat</button>
         </form>
@@ -1946,7 +1956,7 @@ export default function App() {
       <div id="galleryModal" className="sheet" aria-hidden="true">
         <div className="sheet-head">
           <h3>Moje fotky</h3>
-          <input id="filePicker" type="file" accept="image/*" multiple hidden />
+          <input id="filePicker" type="file" accept="image/*" multiple hidden onFocus={e => scrollIntoViewOnFocus(e.target)} />
           <button id="btnAddPhoto">+ Přidat</button>
           <button id="btnCloseGallery" aria-label="Zavřít">✕</button>
         </div>
@@ -2122,6 +2132,7 @@ export default function App() {
               onChange={(e) => setChatText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Napiš zprávu…"
+              onFocus={e => scrollIntoViewOnFocus(e.target)}
               style={{
                 flex: 1,
                 border: "1px solid #ddd",
@@ -2135,6 +2146,7 @@ export default function App() {
               accept="image/*"
               style={{ display: "none" }}
               onChange={onPickChatPhoto}
+              onFocus={e => scrollIntoViewOnFocus(e.target)}
             />
             <button
               onClick={() => document.getElementById("fileChatPhoto")?.click()}
@@ -2200,6 +2212,7 @@ export default function App() {
                 multiple
                 style={{ display: "none" }}
                 onChange={onPickPhotos}
+                onFocus={e => scrollIntoViewOnFocus(e.target)}
               />
               <button
                 onClick={() => document.getElementById("filePhotos")?.click()}
