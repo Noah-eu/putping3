@@ -813,7 +813,7 @@ export default function App() {
         lastActive: Date.now(),
         online: true,
       });
-      await mirrorMe({ lat: latitude, lng: longitude });
+      await upsertPublicProfile(me.uid, { lat: latitude, lng: longitude });
     };
     const handleErr = async (err) => {
       console.warn("Geolocation error", err);
