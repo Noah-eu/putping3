@@ -186,7 +186,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
   // krok se počítá vždy z aktuálních flagů + auth + profilu
-  const [step, setStep] = useState(() => 99); // 99 = init (jen intro, než víme víc)
+  const [step, setStep] = useState(0);
   const [introState, setIntroState] = useState('show'); // 'show' | 'fade' | 'hide'
 
   function computeStep(me) {
@@ -203,27 +203,27 @@ export default function App() {
 
   // po mountu + hashchange → přepočítej
   useEffect(() => {
-    const onHash = () => setStep(s => computeStep(me));
+    const onHash = () => setStep(0);
     window.addEventListener('hashchange', onHash);
-    setStep(computeStep(me));
+    setStep(0);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   // po návratu z Google redirectu
   useEffect(() => {
     import('firebase/auth').then(({ getRedirectResult }) => {
-      getRedirectResult(auth).finally(() => setStep(computeStep(me)));
+      getRedirectResult(auth).finally(() => setStep(0));
     });
   }, []);
 
   // při změně auth i dat profilu přepočítej
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(() => setStep(computeStep(me)));
+    const unsub = auth.onAuthStateChanged(() => setStep(0));
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    setStep(computeStep(me));
+    setStep(0);
   }, [me]);  // ⬅ jakmile dorazí me z DB/cache, krok se srovná
 
   // 4) Neschovávej intro při step > 0 (zůstane jako pozadí wizardu)
@@ -326,12 +326,12 @@ export default function App() {
 
   function acceptTerms(){
     localStorage.setItem('pp_consent_v1','1');
-    setStep(computeStep(me));
+    setStep(0);
   }
 
   function finishOnboard(){
     localStorage.setItem('pp_onboard_v1','1');
-    setStep(computeStep(me));
+    setStep(0);
   }
 
   function RenderSettingsFields(){
@@ -2206,7 +2206,7 @@ export default function App() {
     )}
 
     {/* Wizard když je potřeba */}
-    {step > 0 && step < 99 && <Onboarding step={step} />}
+    {false && <Onboarding step={3} me={me} setMe={setMe} />}
   </>
   );
 }
