@@ -1,7 +1,11 @@
 // src/firebase.js				
-import { initializeApp } from "firebase/app";				
-import { getDatabase } from "firebase/database";				
-import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
+import { initializeApp, getApp, getApps } from "firebase/app";
+import { getDatabase } from "firebase/database";
+import {
+  getAuth,
+  browserLocalPersistence,
+  initializeAuth,
+} from "firebase/auth";
 import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
 				
 const firebaseConfig = {
@@ -15,15 +19,19 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 				
-const app = initializeApp(firebaseConfig);
+const apps = getApps();
+const app = apps.length ? getApp() : initializeApp(firebaseConfig);
 
 const db = getDatabase(app);
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(()=>{});
+let auth;
+if (!apps.length) {
+  auth = initializeAuth(app, { persistence: browserLocalPersistence });
+} else {
+  auth = getAuth(app);
+}
 export const storage = getStorage(app);
 
 const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
 
-export { db, firebaseConfig, initSecondaryApp };
-export { auth };
+export { db, firebaseConfig, initSecondaryApp, auth };
 export { sref, uploadBytes, getDownloadURL };
