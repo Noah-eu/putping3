@@ -6,9 +6,9 @@ interface UserPinProps {
 }
 
 const UserPin: React.FC<UserPinProps> = ({ photoUrl, name }) => {
-  const id = useId();
-  const gradientId = `pinkGradient-${id}`;
-  const clipId = `clipCircle-${id}`;
+  const rawId = useId().replace(/:/g, "");
+  const gradientId = `pinkGradient-${rawId}`;
+  const clipId = `clipCircle-${rawId}`;
 
   return (
     <div className="pin-wrapper">
