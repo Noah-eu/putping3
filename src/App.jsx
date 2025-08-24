@@ -168,14 +168,11 @@ function saveProfile(uid, patch) {
   if (!uid || !patch) return Promise.resolve();
 
   const userRef = ref(db, `users/${uid}`);
-  const pubRef  = ref(db, `publicProfiles/${uid}`);
-  const pubPatch = { lastSeen: patch.lastSeen ?? Date.now() };
+  const pubRef = ref(db, `publicProfiles/${uid}`);
+  const { name, gender, photoURL, lat, lng } = patch;
 
-  if (patch.name !== undefined) pubPatch.name = patch.name;
-  if (patch.gender !== undefined) pubPatch.gender = patch.gender;
-  if (patch.photoURL !== undefined) pubPatch.photoURL = patch.photoURL;
-  if (patch.lat !== undefined) pubPatch.lat = patch.lat;
-  if (patch.lng !== undefined) pubPatch.lng = patch.lng;
+  const pubPatch = { name, gender, photoURL, lat, lng, lastSeen: Date.now() };
+  Object.keys(pubPatch).forEach((k) => pubPatch[k] === undefined && delete pubPatch[k]);
 
   return Promise.all([
     update(userRef, patch),
