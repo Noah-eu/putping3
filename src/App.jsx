@@ -276,7 +276,13 @@ export default function App() {
     const unsub = onAuthStateChanged(a, async (user) => {
       setAuthed(!!user);
       if (!user) { setStep(2); return; }
-      const uid = user.uid;
+      const uid = user?.uid;
+      if (uid) {
+        const cached = readProfileCache(uid) || {};
+        const initial = { uid, ...cached, pingPrefs: cached.pingPrefs || {} };
+        setMe(initial);
+        meGlobal = initial;
+      }
       const uRef = ref(db, 'users/'+uid);
       const us = await get(uRef);
       if (!us.exists()) {
