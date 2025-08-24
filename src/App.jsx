@@ -51,10 +51,13 @@ async function recoverAccount(oldUid) {
   // 1) users: přenes profil (name, photoURL, photos)
   const oldUserSnap = await get(ref(db, `users/${oldUid}`));
   const oldUser = oldUserSnap.val() || {};
-  await update(ref(db, `users/${newUid}`), {
+  await saveProfile(newUid, {
     name: oldUser.name || 'Anonym',
+    gender: oldUser.gender || null,
     photoURL: oldUser.photoURL || null,
     photos: oldUser.photos || [],
+    lat: oldUser.lat ?? null,
+    lng: oldUser.lng ?? null,
     lastSeen: Date.now(),
     online: true,
   });
@@ -154,11 +157,23 @@ const writeProfileCache = (uid,data)=> {
   try { localStorage.setItem(profileKey(uid), JSON.stringify(data||{})); } catch {}
 };
 
-function saveProfile(uid, patch){
-  if(!uid||!patch) return;
-  import('firebase/database').then(({ref, update})=>{
-    update(ref(db, `users/${uid}`), patch).catch(console.warn);
-  });
+function saveProfile(uid, patch) {
+  if (!uid || !patch) return Promise.resolve();
+
+  const userRef = ref(db, `users/${uid}`);
+  const pubRef  = ref(db, `publicProfiles/${uid}`);
+  const pubPatch = { lastSeen: Date.now() };
+
+  if (patch.name !== undefined) pubPatch.name = patch.name;
+  if (patch.gender !== undefined) pubPatch.gender = patch.gender;
+  if (patch.photoURL !== undefined) pubPatch.photoURL = patch.photoURL;
+  if (patch.lat !== undefined) pubPatch.lat = patch.lat;
+  if (patch.lng !== undefined) pubPatch.lng = patch.lng;
+
+  return Promise.all([
+    update(userRef, patch),
+    update(pubRef, pubPatch),
+  ]).catch(console.warn);
 }
 
 // jednoduchý debounce
@@ -490,7 +505,7 @@ export default function App() {
       item.querySelector('.del').onclick = async () => {
         const photos = [...(users[me.uid]?.photos||[])];
         photos.splice(i,1);
-        await update(ref(db, `users/${me.uid}`), {
+        await saveProfile(me.uid, {
           photos,
           photoURL: photos[0] || null,
         });
@@ -506,7 +521,7 @@ export default function App() {
         const photos = [...(users[me.uid]?.photos||[])];
         const [moved] = photos.splice(from,1);
         photos.splice(to,0,moved);
-        await update(ref(db, `users/${me.uid}`), {
+        await saveProfile(me.uid, {
           photos,
           photoURL: photos[0] || null,
         });
@@ -689,7 +704,7 @@ export default function App() {
         onEnd: async () => {
           if (!me || !sortableRef.current) return;
           const arr = sortableRef.current.toArray();
-          await update(ref(db, `users/${me.uid}`), {
+          await saveProfile(me.uid, {
             photos: arr,
             photoURL: arr[0] || null,
             lastSeen: Date.now(),
@@ -739,7 +754,7 @@ export default function App() {
         newUrls.push(url);
       }
       const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
-      await update(ref(db, `users/${me.uid}`), { photos });
+      await saveProfile(me.uid, { photos });
       buildGrid(photos);
     };
 
@@ -760,10 +775,8 @@ export default function App() {
 
   useEffect(() => {
     if (!me) return;
-    const meRef = ref(db, `users/${me.uid}`);
-
     if (!locationConsent || !("geolocation" in navigator)) {
-      update(meRef, {
+      saveProfile(me.uid, {
         lat: null,
         lng: null,
         lastSeen: Date.now(),
@@ -780,7 +793,7 @@ export default function App() {
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
-        update(meRef, {
+        saveProfile(me.uid, {
           lastSeen: Date.now(),
           online: true,
         });
@@ -788,7 +801,7 @@ export default function App() {
       }
       localStorage.setItem('lastLat', String(latitude));
       localStorage.setItem('lastLng', String(longitude));
-      update(meRef, {
+      saveProfile(me.uid, {
         lat: latitude,
         lng: longitude,
         lastSeen: Date.now(),
@@ -797,7 +810,7 @@ export default function App() {
     };
     const handleErr = (err) => {
       console.warn("Geolocation error", err);
-      update(meRef, {
+      saveProfile(me.uid, {
         lat: null,
         lng: null,
         lastSeen: Date.now(),
@@ -1619,7 +1632,7 @@ export default function App() {
         const url = await getDownloadURL(dest);
         urls.push(url);
       }
-      await update(ref(db, `users/${me.uid}`), {
+      await saveProfile(me.uid, {
         photos: urls,
         photoURL: urls[0] || null,
         lastSeen: Date.now(),
@@ -1637,7 +1650,7 @@ export default function App() {
     if (deleteIdx === null || !me) return;
     const arr = [...(users[me.uid]?.photos || [])];
     arr.splice(deleteIdx, 1);
-    await update(ref(db, `users/${me.uid}`), {
+    await saveProfile(me.uid, {
       photos: arr,
       photoURL: arr[0] || null,
       lastSeen: Date.now(),
