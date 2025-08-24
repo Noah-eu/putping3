@@ -164,7 +164,19 @@ const writeProfileCache = (uid,data)=> {
   try { localStorage.setItem(profileKey(uid), JSON.stringify(data||{})); } catch {}
 };
 
-function saveProfile(uid, patch) {
+function upsertPublicProfile(uid, partial) {
+  if (!uid) return Promise.resolve();
+  const safe = {};
+  if ('name' in partial) safe.name = partial.name ?? '';
+  if ('gender' in partial) safe.gender = partial.gender ?? 'any';
+  if ('photoURL' in partial) safe.photoURL = partial.photoURL ?? '';
+  if ('lat' in partial) safe.lat = partial.lat ?? 0;
+  if ('lng' in partial) safe.lng = partial.lng ?? 0;
+  safe.lastSeen = Date.now();
+  return update(ref(db, `publicProfiles/${uid}`), safe);
+}
+
+async function saveProfile(uid, patch) {
   if (!uid || !patch) return Promise.resolve();
 
   const userRef = ref(db, `users/${uid}`);
@@ -174,10 +186,15 @@ function saveProfile(uid, patch) {
   const pubPatch = { name, gender, photoURL, lat, lng, lastSeen: Date.now() };
   Object.keys(pubPatch).forEach((k) => pubPatch[k] === undefined && delete pubPatch[k]);
 
-  return Promise.all([
-    update(userRef, patch),
-    update(pubRef, pubPatch),
-  ]).catch(console.warn);
+  try {
+    await Promise.all([
+      update(userRef, patch),
+      update(pubRef, pubPatch),
+    ]);
+    await upsertPublicProfile(uid, { name, gender, photoURL, lat, lng });
+  } catch (err) {
+    console.warn(err);
+  }
 }
 
 // jednoduchý debounce
