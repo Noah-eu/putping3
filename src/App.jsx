@@ -2,7 +2,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  signInAnonymously,
+} from "firebase/auth";
 import {
   ref,
   set,
@@ -298,20 +305,20 @@ export default function App() {
   // Google login (redirect – funguje i na iPhone)
   async function loginGoogle() {
     try {
-      const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-      await signInWithRedirect(auth, new GoogleAuthProvider());
+      const a = auth || getAuth();
+      await signInWithRedirect(a, new GoogleAuthProvider());
     } catch (err) {
-      console.error('loginGoogle', err);
+      console.error(err);
       alert(err.code || err.message);
     }
   }
   // anonymně (lze kdykoli později propojit s Googlem)
   async function loginAnon() {
     try {
-      const { signInAnonymously } = await import('firebase/auth');
-      await signInAnonymously(auth);
+      const a = auth || getAuth();
+      await signInAnonymously(a);
     } catch (err) {
-      console.error('loginAnon', err);
+      console.error(err);
       alert(err.code || err.message);
     }
   }
