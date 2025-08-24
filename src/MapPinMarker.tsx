@@ -5,7 +5,8 @@ interface MapPinMarkerProps {
 }
 
 const MapPinMarker: React.FC<MapPinMarkerProps> = ({ onPing }) => {
-  const gradientId = useId();
+  const rawId = useId();
+  const gradientId = `markerGradient-${rawId.replace(/:/g, "")}`;
 
   return (
     <svg
