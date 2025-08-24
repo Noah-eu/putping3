@@ -8,13 +8,13 @@ interface PinSVGProps {
 
 const PinSVG: React.FC<PinSVGProps> = ({ photoUrl, name, onPing }) => {
   const [mode, setMode] = useState<"ping" | "chat">("ping");
-  const id = useId();
+  const rawId = useId().replace(/:/g, "");
 
-  const pinGradientId = `pinGradient-${id}`;
-  const pingButtonGradientId = `pingButtonGradient-${id}`;
-  const chatButtonGradientId = `chatButtonGradient-${id}`;
-  const photoClipId = `photoClip-${id}`;
-  const shadowId = `shadow-${id}`;
+  const pinGradientId = `pinGradient-${rawId}`;
+  const pingButtonGradientId = `pingButtonGradient-${rawId}`;
+  const chatButtonGradientId = `chatButtonGradient-${rawId}`;
+  const photoClipId = `photoClip-${rawId}`;
+  const shadowId = `shadow-${rawId}`;
 
   const handleClick = () => {
     if (mode === "ping" && onPing) onPing();
