@@ -1817,9 +1817,9 @@ export default function App() {
 
   return (
     <>
-      {/* Intro je VŽDY – u „starých“ fade-out po ~0.7s */}
-      {introState !== 'hide' && (
-        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`}></div>
+      {/* Intro jen na mapě (step 0) – u „starých“ fade-out po ~0.7s */}
+      {(step === 0 && introState !== 'hide') && (
+        <div className={`intro-screen ${introState==='fade' ? 'intro--fade' : ''}`} />
       )}
 
       {/* app (mapa, FAB, markery…) */}
