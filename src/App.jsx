@@ -21,6 +21,7 @@ import {
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
 import { spawnDevBot } from './devBot';
+import { upsertPublicProfile } from "./publicProfiles";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -189,6 +190,20 @@ export default function App() {
   const [step, setStep] = useState(0);
   const [introState, setIntroState] = useState('show'); // 'show' | 'fade' | 'hide'
 
+  async function mirrorMe(extra = {}) {
+    const uid = me?.uid;
+    if (!uid) return;
+    const base = { ...(users[uid] || {}), ...(me || {}) };
+    const data = { ...base, ...extra };
+    await upsertPublicProfile(uid, {
+      name: data.name,
+      gender: data.gender,
+      photoURL: data.photoURL,
+      lat: data.lat,
+      lng: data.lng,
+    });
+  }
+
   function computeStep(me) {
     if (forceOnboard()) return (auth.currentUser ? 3 : 1);
     const consented = localStorage.getItem('pp_consent_v1') === '1';
@@ -310,11 +325,12 @@ export default function App() {
     );
   }
 
-  function selectGender(val){
+  async function selectGender(val){
     setMe(m => ({...m, gender: val}));
     applyGenderRingInstant(me?.uid, val);          // okamžitý efekt
     writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), gender: val});
     saveProfileDebounced(me?.uid, { gender: val }); // ulož do DB
+    await mirrorMe({ gender: val });
   }
 
   function acceptTerms(){
@@ -334,11 +350,12 @@ export default function App() {
         <input
           placeholder="Jméno"
           value={me?.name || ''}
-          onChange={e => {
+          onChange={async e => {
             const name = e.target.value;
             setMe(m => ({...m, name}));
             writeProfileCache(me?.uid, {...(readProfileCache(me?.uid)||{}), name});
             saveProfileDebounced(me?.uid, { name });
+            await mirrorMe({ name });
           }}
         />
 
@@ -473,8 +490,8 @@ export default function App() {
 
   function buildGrid(list){
     const grid = document.getElementById('galleryGrid'); if(!grid) return;
-    const arr = list ?? ((users?.[me?.uid]?.photos && Array.isArray(users[me.uid].photos))
-      ? users[me.uid].photos
+    const arr = list ?? ((me?.photos && Array.isArray(me.photos))
+      ? me.photos
       : (me?.photoURL ? [me.photoURL] : []));
     grid.innerHTML = '';
     arr.forEach((url, i)=>{
@@ -487,12 +504,14 @@ export default function App() {
     `;
       // delete
       item.querySelector('.del').onclick = async () => {
-        const photos = [...(users[me.uid]?.photos||[])];
+        const photos = [...(me?.photos||[])];
         photos.splice(i,1);
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
         });
+        setMe(m => ({ ...m, photos, photoURL: photos[0] || null }));
+        await mirrorMe({ photoURL: photos[0] || null });
         buildGrid(photos);
       };
       // drag reorder
@@ -502,13 +521,15 @@ export default function App() {
         e.preventDefault();
         const from = Number(e.dataTransfer.getData('text/plain'));
         const to = Number(item.dataset.index);
-        const photos = [...(users[me.uid]?.photos||[])];
+        const photos = [...(me?.photos||[])];
         const [moved] = photos.splice(from,1);
         photos.splice(to,0,moved);
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
         });
+        setMe(m => ({ ...m, photos, photoURL: photos[0] || null }));
+        await mirrorMe({ photoURL: photos[0] || null });
         buildGrid(photos);
       });
       grid.appendChild(item);
@@ -697,6 +718,8 @@ export default function App() {
             photoURL: arr[0] || null,
             lastActive: Date.now(),
           });
+          setMe(m => ({ ...m, photos: arr, photoURL: arr[0] || null }));
+          await mirrorMe({ photoURL: arr[0] || null });
         },
       });
     }
@@ -741,8 +764,11 @@ export default function App() {
         const url = await getDownloadURL(snap.ref);
         newUrls.push(url);
       }
-      const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
+      const photos = [ ...(me?.photos||[]), ...newUrls ];
+      const photoURL = photos[0] || null;
       await update(ref(db, `users/${me.uid}`), { photos });
+      setMe(m => ({ ...m, photos, photoURL }));
+      await mirrorMe({ photoURL });
       buildGrid(photos);
     };
 
@@ -767,13 +793,13 @@ export default function App() {
     const meRef = ref(db, `users/${me.uid}`);
     const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
 
-    const updatePos = (pos) => {
+    const updatePos = async (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
       console.log('My coords', latitude, longitude, 'accuracy', accuracy);
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
-        update(meRef, {
+        await update(meRef, {
           lastActive: Date.now(),
           online: true,
         });
@@ -781,16 +807,17 @@ export default function App() {
       }
       localStorage.setItem('lastLat', String(latitude));
       localStorage.setItem('lastLng', String(longitude));
-      update(meRef, {
+      await update(meRef, {
         lat: latitude,
         lng: longitude,
         lastActive: Date.now(),
         online: true,
       });
+      await mirrorMe({ lat: latitude, lng: longitude });
     };
-    const handleErr = (err) => {
+    const handleErr = async (err) => {
       console.warn("Geolocation error", err);
-      update(meRef, {
+      await update(meRef, {
         lat: null,
         lng: null,
         lastActive: Date.now(),
@@ -836,7 +863,7 @@ export default function App() {
   useEffect(() => {
     if (!map || !me) return;
 
-    const usersRef = ref(db, "users");
+    const usersRef = ref(db, "publicProfiles");
     const unsub = onValue(usersRef, (snap) => {
       const data = snap.val() || {};
       // Firebase RTDB may return arrays as objects; ensure photos are arrays
@@ -873,9 +900,8 @@ export default function App() {
           return; // nepokračuj renderem markeru bota
         }
         const isOnline =
-          u.online &&
-          u.lastActive &&
-          Date.now() - u.lastActive < ONLINE_TTL_MS;
+          u.lastSeen &&
+          Date.now() - u.lastSeen < ONLINE_TTL_MS;
         if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           // remove & return
           if (markers.current[uid]) {
@@ -1132,9 +1158,8 @@ export default function App() {
 
       const isMe = me && uid === me.uid;
       const isOnline =
-        u.online &&
-        u.lastActive &&
-        Date.now() - u.lastActive < ONLINE_TTL_MS;
+        u.lastSeen &&
+        Date.now() - u.lastSeen < ONLINE_TTL_MS;
 
       if (!isOnline && !isMe) {
         if (openBubble.current === uid) openBubble.current = null;
@@ -1588,7 +1613,7 @@ export default function App() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     try {
-      const existing = users[me.uid]?.photos || [];
+      const existing = me?.photos || [];
       const allowed = Math.max(0, 9 - existing.length);
       const selected = files.slice(0, allowed);
       const urls = [...existing];
@@ -1607,6 +1632,8 @@ export default function App() {
         photoURL: urls[0] || null,
         lastActive: Date.now(),
       });
+      setMe(m => ({ ...m, photos: urls, photoURL: urls[0] || null }));
+      await mirrorMe({ photoURL: urls[0] || null });
       alert("🖼️ Fotky nahrány.");
     } catch (e2) {
       console.error(e2);
@@ -1618,13 +1645,15 @@ export default function App() {
 
   async function deletePhoto() {
     if (deleteIdx === null || !me) return;
-    const arr = [...(users[me.uid]?.photos || [])];
+    const arr = [...(me?.photos || [])];
     arr.splice(deleteIdx, 1);
     await update(ref(db, `users/${me.uid}`), {
       photos: arr,
       photoURL: arr[0] || null,
       lastActive: Date.now(),
     });
+    setMe(m => ({ ...m, photos: arr, photoURL: arr[0] || null }));
+    await mirrorMe({ photoURL: arr[0] || null });
     setDeleteIdx(null);
   }
 
@@ -2079,7 +2108,7 @@ export default function App() {
               ref={galleryRef}
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}
             >
-              {(users[me.uid]?.photos || []).map((url, idx) => (
+              {(me?.photos || []).map((url, idx) => (
                 <div key={url} data-id={url} style={{ position: "relative" }}>
                   <img
                     src={url}
@@ -2117,7 +2146,7 @@ export default function App() {
                   </button>
                 </div>
               ))}
-              {(users[me.uid]?.photos || []).length === 0 && (
+              {(me?.photos || []).length === 0 && (
                 <div style={{ fontSize: 13, color: "#666" }}>Žádné fotky</div>
               )}
             </div>
