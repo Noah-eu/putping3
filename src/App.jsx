@@ -892,6 +892,7 @@ export default function App() {
         const highlight = markerHighlightsRef.current[uid];
         const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
         const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
+        const genderRing = getGenderRing(u) || "transparent";
         const draggable = false;
 
         if (!markers.current[uid]) {
@@ -899,7 +900,7 @@ export default function App() {
           wrapper.className = "marker-wrapper";
           wrapper.dataset.uid = uid;
           wrapper.style.transformOrigin = "bottom center";
-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          wrapper.style.setProperty('--ring-color', genderRing);
           const ring = document.createElement('div');
           ring.className = 'marker-ring';
           wrapper.appendChild(ring);
@@ -915,7 +916,7 @@ export default function App() {
               u.photoURL,
             baseColor,
             highlight,
-            getGenderRing(u)
+            genderRing
           );
           wrapper.appendChild(avatar);
 
@@ -945,7 +946,7 @@ export default function App() {
 
           const wrapper = markers.current[uid].getElement();
           wrapper.dataset.uid = uid;
-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          wrapper.style.setProperty('--ring-color', genderRing);
           if (!wrapper.querySelector('.marker-ring')) {
             const ring = document.createElement('div');
             ring.className = 'marker-ring';
@@ -962,7 +963,7 @@ export default function App() {
               u.photoURL,
             baseColor,
             highlight,
-            getGenderRing(u)
+            genderRing
           );
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
@@ -1094,7 +1095,8 @@ export default function App() {
       const u = users[uid];
       if (!u) return;
       const wrapper = mk.getElement();
-      wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+      const genderRing = getGenderRing(u) || 'transparent';
+      wrapper.style.setProperty('--ring-color', genderRing);
       if (!wrapper.querySelector('.marker-ring')) {
         const ring = document.createElement('div');
         ring.className = 'marker-ring';
@@ -1144,7 +1146,7 @@ export default function App() {
         src,
         baseColor,
         highlight,
-        getGenderRing(u)
+        genderRing
       );
     });
   }, [pairPings, chatPairs, users, me, markerHighlights]);
