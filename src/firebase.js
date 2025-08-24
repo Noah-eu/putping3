@@ -1,9 +1,9 @@
-// src/firebase.js
-import { initializeApp, getApp, getApps } from "firebase/app";
-import { getDatabase } from "firebase/database";
-import { getAuth } from "firebase/auth";
+// src/firebase.js				
+import { initializeApp } from "firebase/app";				
+import { getDatabase } from "firebase/database";				
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "firebase/storage";
-
+				
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -14,13 +14,16 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+				
+const app = initializeApp(firebaseConfig);
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-
-export const auth = getAuth(app);
-export const db = getDatabase(app);
+const db = getDatabase(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
 export const storage = getStorage(app);
 
-export const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
+const initSecondaryApp = (name) => initializeApp(firebaseConfig, name);
 
-export { firebaseConfig, sref, uploadBytes, getDownloadURL };
+export { db, firebaseConfig, initSecondaryApp };
+export { auth };
+export { sref, uploadBytes, getDownloadURL };
