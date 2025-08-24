@@ -843,6 +843,9 @@ export default function App() {
       const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
       await saveProfile(me.uid, { photos });
       buildGrid(photos);
+      if (!me?.photoURL && newUrls[0]) {
+        await saveProfile(me.uid, { photoURL: newUrls[0] });
+      }
     };
 
     const btnAdd = document.getElementById('btnAddPhoto');
@@ -1781,6 +1784,9 @@ export default function App() {
           {step===3 && (
             <>
               <h1>Nastavení profilu</h1>
+              <button className="btn btn-light" onClick={()=>{
+                document.getElementById('filePicker')?.click();
+              }}>+ Přidat fotku</button>
               <RenderSettingsFields/>
               <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
             </>
