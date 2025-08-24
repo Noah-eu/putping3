@@ -76,13 +76,21 @@ export default function App() {
   const [showChatList, setShowChatList] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
-  const [showIntro, setShowIntro] = useState(true);
-  const [fadeIntro, setFadeIntro] = useState(false);
+  const [introState, setIntroState] = useState('show');
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
   );
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setIntroState('fade'), 800);
+    const t2 = setTimeout(() => setIntroState('hide'), 1700);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
@@ -958,8 +966,8 @@ export default function App() {
 
   /* ──────────────────────────────── Render UI ───────────────────────────── */
 
-  return (
-    <div>
+    return (
+      <div id="appRoot">
       {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
@@ -1054,8 +1062,8 @@ export default function App() {
         </button>
       </div>
 
-      {/* Mapa */}
-      <div id="map" style={{ width: "100vw", height: "100vh" }} />
+        {/* Mapa */}
+        <div id="map" />
 
       {false && showChatList && (
         <div className="chat-list">
@@ -1469,17 +1477,11 @@ export default function App() {
           </div>
         </div>
       )}
-      {false && showIntro && (
-        <div
-          className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
-          onClick={() => {
-            setFadeIntro(true);
-            setTimeout(() => setShowIntro(false), 500);
-          }}
-        >
-          <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
-        </div>
-      )}
-    </div>
-  );
-}
+        {(step===0 && introState!=='hide') && (
+          <div className={`intro-screen ${introState==='fade'?'intro--fade':''}`}>
+            <div className="intro-logo">PutPing</div>
+          </div>
+        )}
+      </div>
+    );
+  }
