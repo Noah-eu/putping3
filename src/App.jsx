@@ -245,7 +245,7 @@ export default function App() {
     const authed  = !!auth.currentUser;
     if (!consent) return 1;      // 1) souhlas
     if (!authed)  return 2;      // 2) přihlášení
-    if (!meLoaded) return 2;     // počkej, než se /users načte
+    if (!meLoaded) return 3;     // dočasně nastavení, než se načte profil
     if (!isProfileComplete(me)) return 3; // 3) nastavení
     return 0;                     // mapa
   }
@@ -265,9 +265,15 @@ export default function App() {
     });
   }, []);
 
-  // při změně auth i dat profilu přepočítej
+  // při změně auth setni krok na 3 dokud není profil hotový
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(() => setStep(computeStep()));
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        setStep(() => 3); // dočasně do nastavení
+      } else {
+        setStep(computeStep());
+      }
+    });
     return () => unsub();
   }, []);
 
