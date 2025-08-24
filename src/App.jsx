@@ -338,9 +338,9 @@ export default function App() {
     try {
       const a = auth || getAuth();
       await signInWithRedirect(a, new GoogleAuthProvider());
-    } catch (err) {
-      console.error(err);
-      alert(err.code || err.message);
+    } catch (e) {
+      console.error('loginGoogle', e);
+      alert(e.code || e.message);
     }
   }
   // anonymně (lze kdykoli později propojit s Googlem)
@@ -348,9 +348,9 @@ export default function App() {
     try {
       const a = auth || getAuth();
       await signInAnonymously(a);
-    } catch (err) {
-      console.error(err);
-      alert(err.code || err.message);
+    } catch (e) {
+      console.error('loginAnon', e);
+      alert(e.code || e.message);
     }
   }
 
