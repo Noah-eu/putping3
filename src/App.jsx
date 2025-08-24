@@ -2,7 +2,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  getAuth, GoogleAuthProvider,
+  signInWithPopup, signInWithRedirect, getRedirectResult,
+  signInAnonymously,
+  setPersistence, browserLocalPersistence,
+  linkWithPopup, linkWithRedirect,
+  onAuthStateChanged, signOut,
+} from "firebase/auth";
 import {
   ref,
   set,
@@ -224,11 +231,21 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // persistence na local, aby session držela i po reloadu/redirectu
+  useEffect(() => {
+    const a = auth || getAuth();
+    setPersistence(a, browserLocalPersistence).catch(console.error);
+  }, []);
+
   // po návratu z Google redirectu
   useEffect(() => {
-    import('firebase/auth').then(({ getRedirectResult }) => {
-      getRedirectResult(auth).finally(() => setStep(0));
-    });
+    const a = auth || getAuth();
+    getRedirectResult(a)
+      .catch(e => {
+        console.error('getRedirectResult', e);
+        alert(e.code || e.message);
+      })
+      .finally(() => setStep(0));
   }, []);
 
   // při změně auth i dat profilu přepočítej
@@ -304,15 +321,33 @@ export default function App() {
   const galleryRef = useRef(null);
   const sortableRef = useRef(null);
 
-  // Google login (redirect – funguje i na iPhone)
-  async function loginGoogle() {
-    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-    await signInWithRedirect(auth, new GoogleAuthProvider());
+  // Google login
+  async function loginGoogle(){
+    const a = auth || getAuth();
+    const p = new GoogleAuthProvider();
+    try {
+      if (a.currentUser?.isAnonymous) {
+        try { await linkWithPopup(a.currentUser, p); }
+        catch { await linkWithRedirect(a.currentUser, p); }
+      } else {
+        try { await signInWithPopup(a, p); }
+        catch { await signInWithRedirect(a, p); }
+      }
+    } catch (e) {
+      console.error('loginGoogle', e);
+      alert(e.code || e.message);
+    }
   }
+
   // anonymně (lze kdykoli později propojit s Googlem)
-  async function loginAnon() {
-    const { signInAnonymously } = await import('firebase/auth');
-    await signInAnonymously(auth);
+  async function loginAnon(){
+    const a = auth || getAuth();
+    try {
+      await signInAnonymously(a);
+    } catch(e){
+      console.error('loginAnon', e);
+      alert(e.code || e.message);
+    }
   }
 
   function applyGenderRingInstant(uid, genderValue){
