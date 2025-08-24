@@ -433,13 +433,13 @@ export default function App() {
 
   function RenderSettingsFields(){
     const uid = me?.uid || auth.currentUser?.uid || '';
-    const safeMe = me || { uid, pingPrefs:{} };
+    const safeMe = me || { uid, name:'', gender:'any', age:null, photoURL:'', pingPrefs:{} };
     return (
       <div style={{display:'grid', gap:10}}>
         {/* Jméno */}
         <input
           placeholder="Jméno"
-          value={safeMe.name || ''}
+          value={safeMe.name ?? ''}
           onChange={e => {
             const name = e.target.value;
             setMe(m => ({ ...(m||{}), name }));
@@ -472,7 +472,7 @@ export default function App() {
         <input
           type="number"
           placeholder="Věk (volitelné)"
-          value={safeMe.age || ''}
+          value={safeMe.age ?? ''}
           onChange={e => {
             const age = Number(e.target.value) || null;
             setMe(m => ({ ...(m||{}), age }));
@@ -524,7 +524,7 @@ export default function App() {
           <input
             type="number"
             placeholder="Věk od"
-            value={safeMe.pingPrefs?.minAge ?? 16}
+            value={safeMe.pingPrefs?.minAge ?? ''}
             onChange={e => {
               const minAge = parseInt(e.target.value,10);
               setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16 }}));
@@ -536,7 +536,7 @@ export default function App() {
           <input
             type="number"
             placeholder="do"
-            value={safeMe.pingPrefs?.maxAge ?? 100}
+            value={safeMe.pingPrefs?.maxAge ?? ''}
             onChange={e => {
               const maxAge = parseInt(e.target.value,10);
               setMe(m=>({ ...(m||{}), pingPrefs:{ ...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100 }}));
