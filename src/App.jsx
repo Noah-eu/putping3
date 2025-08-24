@@ -409,8 +409,18 @@ export default function App() {
     setStep(computeStep());
   }
 
-  function finishOnboard(){
-    setStep(computeStep());
+  async function finishOnboard(){
+    const u = me || {};
+    const ok = !!(u.name && u.gender && u.photoURL);
+    if (!ok) { alert('Doplň jméno, pohlaví a fotku.'); return; }
+    try {
+      await saveProfile(u.uid, {
+        name: u.name, gender: u.gender, photoURL: u.photoURL,
+        age: u.age ?? null
+      });
+      localStorage.setItem('pp_onboard_v1', '1');
+      setStep(0);
+    } catch(e){ console.error(e); alert(e.code||e.message); }
   }
 
   function RenderSettingsFields(){
