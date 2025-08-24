@@ -905,6 +905,7 @@ export default function App() {
         if (!markers.current[uid]) {
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
+          wrapper.dataset.uid = uid;
           wrapper.style.transformOrigin = "bottom center";
           wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
           const ring = document.createElement('div');
@@ -951,6 +952,7 @@ export default function App() {
           }
 
           const wrapper = markers.current[uid].getElement();
+          wrapper.dataset.uid = uid;
           wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
           if (!wrapper.querySelector('.marker-ring')) {
             const ring = document.createElement('div');
