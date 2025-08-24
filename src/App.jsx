@@ -812,9 +812,9 @@ export default function App() {
     return () => navigator.geolocation.clearWatch(id);
   }, [me, locationConsent]);
 
-    function initMapOnce(){
-      if (map) return;                 // ⬅ dříve bylo `if (map || !me) return;`
-      let m;
+  function initMapOnce() {
+    if (map) return;
+    let m;
     (async () => {
       // Start at last known position from DB if available, otherwise Prague
       let center = [14.42076, 50.08804];
