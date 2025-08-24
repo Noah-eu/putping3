@@ -776,28 +776,3 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 .pill{ padding:10px 12px; border-radius:12px; border:1px solid rgba(122,40,69,.25); cursor:pointer; background:#fff; }
 .pill.active{ box-shadow: 0 0 0 2px #fff, 0 0 0 4px #EC4899; border-color: transparent; } /* MUŽ = růžový obdélník */
-
-/* Onboarding: vždy propusť tapy dovnitř karty */
-.onboard, .onboard * { touch-action: manipulation; }
-.onboard-card, .onboard-card * { pointer-events: auto !important; }
-
-/* Vstupy musí být focusovatelné i na iOS */
-input, textarea, select, button { -webkit-tap-highlight-color: transparent; }
-input, textarea { -webkit-user-select: text; user-select: text; }
-
-/* Bezpečí: skryté vrstvy, které nejsou otevřené, nesmí chytat události */
-.gear-menu:not(.open), .chat-panel.hidden { pointer-events: none; }
-
-/* Onboarding musí být nad vším a klikatelný */
-.onboard{ z-index:3000; }
-.onboard, .onboard * { pointer-events:auto !important; touch-action: manipulation; }
-
-/* Splash nesmí chytat události (když by se náhodou vykreslil) */
-.intro-screen{ pointer-events:none; }
-/* Onboarding nad vším a klikací */
-.onboard { z-index: 9999; pointer-events: auto; }
-.onboard-card { z-index: 10000; pointer-events: auto; position: relative; }
-.onboard-card * { pointer-events: auto; }
-
-/* Splash (intro) nesmí chytat události */
-.intro-screen { pointer-events: none !important; }
