@@ -869,7 +869,7 @@ export default function App() {
         }
 
         // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
-        if (!markers.current[uid] && isMe && !hasCoords) {
+        if (!markers.current[uid] && isMe && !hasCoords && mapRef.current && mapReady) {
           const c = mapRef.current.getCenter();
           u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
         }
