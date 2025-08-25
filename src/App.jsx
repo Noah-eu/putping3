@@ -972,7 +972,8 @@ export default function App() {
   }, [mapReady, me]);
 
   useEffect(() => {
-    if (!mapRef.current || !mapReady || !me || centeredOnMe.current) return;
+    if (!mapRef.current || !mapReady || centeredOnMe.current) return;
+    if (!me) return;
     const u = users[me.uid];
     if (
       u &&
