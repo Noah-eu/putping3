@@ -12,7 +12,6 @@ import {
   push,
   serverTimestamp,
   get,
-  onDisconnect,
 } from "firebase/database";
 import {
   ref as sref,
@@ -26,16 +25,7 @@ import { getRedirectResult, signOut } from "firebase/auth";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
-if (!mapboxgl.accessToken) {
-  mapboxgl.accessToken =
-    (import.meta?.env?.VITE_MAPBOX_TOKEN) ||
-    (typeof window !== 'undefined' ? window.MAPBOX_TOKEN : '') ||
-    '';
-  if (!mapboxgl.accessToken) {
-    console.warn('Mapbox access token is missing (VITE_MAPBOX_TOKEN / window.MAPBOX_TOKEN).');
-    // optional: alert('Chybí Mapbox token – nastav VITE_MAPBOX_TOKEN v Netlify Environment Variables.');
-  }
-}
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 window.shouldPlaySound = () =>
   localStorage.getItem("soundEnabled") !== "0";
@@ -69,14 +59,6 @@ async function recoverAccount(oldUid) {
     photos: oldUser.photos || [],
     lastActive: Date.now(),
     online: true,
-  });
-
-  await upsertPublicProfile(newUid, {
-    name: oldUser.name,
-    gender: oldUser.gender,
-    photoURL: oldUser.photoURL,
-    lat: oldUser.lat,
-    lng: oldUser.lng,
   });
 
   // 2) pairs/pairPings/messages – překlop všechna párová data
@@ -136,46 +118,55 @@ async function compressImage(file, maxDim = 800, quality = 0.8) {
 
 function normGender(g) {
   const s = (g ?? '').toString().trim().toLowerCase();
-  if (["m", "male", "man", "muž", "muz", "kluk", "boy"].includes(s)) return "m";
-  if (["f", "female", "woman", "žena", "zena", "holka", "girl"].includes(s)) return "f";
-  return "any";
+  if (['m','male','man','muž','muz','kluk','boy'].includes(s)) return 'm';
+  if (['f','female','woman','žena','zena','holka','girl'].includes(s)) return 'f';
+  return 'any';
 }
 
 function canPing(viewer = {}, target = {}) {
-  const prefs = target.pingPrefs || { gender: "any", minAge: 16, maxAge: 100 };
+  // preferuj cílové preference, ale měj bezpečné defaulty
+  const prefs = target.pingPrefs || { gender: 'any', minAge: 16, maxAge: 100 };
 
+  // gender – normalizuj obě strany; 'any' nic neomezuje
   const vg = normGender(viewer.gender);
-  if (prefs.gender === "m" && vg !== "m") return false;
-  if (prefs.gender === "f" && vg !== "f") return false;
+  if (prefs.gender === 'm' && vg !== 'm') return false;
+  if (prefs.gender === 'f' && vg !== 'f') return false;
 
+  // věk – když není známý, NEblokuj tlačítko (předtím to vracelo false)
   const age = Number(viewer.age);
   if (!Number.isFinite(age)) return true;
 
+  // věkové hranice
   if (age < (prefs.minAge ?? 16)) return false;
   if (age > (prefs.maxAge ?? 100)) return false;
 
   return true;
 }
 
-// Zapisuje veřejné minimum do /publicProfiles/<uid>
-function upsertPublicProfile(uid, partial) {
-  if (!uid) return Promise.resolve();
-  const safe = {};
-  if ('name' in partial)     safe.name     = partial.name ?? '';
-  if ('gender' in partial)   safe.gender   = partial.gender ?? 'any';
-  if ('photoURL' in partial) safe.photoURL = partial.photoURL ?? '';
-  if ('lat' in partial)      safe.lat      = Number(partial.lat) || 0;
-  if ('lng' in partial)      safe.lng      = Number(partial.lng) || 0;
-  safe.lastSeen = Date.now();
-  return update(ref(db, `publicProfiles/${uid}`), safe);
+// --- profil: cache + DB sync ---
+const profileKey = (uid)=>`pp_profile_${uid}`;
+const readProfileCache = (uid)=> {
+  try { return JSON.parse(localStorage.getItem(profileKey(uid))||'{}'); } catch { return {}; }
+};
+const writeProfileCache = (uid,data)=> {
+  try { localStorage.setItem(profileKey(uid), JSON.stringify(data||{})); } catch {}
+};
+
+function saveProfile(uid, patch){
+  if(!uid||!patch) return;
+  import('firebase/database').then(({ref, update})=>{
+    update(ref(db, `users/${uid}`), patch).catch(console.warn);
+  });
 }
+
+// jednoduchý debounce
+const debounce=(fn,ms=400)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+const saveProfileDebounced = debounce(saveProfile, 500);
 
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
-  const mapRef = useRef(null);
-  const [mapReady, setMapReady] = useState(false);
-  const VIEW_KEY = 'pp_view_v1';
+  const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
@@ -186,11 +177,32 @@ export default function App() {
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
+  const recomputeStep = () => {
+    const consented = localStorage.getItem('pp_consent_v1') === '1';
+    const finished  = localStorage.getItem('pp_onboard_v1') === '1';
+    const loggedIn  = !!auth.currentUser;
+    if (finished) return 0;          // onboarding dokončen
+    if (!consented) return 1;        // nejdřív souhlas
+    if (!loggedIn) return 2;         // pak přihlášení
+    return 3;                        // potom nastavení profilu
+  };
+  const [step, setStep] = useState(recomputeStep);
+  const finishOnboard = () => {
+    localStorage.setItem('pp_onboard_v1', '1');
+    setStep(0);
+  };
+  useEffect(() => {
+    if (step === 0 && showIntro) {
+      setFadeIntro(true);
+      const t = setTimeout(() => setShowIntro(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [step, showIntro]);
   const [markerHighlights, setMarkerHighlights] = useState({}); // uid -> color
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
   );
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
@@ -225,6 +237,17 @@ export default function App() {
   const galleryRef = useRef(null);
   const sortableRef = useRef(null);
 
+  // Google login (redirect – funguje i na iPhone)
+  async function loginGoogle() {
+    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+    await signInWithRedirect(auth, new GoogleAuthProvider());
+  }
+  // anonymně (lze kdykoli později propojit s Googlem)
+  async function loginAnon() {
+    const { signInAnonymously } = await import('firebase/auth');
+    await signInAnonymously(auth);
+  }
+
   useEffect(() => {
     markerHighlightsRef.current = markerHighlights;
   }, [markerHighlights]);
@@ -233,7 +256,6 @@ export default function App() {
   function acceptLocation() {
     localStorage.setItem("locationConsent", "1");
     setLocationConsent(true);
-    setShowLocationModal(false);
     if (navigator.geolocation) {
       if (navigator.geolocation.requestAuthorization) {
         navigator.geolocation.requestAuthorization();
@@ -277,13 +299,6 @@ export default function App() {
           photos,
           photoURL: photos[0] || null,
         });
-        await upsertPublicProfile(me.uid, {
-          photoURL: photos[0] || null,
-          name: me?.name,
-          gender: me?.gender,
-          lat: me?.lat,
-          lng: me?.lng,
-        });
         buildGrid(photos);
       };
       // drag reorder
@@ -299,13 +314,6 @@ export default function App() {
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
-        });
-        await upsertPublicProfile(me.uid, {
-          photoURL: photos[0] || null,
-          name: me?.name,
-          gender: me?.gender,
-          lat: me?.lat,
-          lng: me?.lng,
         });
         buildGrid(photos);
       });
@@ -494,13 +502,6 @@ export default function App() {
       };
       try{
         await update(ref(db, `users/${uid}`), clean);
-        await upsertPublicProfile(uid, {
-          name,
-          gender: clean.gender,
-          photoURL: me?.photoURL,
-          lat: me?.lat,
-          lng: me?.lng,
-        });
         users[uid] = { ...(users[uid]||{}), ...clean };
         closeSheet('settingsModal');
       }catch(err){
@@ -514,21 +515,56 @@ export default function App() {
 
     const myUid = auth.currentUser?.uid || me?.uid || null;
     const u = (myUid && users?.[myUid]) ? users[myUid] : {};
-    const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
-    if(form){
-      form.querySelector('#sName').value = u.name || '';
-      form.querySelector('#sAge').value = u.age ?? '';
-      const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
-      form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
-      const ag = prefs.gender || 'any';
-      const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
-      if(agEl) agEl.checked = true;
-      form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
-      form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
-      document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+      const prefs = u.pingPrefs || {gender:'any', minAge:16, maxAge:100};
+      if(form){
+        form.querySelector('#sName').value = u.name || '';
+        form.querySelector('#sAge').value = u.age ?? '';
+        const g = (u.gender === 'm' || u.gender === 'f' || u.gender === 'x') ? u.gender : 'x';
+        form.querySelector(`input[name="sGender"][value="${g}"]`)?.click();
+        const ag = prefs.gender || 'any';
+        const agEl = form.querySelector(`input[name="sAllowGender"][value="${ag}"]`);
+        if(agEl) agEl.checked = true;
+        form.querySelector('#sMinAge').value = prefs.minAge ?? 16;
+        form.querySelector('#sMaxAge').value = prefs.maxAge ?? 100;
+        document.getElementById('btnSettingsCancel')?.addEventListener('click', () => closeSheet('settingsModal'));
+        const uid = auth.currentUser?.uid || me?.uid || null;
+        form.querySelector('#sName')?.addEventListener('input', (e)=>{
+          const name = e.target.value;
+          setMe(m=>({...m, name}));
+          saveProfileDebounced(uid, { name });
+        });
+        form.querySelector('#sAge')?.addEventListener('input', (e)=>{
+          const age = parseInt(e.target.value,10);
+          setMe(m=>({...m, age: Number.isFinite(age) ? age : null}));
+          saveProfileDebounced(uid, { age: Number.isFinite(age) ? age : null });
+        });
+        form.querySelectorAll('input[name="sGender"]').forEach(el=>{
+          el.addEventListener('change', (ev)=>{
+            const gender = ev.target.value;
+            setMe(m=>({...m, gender}));
+            saveProfileDebounced(uid, { gender });
+          });
+        });
+        form.querySelectorAll('input[name="sAllowGender"]').forEach(el=>{
+          el.addEventListener('change', (ev)=>{
+            const gender = ev.target.value;
+            setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), gender}}));
+            saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), gender} });
+          });
+        });
+        form.querySelector('#sMinAge')?.addEventListener('input', (e)=>{
+          const minAge = parseInt(e.target.value,10);
+          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16}}));
+          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), minAge: Number.isFinite(minAge)?minAge:16} });
+        });
+        form.querySelector('#sMaxAge')?.addEventListener('input', (e)=>{
+          const maxAge = parseInt(e.target.value,10);
+          setMe(m=>({...m, pingPrefs:{...(m?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100}}));
+          saveProfileDebounced(uid, { pingPrefs:{...(me?.pingPrefs||{}), maxAge: Number.isFinite(maxAge)?maxAge:100} });
+        });
+      }
+      openSheet('settingsModal');
     }
-    openSheet('settingsModal');
-  }
 
   // --- FAB/gear menu: otevření na první tap, klik uvnitř nemá zavírat, cleanup safe ---
   useEffect(() => {
@@ -615,8 +651,14 @@ export default function App() {
     };
 
     refreshPrimary();
-    getRedirectResult(auth).finally(refreshPrimary);
-    onAuthStateChanged(auth, refreshPrimary);
+    getRedirectResult(auth).finally(() => {
+      refreshPrimary();
+      setStep(recomputeStep());
+    });
+    onAuthStateChanged(auth, () => {
+      refreshPrimary();
+      setStep(recomputeStep());
+    });
 
     btnRecover  && (btnRecover.onclick  = withClose(async () => { const o = prompt('Vlož staré UID:'); if (o) await recoverAccount(o); }));
     btnSignOut  && (btnSignOut.onclick  = withClose(async () => { await signOut(auth); }));
@@ -644,13 +686,6 @@ export default function App() {
             photoURL: arr[0] || null,
             lastActive: Date.now(),
           });
-          await upsertPublicProfile(me.uid, {
-            photoURL: arr[0] || null,
-            name: me?.name,
-            gender: me?.gender,
-            lat: me?.lat,
-            lng: me?.lng,
-          });
         },
       });
     }
@@ -663,40 +698,24 @@ export default function App() {
   /* ───────────────────────────── Auth + Me init ─────────────────────────── */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      let u = user;
+    const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         const cred = await signInAnonymously(auth);
         u = cred.user;
       }
-      const name = u.displayName || localStorage.getItem('userName') || 'Anonym';
-      const photoURL = u.photoURL || null;
-      setMe({ uid: u.uid, name });
-
-      const myRef = ref(db, `users/${u.uid}`);
-      onDisconnect(myRef).update({ online: false, lastActive: serverTimestamp() });
-      window.addEventListener("beforeunload", () => {
-        update(myRef, { online: false, lastActive: Date.now() });
+      if(!u){ setMe(null); setStep(recomputeStep()); return; }
+      const uid = u.uid;
+      const cached = readProfileCache(uid);
+      setMe({ uid, ...cached });
+      import('firebase/database').then(({ref, onValue})=>{
+        onValue(ref(db, `users/${uid}`), (snap)=>{
+          const server = snap.val() || {};
+          writeProfileCache(uid, server);
+          setMe({ uid, ...server });
+        });
       });
-
-      await update(myRef, {
-        name,
-        photoURL,
-        lastActive: Date.now(),
-        online: true,
-      });
-
-      await upsertPublicProfile(u.uid, {
-        name,
-        photoURL,
-        gender: me?.gender,
-        lat: me?.lat,
-        lng: me?.lng,
-      });
-
-      // Spawn a development bot for the current user when enabled
-      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(u.uid);
-
+      if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(uid);
+      setStep(recomputeStep());
     });
     return () => unsub();
   }, []);
@@ -718,13 +737,6 @@ export default function App() {
       }
       const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
       await update(ref(db, `users/${me.uid}`), { photos });
-      await upsertPublicProfile(me.uid, {
-        photoURL: photos[0] || null,
-        name: me?.name,
-        gender: me?.gender,
-        lat: me?.lat,
-        lng: me?.lng,
-      });
       buildGrid(photos);
     };
 
@@ -749,13 +761,13 @@ export default function App() {
     const meRef = ref(db, `users/${me.uid}`);
     const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
 
-    const updatePos = async (pos) => {
+    const updatePos = (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
       console.log('My coords', latitude, longitude, 'accuracy', accuracy);
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
-        await update(meRef, {
+        update(meRef, {
           lastActive: Date.now(),
           online: true,
         });
@@ -763,23 +775,21 @@ export default function App() {
       }
       localStorage.setItem('lastLat', String(latitude));
       localStorage.setItem('lastLng', String(longitude));
-      await update(meRef, {
+      update(meRef, {
         lat: latitude,
         lng: longitude,
         lastActive: Date.now(),
         online: true,
       });
-      await upsertPublicProfile(me.uid, { lat: latitude, lng: longitude });
     };
-    const handleErr = async (err) => {
+    const handleErr = (err) => {
       console.warn("Geolocation error", err);
-      await update(meRef, {
+      update(meRef, {
         lat: null,
         lng: null,
         lastActive: Date.now(),
         online: false,
       });
-      await upsertPublicProfile(me.uid, { lat: null, lng: null });
     };
 
     // iOS may not trigger watchPosition immediately; request current position once
@@ -792,42 +802,40 @@ export default function App() {
   /* ───────────────────────────── Init mapy ──────────────────────────────── */
 
   useEffect(() => {
-    if (mapRef.current) return;
-    // 1) Fallback z localStorage (když DB ještě nemá tvoje lat/lng)
-    let center = [14.42076, 50.08804], zoom = 12;
-    try {
-      const raw = localStorage.getItem(VIEW_KEY);
-      if (raw) {
-        const { c, z } = JSON.parse(raw);
-        if (Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) center = c;
-        if (Number.isFinite(z)) zoom = z;
-      }
-    } catch {}
+    if (map || !me) return;
 
-    mapRef.current = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center, zoom
-    });
-    mapRef.current.on('load', () => setMapReady(true));
-    mapRef.current.on('moveend', () => {
+    let m;
+    (async () => {
+      // Start at last known position from DB if available, otherwise Prague
+      let center = [14.42076, 50.08804];
       try {
-        const c = mapRef.current.getCenter();
-        const z = mapRef.current.getZoom();
-        localStorage.setItem(VIEW_KEY, JSON.stringify({ c: [c.lng, c.lat], z }));
-      } catch {}
-    });
-  }, []);
+        const snap = await get(ref(db, `users/${me.uid}`));
+        const u = snap.val();
+        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
+          center = [u.lng, u.lat];
+        }
+      } catch (err) {
+        console.warn("Failed to load last position", err);
+      }
+      m = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v12",
+        center,
+        zoom: 13,
+      });
+      setMap(m);
+    })();
+
+    return () => m && m.remove();
+  }, [me]);
 
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
 
   useEffect(() => {
-    if (!mapRef.current || !mapReady || !me) return;
+    if (!map || !me) return;
 
-    const profilesRef = ref(db, "publicProfiles");
-    const unsub = onValue(
-      profilesRef,
-      (snap) => {
+    const usersRef = ref(db, "users");
+    const unsub = onValue(usersRef, (snap) => {
       const data = snap.val() || {};
       // Firebase RTDB may return arrays as objects; ensure photos are arrays
       Object.values(data).forEach((u) => {
@@ -863,12 +871,10 @@ export default function App() {
           return; // nepokračuj renderem markeru bota
         }
         const isOnline =
-          (typeof u.lastSeen === "number"
-            ? (Date.now() - u.lastSeen) < ONLINE_TTL_MS
-            : true);
-
-        const hasCoords = Number.isFinite(u.lat) && Number.isFinite(u.lng);
-        if (!isMe && (!isOnline || !hasCoords)) {
+          u.online &&
+          u.lastActive &&
+          Date.now() - u.lastActive < ONLINE_TTL_MS;
+        if (!isMe && (!isOnline || !u.lat || !u.lng)) {
           // remove & return
           if (markers.current[uid]) {
             markers.current[uid].remove();
@@ -878,8 +884,8 @@ export default function App() {
         }
 
         // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
-        if (!markers.current[uid] && isMe && !hasCoords && mapRef.current && mapReady) {
-          const c = mapRef.current.getCenter();
+        if (!markers.current[uid] && isMe && (!u.lat || !u.lng)) {
+          const c = map.getCenter();
           u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
         }
 
@@ -892,6 +898,10 @@ export default function App() {
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
           wrapper.style.transformOrigin = "bottom center";
+          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          const ring = document.createElement('div');
+          ring.className = 'marker-ring';
+          wrapper.appendChild(ring);
           const avatar = document.createElement("div");
           avatar.className = "marker-avatar";
           const selIdx =
@@ -923,16 +933,22 @@ export default function App() {
 
           const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
             .setLngLat([u.lng, u.lat])
-            .addTo(mapRef.current);
+            .addTo(map);
 
           markers.current[uid] = mk;
         } else {
-          const shouldUpdate = (isOnline || isMe) && hasCoords;
+          const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
 
           const wrapper = markers.current[uid].getElement();
+          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+          if (!wrapper.querySelector('.marker-ring')) {
+            const ring = document.createElement('div');
+            ring.className = 'marker-ring';
+            wrapper.prepend(ring);
+          }
           const avatar = wrapper.querySelector(".marker-avatar");
           const selIdx =
             markerPhotoIdxRef.current?.[uid] ?? 0;
@@ -973,38 +989,35 @@ export default function App() {
           delete markers.current[uid];
         }
       });
-      },
-      (err) => console.warn("publicProfiles stream error:", err?.code || err)
-    );
+    });
 
     return () => unsub();
-  }, [mapReady, me]);
+  }, [map, me]);
 
   useEffect(() => {
-    if (!mapRef.current || !mapReady || centeredOnMe.current) return;
-    if (!me) return;
+    if (!map || !me || centeredOnMe.current) return;
     const u = users[me.uid];
     if (
       u &&
       Number.isFinite(u.lat) &&
       Number.isFinite(u.lng)
     ) {
-      mapRef.current.setCenter([u.lng, u.lat]);
+      map.setCenter([u.lng, u.lat]);
       centeredOnMe.current = true;
     }
-  }, [mapReady, me, users]);
+  }, [map, me, users]);
 
   useEffect(() => {
-    if (!mapRef.current || !mapReady) return;
+    if (!map) return;
     const handler = () => {
       if (openBubble.current) {
         closeBubble(openBubble.current);
         openBubble.current = null;
       }
     };
-    mapRef.current.on("click", handler);
-    return () => mapRef.current.off("click", handler);
-  }, [mapReady]);
+    map.on("click", handler);
+    return () => map.off("click", handler);
+  }, [map]);
 
   // sledování vzájemných pingů
   useEffect(() => {
@@ -1093,6 +1106,12 @@ export default function App() {
       const u = users[uid];
       if (!u) return;
       const wrapper = mk.getElement();
+      wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+      if (!wrapper.querySelector('.marker-ring')) {
+        const ring = document.createElement('div');
+        ring.className = 'marker-ring';
+        wrapper.prepend(ring);
+      }
       const oldBubble = wrapper.querySelector(".marker-bubble");
       const newBubble = getBubbleContent({
         uid,
@@ -1111,12 +1130,11 @@ export default function App() {
 
       const isMe = me && uid === me.uid;
       const isOnline =
-        (typeof u.lastSeen === "number"
-          ? (Date.now() - u.lastSeen) < ONLINE_TTL_MS
-          : true);
+        u.online &&
+        u.lastActive &&
+        Date.now() - u.lastActive < ONLINE_TTL_MS;
 
-      const hasCoords = Number.isFinite(u.lat) && Number.isFinite(u.lng);
-      if (!isMe && (!isOnline || !hasCoords)) {
+      if (!isOnline && !isMe) {
         if (openBubble.current === uid) openBubble.current = null;
         mk.remove();
         delete markers.current[uid];
@@ -1174,37 +1192,30 @@ export default function App() {
       el.style.backgroundColor = baseColor || "#000";
     }
 
-    const ring = ringColor || null;
-    if (ring) {
-      // bílý separátor + BAREVNÝ prstenec + jemný stín (viditelné i na mapě)
-      el.style.boxShadow =
-        "0 0 0 2px #fff, 0 0 0 8px " + ring + ", 0 3px 8px rgba(0,0,0,.25)";
-    } else {
-      el.style.boxShadow =
-        "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
-    }
+    el.style.boxShadow =
+      "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.12)";
     // pulz nech jen pro skutečný highlight (ping)
-    if (highlight && !ringColor) el.classList.add("marker-highlight");
+    if (highlight) el.classList.add("marker-highlight");
     else el.classList.remove("marker-highlight");
   }
 
   function freezeMap(center) {
-    if (!mapRef.current || !mapReady) return;
+    if (!map) return;
     if (center) {
-      mapRef.current.setCenter(center);
+      map.setCenter(center);
     }
-    mapRef.current.dragPan.disable();
-    mapRef.current.scrollZoom.disable();
-    mapRef.current.doubleClickZoom.disable();
-    mapRef.current.touchZoomRotate.disable();
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoomRotate.disable();
   }
 
   function unfreezeMap() {
-    if (!mapRef.current || !mapReady) return;
-    mapRef.current.dragPan.enable();
-    mapRef.current.scrollZoom.enable();
-    mapRef.current.doubleClickZoom.enable();
-    mapRef.current.touchZoomRotate.enable();
+    if (!map) return;
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.doubleClickZoom.enable();
+    map.touchZoomRotate.enable();
   }
 
   function toggleBubble(uid) {
@@ -1242,6 +1253,7 @@ export default function App() {
 
     const bubble = document.createElement("div");
     bubble.className = "marker-bubble";
+    bubble.style.setProperty('--ring-color', getGenderRing(users[uid]) || 'transparent');
     bubble.addEventListener("click", (e) => e.stopPropagation());
     (function applyBubbleRing(){
       const ring = getGenderRing(users[uid]);
@@ -1593,13 +1605,6 @@ export default function App() {
         photoURL: urls[0] || null,
         lastActive: Date.now(),
       });
-      await upsertPublicProfile(me.uid, {
-        photoURL: urls[0] || null,
-        name: me?.name,
-        gender: me?.gender,
-        lat: me?.lat,
-        lng: me?.lng,
-      });
       alert("🖼️ Fotky nahrány.");
     } catch (e2) {
       console.error(e2);
@@ -1618,13 +1623,6 @@ export default function App() {
       photoURL: arr[0] || null,
       lastActive: Date.now(),
     });
-    await upsertPublicProfile(me.uid, {
-      photoURL: arr[0] || null,
-      name: me?.name,
-      gender: me?.gender,
-      lat: me?.lat,
-      lng: me?.lng,
-    });
     setDeleteIdx(null);
   }
 
@@ -1632,7 +1630,7 @@ export default function App() {
 
   return (
     <div>
-      {!locationConsent && showLocationModal && (
+      {isIOS && !locationConsent && (
         <div className="consent-modal">
           <div className="consent-modal__content">
             <h2>Souhlas se sdílením polohy</h2>
@@ -2144,15 +2142,63 @@ export default function App() {
       {showIntro && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
-          onClick={() => {
-            setFadeIntro(true);
-            setTimeout(() => {
-              setShowIntro(false);
-              if (!locationConsent) setShowLocationModal(true);
-            }, 500);
-          }}
-        >
-          <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
+          style={{ backgroundImage: "url(/splash.jpg)" }}
+        />
+      )}
+
+      {step>0 && (
+        <div className="onboard">
+          <div className="onboard-card">
+            {step===1 && (
+              <>
+                <h1>PutPing</h1>
+                <p>Pokračováním souhlasíš s podmínkami používání a zásadami ochrany soukromí.</p>
+                <button className="btn btn-dark" onClick={() => {
+                  localStorage.setItem('pp_consent_v1','1');
+                  setStep(recomputeStep());
+                }}>Souhlasím</button>
+              </>
+            )}
+            {step===2 && (
+              <>
+                <h1>Přihlášení</h1>
+                <div className="row">
+                  <button className="btn btn-dark" onClick={loginGoogle}>Přihlásit Googlem</button>
+                  <button className="btn btn-light" onClick={loginAnon}>Pokračovat bez účtu</button>
+                </div>
+                <button className="btn btn-light" onClick={() => setStep(3)} style={{marginTop:16}}>Mám účet, nastavit profil</button>
+              </>
+            )}
+            {step===3 && (
+              <>
+                <h1>Nastavení profilu</h1>
+                <div style={{display:'grid',gap:8}}>
+                  <input placeholder="Jméno" value={me?.name||''}
+                    onChange={e=>{ const name=e.target.value; setMe(m=>({...m,name})); saveProfileDebounced(me?.uid,{name}); }}/>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='muz'?" active":""}`}
+                      onClick={()=>{ const gender='muz'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Muž</button>
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='žena'?" active":""}`}
+                      onClick={()=>{ const gender='žena'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Žena</button>
+                    <button
+                      type="button"
+                      className={`pill${me?.gender==='jine'?" active":""}`}
+                      onClick={()=>{ const gender='jine'; setMe(m=>({...m,gender})); saveProfileDebounced(me?.uid,{gender}); }}
+                    >Jiné</button>
+                  </div>
+                  <input type="number" placeholder="Věk (volitelné)" value={me?.age||''}
+                    onChange={e=>{ const age=Number(e.target.value)||null; setMe(m=>({...m,age})); saveProfileDebounced(me?.uid,{age}); }}/>
+                </div>
+                <button className="btn btn-dark" onClick={finishOnboard} style={{marginTop:12}}>Uložit a pokračovat</button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

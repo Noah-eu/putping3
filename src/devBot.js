@@ -4,19 +4,6 @@ import { initSecondaryApp } from "./firebase.js";
 
 function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
 
-// Zapisuje veřejné minimum do /publicProfiles/<uid>
-function upsertPublicProfile(db, uid, partial) {
-  if (!uid) return Promise.resolve();
-  const safe = {};
-  if ('name' in partial)     safe.name     = partial.name ?? '';
-  if ('gender' in partial)   safe.gender   = partial.gender ?? 'any';
-  if ('photoURL' in partial) safe.photoURL = partial.photoURL ?? '';
-  if ('lat' in partial)      safe.lat      = Number(partial.lat) || 0;
-  if ('lng' in partial)      safe.lng      = Number(partial.lng) || 0;
-  safe.lastSeen = Date.now();
-  return update(ref(db, `publicProfiles/${uid}`), safe);
-}
-
 export async function spawnDevBot(ownerUid){
   const app = initSecondaryApp("dev-bot");
   const db2 = getDatabase(app);
@@ -40,14 +27,10 @@ export async function spawnDevBot(ownerUid){
     }
   }
 
-  const botName = "Kontrolní bot";
-  const botPhotoURL = "https://i.pravatar.cc/200?img=12";
-  const botGender = "any";
-
   const userRef = ref(db2, `users/${botUid}`);
   await set(userRef, {
-    name: botName,
-    photoURL: botPhotoURL,
+    name: "Kontrolní bot",
+    photoURL: "https://i.pravatar.cc/200?img=12",
     photos: [],
     gender: "muz",
     lat, lng,
@@ -55,13 +38,6 @@ export async function spawnDevBot(ownerUid){
     lastActive: Date.now(),
     isDevBot: true,
     privateTo: ownerUid,
-  });
-
-  await upsertPublicProfile(db2, botUid, {
-    name: botName || 'Kontrolní bot',
-    gender: botGender || 'any',
-    photoURL: botPhotoURL || '',
-    lat, lng,
   });
 
   // Reakce na pingy → spáruj pár a pošli zprávu
