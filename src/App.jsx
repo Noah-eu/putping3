@@ -775,9 +775,10 @@ export default function App() {
           return; // nepokračuj renderem markeru bota
         }
         const isOnline =
-          u.online &&
-          u.lastActive &&
-          Date.now() - u.lastActive < ONLINE_TTL_MS;
+          (typeof u.lastSeen === "number"
+            ? (Date.now() - u.lastSeen) < ONLINE_TTL_MS
+            : true);
+
         const hasCoords = Number.isFinite(u.lat) && Number.isFinite(u.lng);
         if (!isMe && (!isOnline || !hasCoords)) {
           // remove & return
@@ -1021,11 +1022,12 @@ export default function App() {
 
       const isMe = me && uid === me.uid;
       const isOnline =
-        u.online &&
-        u.lastActive &&
-        Date.now() - u.lastActive < ONLINE_TTL_MS;
+        (typeof u.lastSeen === "number"
+          ? (Date.now() - u.lastSeen) < ONLINE_TTL_MS
+          : true);
 
-      if (!isOnline && !isMe) {
+      const hasCoords = Number.isFinite(u.lat) && Number.isFinite(u.lng);
+      if (!isMe && (!isOnline || !hasCoords)) {
         if (openBubble.current === uid) openBubble.current = null;
         mk.remove();
         delete markers.current[uid];
