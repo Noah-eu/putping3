@@ -147,7 +147,7 @@ export default function App() {
   const [locationConsent, setLocationConsent] = useState(() =>
     localStorage.getItem("locationConsent") === "1"
   );
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
@@ -190,6 +190,7 @@ export default function App() {
   function acceptLocation() {
     localStorage.setItem("locationConsent", "1");
     setLocationConsent(true);
+    setShowLocationModal(false);
     if (navigator.geolocation) {
       if (navigator.geolocation.requestAuthorization) {
         navigator.geolocation.requestAuthorization();
@@ -1522,7 +1523,7 @@ export default function App() {
 
   return (
     <div>
-      {isIOS && !locationConsent && (
+      {!locationConsent && showLocationModal && (
         <div className="consent-modal">
           <div className="consent-modal__content">
             <h2>Souhlas se sdílením polohy</h2>
@@ -2036,7 +2037,10 @@ export default function App() {
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
           onClick={() => {
             setFadeIntro(true);
-            setTimeout(() => setShowIntro(false), 500);
+            setTimeout(() => {
+              setShowIntro(false);
+              if (!locationConsent) setShowLocationModal(true);
+            }, 500);
           }}
         >
           <img src="/splash.jpg" alt="PutPing" className="intro-screen__img" />
