@@ -26,7 +26,16 @@ import { getRedirectResult, signOut } from "firebase/auth";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+if (!mapboxgl.accessToken) {
+  mapboxgl.accessToken =
+    (import.meta?.env?.VITE_MAPBOX_TOKEN) ||
+    (typeof window !== 'undefined' ? window.MAPBOX_TOKEN : '') ||
+    '';
+  if (!mapboxgl.accessToken) {
+    console.warn('Mapbox access token is missing (VITE_MAPBOX_TOKEN / window.MAPBOX_TOKEN).');
+    // optional: alert('Chybí Mapbox token – nastav VITE_MAPBOX_TOKEN v Netlify Environment Variables.');
+  }
+}
 
 window.shouldPlaySound = () =>
   localStorage.getItem("soundEnabled") !== "0";
