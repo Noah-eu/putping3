@@ -897,7 +897,6 @@ export default function App() {
         if (!markers.current[uid]) {
           const wrapper = document.createElement("div");
           wrapper.className = "marker-wrapper";
-          wrapper.style.transformOrigin = "bottom center";
           wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
           const ring = document.createElement('div');
           ring.className = 'marker-ring';
