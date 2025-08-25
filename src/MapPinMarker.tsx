@@ -1,12 +1,10 @@
-import React, { useId } from "react";
+import React from "react";
 
 interface MapPinMarkerProps {
   onPing?: () => void;
 }
 
 const MapPinMarker: React.FC<MapPinMarkerProps> = ({ onPing }) => {
-  const gradientId = useId();
-
   return (
     <svg
       width={80}
@@ -15,14 +13,14 @@ const MapPinMarker: React.FC<MapPinMarkerProps> = ({ onPing }) => {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="pinGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#FF3366" />
           <stop offset="100%" stopColor="#FF6F91" />
         </linearGradient>
       </defs>
       <path
         d="M40 0C62 0 80 18 80 40C80 73 40 112 40 112C40 112 0 73 0 40C0 18 18 0 40 0Z"
-        fill={`url(#${gradientId})`}
+        fill="url(#pinGradient)"
       />
       <g
         onClick={() => onPing && onPing()}
