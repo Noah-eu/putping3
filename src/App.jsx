@@ -164,7 +164,9 @@ function upsertPublicProfile(uid, partial) {
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
-  const [map, setMap] = useState(null);
+  const mapRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
+  const VIEW_KEY = 'pp_view_v1';
   const [me, setMe] = useState(null); // {uid, name, photoURL}
   const [users, setUsers] = useState({});
   const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
@@ -781,37 +783,37 @@ export default function App() {
   /* ───────────────────────────── Init mapy ──────────────────────────────── */
 
   useEffect(() => {
-    if (map || !me) return;
-
-    let m;
-    (async () => {
-      // Start at last known position from DB if available, otherwise Prague
-      let center = [14.42076, 50.08804];
-      try {
-        const snap = await get(ref(db, `users/${me.uid}`));
-        const u = snap.val();
-        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
-          center = [u.lng, u.lat];
-        }
-      } catch (err) {
-        console.warn("Failed to load last position", err);
+    if (mapRef.current) return;
+    // 1) Fallback z localStorage (když DB ještě nemá tvoje lat/lng)
+    let center = [14.42076, 50.08804], zoom = 12;
+    try {
+      const raw = localStorage.getItem(VIEW_KEY);
+      if (raw) {
+        const { c, z } = JSON.parse(raw);
+        if (Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) center = c;
+        if (Number.isFinite(z)) zoom = z;
       }
-      m = new mapboxgl.Map({
-        container: "map",
-        style: "mapbox://styles/mapbox/streets-v12",
-        center,
-        zoom: 13,
-      });
-      setMap(m);
-    })();
+    } catch {}
 
-    return () => m && m.remove();
-  }, [me]);
+    mapRef.current = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center, zoom
+    });
+    mapRef.current.on('load', () => setMapReady(true));
+    mapRef.current.on('moveend', () => {
+      try {
+        const c = mapRef.current.getCenter();
+        const z = mapRef.current.getZoom();
+        localStorage.setItem(VIEW_KEY, JSON.stringify({ c: [c.lng, c.lat], z }));
+      } catch {}
+    });
+  }, []);
 
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
 
   useEffect(() => {
-    if (!map || !me) return;
+    if (!mapRef.current || !mapReady || !me) return;
 
     const profilesRef = ref(db, "publicProfiles");
     const unsub = onValue(
@@ -868,7 +870,7 @@ export default function App() {
 
         // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
         if (!markers.current[uid] && isMe && !hasCoords) {
-          const c = map.getCenter();
+          const c = mapRef.current.getCenter();
           u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
         }
 
@@ -912,7 +914,7 @@ export default function App() {
 
           const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
             .setLngLat([u.lng, u.lat])
-            .addTo(map);
+            .addTo(mapRef.current);
 
           markers.current[uid] = mk;
         } else {
@@ -967,32 +969,32 @@ export default function App() {
     );
 
     return () => unsub();
-  }, [map, me]);
+  }, [mapReady, me]);
 
   useEffect(() => {
-    if (!map || !me || centeredOnMe.current) return;
+    if (!mapRef.current || !mapReady || !me || centeredOnMe.current) return;
     const u = users[me.uid];
     if (
       u &&
       Number.isFinite(u.lat) &&
       Number.isFinite(u.lng)
     ) {
-      map.setCenter([u.lng, u.lat]);
+      mapRef.current.setCenter([u.lng, u.lat]);
       centeredOnMe.current = true;
     }
-  }, [map, me, users]);
+  }, [mapReady, me, users]);
 
   useEffect(() => {
-    if (!map) return;
+    if (!mapRef.current || !mapReady) return;
     const handler = () => {
       if (openBubble.current) {
         closeBubble(openBubble.current);
         openBubble.current = null;
       }
     };
-    map.on("click", handler);
-    return () => map.off("click", handler);
-  }, [map]);
+    mapRef.current.on("click", handler);
+    return () => mapRef.current.off("click", handler);
+  }, [mapReady]);
 
   // sledování vzájemných pingů
   useEffect(() => {
@@ -1177,22 +1179,22 @@ export default function App() {
   }
 
   function freezeMap(center) {
-    if (!map) return;
+    if (!mapRef.current || !mapReady) return;
     if (center) {
-      map.setCenter(center);
+      mapRef.current.setCenter(center);
     }
-    map.dragPan.disable();
-    map.scrollZoom.disable();
-    map.doubleClickZoom.disable();
-    map.touchZoomRotate.disable();
+    mapRef.current.dragPan.disable();
+    mapRef.current.scrollZoom.disable();
+    mapRef.current.doubleClickZoom.disable();
+    mapRef.current.touchZoomRotate.disable();
   }
 
   function unfreezeMap() {
-    if (!map) return;
-    map.dragPan.enable();
-    map.scrollZoom.enable();
-    map.doubleClickZoom.enable();
-    map.touchZoomRotate.enable();
+    if (!mapRef.current || !mapReady) return;
+    mapRef.current.dragPan.enable();
+    mapRef.current.scrollZoom.enable();
+    mapRef.current.doubleClickZoom.enable();
+    mapRef.current.touchZoomRotate.enable();
   }
 
   function toggleBubble(uid) {
