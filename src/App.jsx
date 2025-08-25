@@ -775,7 +775,8 @@ export default function App() {
           u.online &&
           u.lastActive &&
           Date.now() - u.lastActive < ONLINE_TTL_MS;
-        if (!isMe && (!isOnline || !u.lat || !u.lng)) {
+        const hasCoords = Number.isFinite(u.lat) && Number.isFinite(u.lng);
+        if (!isMe && (!isOnline || !hasCoords)) {
           // remove & return
           if (markers.current[uid]) {
             markers.current[uid].remove();
@@ -785,7 +786,7 @@ export default function App() {
         }
 
         // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
-        if (!markers.current[uid] && isMe && (!u.lat || !u.lng)) {
+        if (!markers.current[uid] && isMe && !hasCoords) {
           const c = map.getCenter();
           u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
         }
@@ -834,7 +835,7 @@ export default function App() {
 
           markers.current[uid] = mk;
         } else {
-          const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
+          const shouldUpdate = (isOnline || isMe) && hasCoords;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
