@@ -736,8 +736,10 @@ export default function App() {
   useEffect(() => {
     if (!map || !me) return;
 
-    const usersRef = ref(db, "users");
-    const unsub = onValue(usersRef, (snap) => {
+    const profilesRef = ref(db, "publicProfiles");
+    const unsub = onValue(
+      profilesRef,
+      (snap) => {
       const data = snap.val() || {};
       // Firebase RTDB may return arrays as objects; ensure photos are arrays
       Object.values(data).forEach((u) => {
@@ -882,7 +884,9 @@ export default function App() {
           delete markers.current[uid];
         }
       });
-    });
+      },
+      (err) => console.warn("publicProfiles stream error:", err?.code || err)
+    );
 
     return () => unsub();
   }, [map, me]);
