@@ -62,6 +62,14 @@ async function recoverAccount(oldUid) {
     online: true,
   });
 
+  await upsertPublicProfile(newUid, {
+    name: oldUser.name,
+    gender: oldUser.gender,
+    photoURL: oldUser.photoURL,
+    lat: oldUser.lat,
+    lng: oldUser.lng,
+  });
+
   // 2) pairs/pairPings/messages – překlop všechna párová data
   const allPairsSnap = await get(ref(db, `pairPings`));
   const allPairs = allPairsSnap.val() || {};
@@ -127,6 +135,19 @@ function canPing(viewer, target){
   if (age < (prefs.minAge ?? 16)) return false;
   if (age > (prefs.maxAge ?? 100)) return false;
   return true;
+}
+
+// Zapisuje veřejné minimum do /publicProfiles/<uid>
+function upsertPublicProfile(uid, partial) {
+  if (!uid) return Promise.resolve();
+  const safe = {};
+  if ('name' in partial)     safe.name     = partial.name ?? '';
+  if ('gender' in partial)   safe.gender   = partial.gender ?? 'any';
+  if ('photoURL' in partial) safe.photoURL = partial.photoURL ?? '';
+  if ('lat' in partial)      safe.lat      = Number(partial.lat) || 0;
+  if ('lng' in partial)      safe.lng      = Number(partial.lng) || 0;
+  safe.lastSeen = Date.now();
+  return update(ref(db, `publicProfiles/${uid}`), safe);
 }
 
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
@@ -234,6 +255,13 @@ export default function App() {
           photos,
           photoURL: photos[0] || null,
         });
+        await upsertPublicProfile(me.uid, {
+          photoURL: photos[0] || null,
+          name: me?.name,
+          gender: me?.gender,
+          lat: me?.lat,
+          lng: me?.lng,
+        });
         buildGrid(photos);
       };
       // drag reorder
@@ -249,6 +277,13 @@ export default function App() {
         await update(ref(db, `users/${me.uid}`), {
           photos,
           photoURL: photos[0] || null,
+        });
+        await upsertPublicProfile(me.uid, {
+          photoURL: photos[0] || null,
+          name: me?.name,
+          gender: me?.gender,
+          lat: me?.lat,
+          lng: me?.lng,
         });
         buildGrid(photos);
       });
@@ -437,6 +472,13 @@ export default function App() {
       };
       try{
         await update(ref(db, `users/${uid}`), clean);
+        await upsertPublicProfile(uid, {
+          name,
+          gender: clean.gender,
+          photoURL: me?.photoURL,
+          lat: me?.lat,
+          lng: me?.lng,
+        });
         users[uid] = { ...(users[uid]||{}), ...clean };
         closeSheet('settingsModal');
       }catch(err){
@@ -580,6 +622,13 @@ export default function App() {
             photoURL: arr[0] || null,
             lastActive: Date.now(),
           });
+          await upsertPublicProfile(me.uid, {
+            photoURL: arr[0] || null,
+            name: me?.name,
+            gender: me?.gender,
+            lat: me?.lat,
+            lng: me?.lng,
+          });
         },
       });
     }
@@ -615,6 +664,14 @@ export default function App() {
         online: true,
       });
 
+      await upsertPublicProfile(u.uid, {
+        name,
+        photoURL,
+        gender: me?.gender,
+        lat: me?.lat,
+        lng: me?.lng,
+      });
+
       // Spawn a development bot for the current user when enabled
       if (import.meta.env.VITE_DEV_BOT === '1') spawnDevBot(u.uid);
 
@@ -639,6 +696,13 @@ export default function App() {
       }
       const photos = [ ...(users[me.uid]?.photos||[]), ...newUrls ];
       await update(ref(db, `users/${me.uid}`), { photos });
+      await upsertPublicProfile(me.uid, {
+        photoURL: photos[0] || null,
+        name: me?.name,
+        gender: me?.gender,
+        lat: me?.lat,
+        lng: me?.lng,
+      });
       buildGrid(photos);
     };
 
@@ -663,13 +727,13 @@ export default function App() {
     const meRef = ref(db, `users/${me.uid}`);
     const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
 
-    const updatePos = (pos) => {
+    const updatePos = async (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
       console.log('My coords', latitude, longitude, 'accuracy', accuracy);
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
-        update(meRef, {
+        await update(meRef, {
           lastActive: Date.now(),
           online: true,
         });
@@ -677,21 +741,23 @@ export default function App() {
       }
       localStorage.setItem('lastLat', String(latitude));
       localStorage.setItem('lastLng', String(longitude));
-      update(meRef, {
+      await update(meRef, {
         lat: latitude,
         lng: longitude,
         lastActive: Date.now(),
         online: true,
       });
+      await upsertPublicProfile(me.uid, { lat: latitude, lng: longitude });
     };
-    const handleErr = (err) => {
+    const handleErr = async (err) => {
       console.warn("Geolocation error", err);
-      update(meRef, {
+      await update(meRef, {
         lat: null,
         lng: null,
         lastActive: Date.now(),
         online: false,
       });
+      await upsertPublicProfile(me.uid, { lat: null, lng: null });
     };
 
     // iOS may not trigger watchPosition immediately; request current position once
@@ -1504,6 +1570,13 @@ export default function App() {
         photoURL: urls[0] || null,
         lastActive: Date.now(),
       });
+      await upsertPublicProfile(me.uid, {
+        photoURL: urls[0] || null,
+        name: me?.name,
+        gender: me?.gender,
+        lat: me?.lat,
+        lng: me?.lng,
+      });
       alert("🖼️ Fotky nahrány.");
     } catch (e2) {
       console.error(e2);
@@ -1521,6 +1594,13 @@ export default function App() {
       photos: arr,
       photoURL: arr[0] || null,
       lastActive: Date.now(),
+    });
+    await upsertPublicProfile(me.uid, {
+      photoURL: arr[0] || null,
+      name: me?.name,
+      gender: me?.gender,
+      lat: me?.lat,
+      lng: me?.lng,
     });
     setDeleteIdx(null);
   }
