@@ -745,3 +745,8 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   z-index: -1;                     /* pod obsahem bubliny */
   pointer-events: none;
 }
+
+/* --- Map fullscreen baseline --- */
+html, body, #root { height: 100%; margin: 0; }
+#appRoot { position: fixed; inset: 0; }
+#map { position: absolute; inset: 0; }
