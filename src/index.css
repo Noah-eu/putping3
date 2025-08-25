@@ -3,6 +3,30 @@
 html, body, #root { height: 100%; }
 body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #111827; }
 
+/* Map container */
+.map { width: 100vw; height: 100vh; }
+
+/* Intro splash */
+.intro-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.5s ease;
+  padding: 7mm;
+  background: #ff8fa1;
+}
+.intro-screen--hidden {
+  opacity: 0;
+}
+.intro-screen__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* Location consent modal */
 .consent-modal {
   position: fixed;
@@ -58,7 +82,9 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   height: 320px;
   background: #ff8fa1;
   clip-path: path('M120 0C186 0 240 54 240 120C240 220 120 320 120 320C120 320 0 220 0 120C0 54 54 0 120 0Z');
-  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.9),   /* nový tenký rámeček */
+    0 2px 10px rgba(0,0,0,.15);             /* původní stín */
   text-align: center;
   font: 12px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   z-index: 10;
@@ -81,18 +107,24 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   pointer-events: auto;
 }
 .marker-wrapper.active .marker-avatar { display: none; }
-.bubble-gallery {
-    width: 75%;
-    height: 56%;
-    flex: 0 0 56%;
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    border-radius: 50%;
-    touch-action: pan-x;
-    padding-bottom: 6px;
-    scrollbar-width: thin;
+/* Galerie bude vždy čtverec = kruh */
+.bubble-gallery{
+  width:76%;
+  aspect-ratio:1/1;        /* místo height:56% a flex:0 0 56% */
+  flex:0 0 auto;
+  display:flex;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  border-radius:50%;
+  /* ↓ přidej: lehké odsazení dolů, ať je nahoře vidět víc růžové */
+  margin-top:8px;
+
+  /* prstýnek + stín (mírně tenčí) */
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,.85),
+    0 6px 16px rgba(0,0,0,.18);
+  padding:0;
+  scrollbar-width:thin;
 }
 .bubble-gallery::-webkit-scrollbar {
   height: 4px;
@@ -106,27 +138,20 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   border-radius: 4px;
 }
 .bubble-photo{
-  flex:0 0 100%;
-  width:100%;
-  height:100%;
-  object-fit:cover;             /* dříve bylo contain → proto nebyl kruh plný */
-  scroll-snap-align:center;
+  flex: 0 0 100%;
+  width:100%; height:100%;
+  object-fit:cover;
   border-radius:50%;
-  box-sizing:border-box;
-
-  /* dvouvrstvý rámeček: bílý okraj + jemný prstýnek a stín */
-  border:4px solid #fff;
-  box-shadow:
-    0 0 0 4px rgba(255,255,255,.7),   /* prstýnek venku */
-    0 6px 16px rgba(0,0,0,.18);       /* měkký stín */
-  background:#fff;
+  border:3px solid #fff;   /* bylo 4px → zjemníme */
+  scroll-snap-align:center;
 }
 .bubble-photo.empty{
   background:#f3f4f6; border:4px dashed rgba(255,255,255,.8);
   border-radius:50%;
 }
-.marker-wrapper.active img.bubble-photo {
-  transform: translateY(10%);
+/* jistota: žádný posun fotky */
+.marker-wrapper.active img.bubble-photo{
+  transform:none !important;
 }
 .bubble-bottom {
   flex: 0 0 25%;
@@ -137,13 +162,15 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   align-items: center;
   padding: 4px 8px 12px;
 }
-.bubble-name {
-  margin-top: 12px;             /* níž pod fotkou */
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;                   /* bílý text */
-  text-shadow: 0 1px 2px rgba(0,0,0,.45); /* jemný stín pod ním */
-  text-align: center;
+.bubble-name{
+  margin-top:12px;
+  font-size:20px;           /* o chlup větší */
+  font-weight:700;
+  font-family:'Poppins', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color:#fff;
+  letter-spacing:.2px;
+  text-shadow:0 2px 6px rgba(0,0,0,.35);
+  text-align:center;
 }
 /* ukotveni tlacitka do spicky pinu */
 .bubble-actions{
@@ -153,7 +180,7 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   transform:translateX(-50%);  /* zruš ten +6px dolů */
   margin:0;
   display:block;
-  z-index:2;
+  z-index:3;
 }
 
 /* vetsi pilulka, hezci tvar – SIRKA 140 x VYSKA 40 */
@@ -452,16 +479,269 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   transform: translateX(-50%);
 }
 
-html,body,#root{height:100%;margin:0}
-#appRoot{position:fixed; inset:0}
-#map{position:absolute; inset:0}
+/* Auth buttons */
+#btnAuthPrimary{ background: #111; color:#fff; }
+#btnSignOut{ background: #eee; }
 
-.intro-screen{
-  position:fixed; inset:0; z-index:5;
-  display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(180deg,#f5a4b3 0%,#f2a0af 100%);
-  opacity:1; transition:opacity .7s ease;
-  pointer-events:none; /* nikdy neblokuje kliky */
+/* FAB tlačítko (ozubené kolečko) */
+.fab-gear{
+  position:fixed;
+  right:calc(16px + env(safe-area-inset-right));
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  width:56px;height:56px;border:none;border-radius:50%;
+  display:grid;place-items:center;
+  background:#111;color:#fff;cursor:pointer;
+  box-shadow:0 6px 20px rgba(0,0,0,.28);
+  z-index:2100; /* nad mapou */
 }
-.intro-screen.intro--fade{ opacity:0; }
-.intro-logo{ font-size:40px; font-weight:800; color:#1a1a1a; }
+.fab-gear svg{ width:24px;height:24px; }
+
+/* FAB menu jako responsivní bottom-sheet */
+.gear-menu{
+  position:fixed;
+  left:50%;
+  bottom:calc(84px + env(safe-area-inset-bottom)); /* nad FAB, ale nízko */
+  transform:translate(-50%, 8px); /* vstupní poloha (skryté) */
+  width:clamp(280px, 92vw, 420px);
+  max-height:min(70vh, 560px);
+  overflow:auto;
+  -webkit-overflow-scrolling: touch;
+
+  display:flex;flex-direction:column;gap:10px;
+  padding:12px;border-radius:16px;
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(8px);
+  box-shadow:0 12px 32px rgba(0,0,0,.28);
+  z-index:2200;
+
+  opacity:0; pointer-events:none;
+  transition:transform .18s ease, opacity .18s ease;
+}
+.gear-menu.open{
+  transform:translate(-50%, 0);
+  opacity:1; pointer-events:auto;
+}
+
+/* extra bezpečnost pro velmi malé výšky (zaplní skoro celé okno) */
+@media (max-height: 640px){
+  .gear-menu{
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    max-height:calc(92vh - 72px);
+  }
+}
+
+/* položky v menu */
+.gear-menu button{
+  min-height:44px;
+  border:none;border-radius:12px;
+  padding:10px 12px;
+  font-weight:600;text-align:left;
+  background:#f3f4f6;color:#111;
+}
+.gear-menu button:hover{ filter:brightness(.97); }
+
+
+/* Bottom sheet gallery */
+.sheet{
+  position:fixed; left:0; right:0; bottom:0;
+  transform:translateY(100%); transition:transform .2s ease;
+  background:#fff; border-radius:16px 16px 0 0;
+  box-shadow:0 -12px 30px rgba(0,0,0,.25); z-index:1001;
+  max-height:70vh; padding:12px;
+}
+.sheet.open{ transform:translateY(0); }
+.sheet-head{ display:flex; align-items:center; gap:8px; }
+.sheet-head h3{ flex:1; margin:0; }
+.sheet-head #btnAddPhoto{ background:#111; color:#fff; border:none; border-radius:10px; padding:8px 12px; font-weight:700; }
+.sheet-head #btnCloseGallery{ background:transparent; border:none; font-size:20px; padding:6px 10px; }
+
+.grid{ margin-top:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.tile{ position:relative; border-radius:12px; overflow:hidden; background:#f3f4f6; }
+.tile img{ width:100%; height:100%; object-fit:cover; display:block; }
+.tile .del{ position:absolute; top:6px; right:6px; background:#f33; color:#fff; border:none; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+.tile .grab{ position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.5); color:#fff; border-radius:6px; padding:2px 6px; font-weight:700; font-family:monospace; }
+.gear-sep{ border:none; border-top:1px solid rgba(0,0,0,.1); margin:8px 0; }
+
+/* Mapbox / MapLibre zoom ovladače posunout nad FAB (podporujeme oboje prefixed) */
+.mapboxgl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-right {
+  bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+  right:  calc(12px + env(safe-area-inset-right)) !important;
+}
+
+
+/* schovej staré plovoucí + a minikolečko, kdyby ještě někde vznikly */
+#btnPlus,.map-plus,.action-fab,.floating-plus,.mini-gear,#miniGear{ display:none!important; }
+
+.chat-row{ width:100%; display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:#f9fafb; border:none; text-align:left; }
+.chat-row + .chat-row{ margin-top:8px; }
+.chat-row .avatar{ width:44px; height:44px; border-radius:50%; object-fit:cover; background:#eee; }
+.chat-row .name{ font-weight:700; }
+.chat-row .sub{ font-size:12px; color:#6b7280; }
+
+.switch{ display:flex; align-items:center; gap:10px; padding:10px; background:#f3f4f6; border-radius:12px; }
+.switch input{ width:18px; height:18px; }
+
+.chat-panel{
+  position:fixed; inset:0;
+  background: rgba(255,255,255,.9);
+  backdrop-filter: blur(8px);
+  display:flex; flex-direction:column;
+  z-index:2400; /* chat nad vším */
+}
+.chat-panel.hidden{ display:none; }
+
+.chat-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  border-bottom:1px solid rgba(0,0,0,.08);
+  background:#fff;
+}
+.chat-header .danger{ background:#ef4444; color:#fff; border:none; padding:8px 12px; border-radius:10px; }
+.chat-title{ font-weight:700; }
+
+.chat-messages{ flex:1; overflow:auto; padding:12px; }
+.chat-form{
+  display:flex; gap:8px; padding:10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background:#fff; border-top:1px solid rgba(0,0,0,.08);
+}
+#chatInput{ flex:1; border:1px solid #ddd; border-radius:12px; padding:10px 12px; }
+#chatSend{ border:none; border-radius:12px; padding:10px 14px; font-weight:600; background:#111; color:#fff; }
+
+/* vrstvy: chat > menu > mapa */
+.chat-panel{ z-index:2400; }
+.gear-menu{ z-index:2200; }
+
+/* obecné položky v menu */
+.gear-menu button{
+  min-height:44px;
+  border:none; border-radius:12px;
+  padding:10px 12px; font-weight:600; text-align:left;
+  background:#f3f4f6; color:#111;
+}
+
+/* PRIMÁRNÍ tlačítko nahoře (Google) – bílý text na černé */
+#btnAuthPrimary{
+  background:#111 !important;
+  color:#fff !important;
+}
+
+#chatOverlay{
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2400 !important;
+  pointer-events: auto !important;
+}
+
+/* FAB zůstává pod dialogy */
+.fab-gear{ z-index:2100; }
+
+/* všechny “sheet” panely (Nastavení, Chaty, Galerie) mají být NAD FAB */
+.sheet{ z-index:2350; }
+
+/* když je otevřen sheet, FAB skryj a vypni kliky (pro jistotu na všech browserch) */
+.sheet-open .fab-gear{
+  opacity:0;
+  transform:scale(0.9);
+  pointer-events:none;
+}
+
+/* Rezerva u dna, ať akční tlačítka nelezou do safe-area/FAB (když by byl vidět) */
+.sheet{
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.sheet, .sheet * { pointer-events: auto; }
+#btnSettingsSave[disabled]{ opacity:.7; }
+
+/* ===== Settings polish ===== */
+.settings-head{
+  position: sticky; top: 0;
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px;
+  background:#fff; z-index:1;
+  border-bottom:1px solid rgba(17,17,17,.06);
+  border-top-left-radius:16px; border-top-right-radius:16px;
+}
+.settings-head .title{ font-size:18px; font-weight:800; letter-spacing:.2px; }
+.settings-head .spacer{ flex:1; }
+.btn{ border:1px solid rgba(17,17,17,.12); background:#fff; border-radius:10px; padding:8px 12px; }
+.btn-icon{ width:36px; height:36px; display:grid; place-items:center; font-size:20px; }
+.btn-primary{ background:#111; color:#fff; border-color:#111; }
+.btn.small{ padding:6px 10px; font-size:13px; }
+
+.settings-form{ display:flex; flex-direction:column; gap:12px; padding:12px 16px 20px; }
+.field>span{ display:block; font-size:13px; opacity:.8; margin-bottom:6px; }
+.field input[type="text"], .field input[type="number"]{
+  width:100%; border:1px solid rgba(17,17,17,.14); border-radius:10px;
+  padding:10px 12px; font-size:16px; background:#fff;
+}
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* „pill“ rádia */
+.segmented{ display:flex; gap:8px; flex-wrap:wrap; }
+.segmented input{ position:absolute; opacity:0; pointer-events:none; }
+.segmented label{ position:relative; }
+.segmented label span{
+  display:inline-block; padding:8px 12px; border-radius:999px;
+  border:1px solid rgba(17,17,17,.14); background:#fff;
+}
+.segmented input:checked + span{
+  background:#111; color:#fff; border-color:#111;
+}
+
+.settings-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+
+/* Rezerva u dna proti safe-area */
+.sheet{ padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+/* ===== Settings – stavové barvy a layout ===== */
+.btn-geo{ display:inline-flex; align-items:center; gap:6px; }
+.btn-geo .icon{ font-size:16px; line-height:1; }
+/* default (prompt) – černé primární */
+.btn-geo.prompt{ background:#111; color:#fff; border-color:#111; }
+/* povoleno = ZELENÁ */
+.btn-geo.granted{ background:#10b981; color:#fff; border-color:#10b981; }
+/* zamítnuto – decentní orámování (neblokujeme uživatele) */
+.btn-geo.denied{ background:#fff; color:#111; border-color:rgba(17,17,17,.25); }
+
+/* „pill“ barvy podle pohlaví (vybrané) */
+.segmented input[value="m"]:checked + span{ background:#f472b6; border-color:#f472b6; color:#fff; } /* muž = růžová */
+.segmented input[value="f"]:checked + span{ background:#3b82f6; border-color:#3b82f6; color:#fff; } /* žena = modrá */
+.segmented input[value="x"]:checked + span{ background:#10b981; border-color:#10b981; color:#fff; } /* jiné = zelená */
+
+/* Akční lišta vždy viditelná u dna */
+.settings-actions{
+  position: sticky; bottom: 0; z-index: 1;
+  background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,.92));
+  padding: 12px 16px; border-top:1px solid rgba(17,17,17,.06);
+}
+/* Rezerva pro malé displeje + safe-area, ať nic „neuteče“ pod okraj */
+.sheet{ padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+/* --- GENDER RING: malý pin --- */
+.marker-wrapper { position: relative; }
+.marker-ring{
+  position:absolute; inset:0;
+  clip-path: path('M16 0C24.8 0 32 7.2 32 16C32 29.2 16 44 16 44C16 44 0 29.2 0 16C0 7.2 7.2 0 16 0Z');
+  transform-origin: bottom center;
+  transform: scale(1.18);          /* tloušťka prstence */
+  background: var(--ring-color, transparent);
+  box-shadow: 0 0 0 2px #fff;      /* bílá separace od mapy */
+  z-index: 0;
+  pointer-events: none;
+}
+.marker-avatar{ position: relative; z-index: 1; }
+
+/* --- GENDER RING: velká bublina --- */
+.marker-bubble{ position: absolute; z-index: 10; }
+.marker-bubble::before{
+  content:""; position:absolute; inset:0;
+  clip-path: path('M120 0C186 0 240 54 240 120C240 220 120 320 120 320C120 320 0 220 0 120C0 54 54 0 120 0Z');
+  transform-origin: bottom center;
+  transform: scale(1.06);          /* mírně větší než bublina */
+  background: var(--ring-color, transparent);
+  box-shadow: 0 0 0 2px #fff;      /* vnitřní bílý lem */
+  z-index: -1;                     /* pod obsahem bubliny */
+  pointer-events: none;
+}
