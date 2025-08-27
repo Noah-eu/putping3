@@ -4,7 +4,6 @@ export default function Onboarding({ onDone }) {
 const [locationAllowed, setLocationAllowed] = useState(false);
 const [coords, setCoords] = useState(null);
 const [name, setName] = useState('');
-
   const [gender, setGender] = useState(null); // 'muz' | 'žena' | 'jine'
 const [photoPreview, setPhotoPreview] = useState(null);
 const [saving, setSaving] = useState(false);
@@ -61,20 +60,7 @@ border: '1px solid #d1d5db',
 cursor: 'pointer',
 background: activeColor || '#f3f4f6',
 });
-
-
-
 return (
-
-
-
-
-
-
-
-
-
-
 <div style={{ maxWidth: 560, margin: '32px auto', padding: 16 }}>
 <h2 style={{ marginBottom: 12 }}>Vítej v PutPing</h2>
 {/* Polohové tlačítko nahoře vpravo */}
@@ -102,36 +88,8 @@ return (
 {/* Pohlaví */}
 <label style={{ display: 'block', margin: '16px 0 8px' }}>Pohlaví</label>
 <div style={{ display: 'flex', alignItems: 'center' }}>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <button
  type="button"
-
-
-
-
-
-
-
-
-
-
-
           className={`pill muz${gender==='muz'?' active':''}`}
           onClick={() => setGender('muz')}
           style={{ marginRight: 8, ...(gender==='muz'?{background: genderColors['muz'], color: '#fff'}:{}) }}
