@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { genderColors } from '../constants/genderColors';
+
 export default function Onboarding({ onDone }) {
-const [locationAllowed, setLocationAllowed] = useState(false);
+
+  const [locAllowed, setLocAllowed] = useState(false);
 const [coords, setCoords] = useState(null);
 const [name, setName] = useState('');
-  const [gender, setGender] = useState(null); // 'muz' | 'žena' | 'jine'
+
+  const [gender, setGender] = useState(null);
 const [photoPreview, setPhotoPreview] = useState(null);
 const [saving, setSaving] = useState(false);
 
@@ -15,8 +18,14 @@ return;
 }
 navigator.geolocation.getCurrentPosition(
 (pos) => {
-setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-setLocationAllowed(true);
+
+
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCoords(c);
+        setLocAllowed(true);
+        if (typeof saveProfileDebounced === 'function') {
+          saveProfileDebounced(me?.uid, { coords: c, locationAllowed: true });
+        }
 },
 (err) => {
 console.error(err);
@@ -37,16 +46,21 @@ reader.readAsDataURL(file);
 const saveProfile = () => {
 if (!name.trim()) return alert('Zadej jméno.');
 if (!gender) return alert('Vyber pohlaví.');
-if (!locationAllowed || !coords) return alert('Povol polohu.');
+
+    if (!locAllowed || !coords) return alert('Povol polohu.');
 setSaving(true);
+    const color = genderColors[gender];
 const profile = {
 name: name.trim(),
 gender,
 photoDataUrl: photoPreview || null,
-locationAllowed,
+
+      locationAllowed: locAllowed,
 coords,
-color: genderColors[gender],
-updatedAt: Date.now(),
+
+
+      color,
+      updatedAt: Date.now()
 };
 localStorage.setItem('pp_profile', JSON.stringify(profile));
 setSaving(false);
@@ -60,24 +74,33 @@ border: '1px solid #d1d5db',
 cursor: 'pointer',
 background: activeColor || '#f3f4f6',
 });
+
 return (
 <div style={{ maxWidth: 560, margin: '32px auto', padding: 16 }}>
 <h2 style={{ marginBottom: 12 }}>Vítej v PutPing</h2>
-{/* Polohové tlačítko nahoře vpravo */}
+
 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
 <button
  type="button"
- onClick={askLocation}
+
  style={{
- ...pill(),
- background: locationAllowed ? '#22c55e' : '#e5e7eb',
- color: locationAllowed ? '#fff' : '#111'
+
+
+
+            padding: '10px 14px',
+            border: '1px solid #d1d5db',
+            borderRadius: 999,
+            background: locAllowed ? '#22c55e' : '#e5e7eb',
+            color: locAllowed ? '#fff' : '#111',
+            cursor: 'pointer',
  }}
+          onClick={askLocation}
 >
- {locationAllowed ? 'Poloha povolena' : 'Povolit polohu'}
+
+          {locAllowed ? 'Poloha povolena' : 'Povolit polohu'}
 </button>
 </div>
-{/* Jméno */}
+
 <label style={{ display: 'block', margin: '12px 0 4px' }}>Jméno</label>
 <input
  value={name}
@@ -85,7 +108,7 @@ return (
  placeholder="Tvoje jméno"
  style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db' }}
 />
-{/* Pohlaví */}
+
 <label style={{ display: 'block', margin: '16px 0 8px' }}>Pohlaví</label>
 <div style={{ display: 'flex', alignItems: 'center' }}>
 <button
@@ -107,7 +130,7 @@ return (
           style={{ ...(gender==='jine'?{background: genderColors['jine'], color: '#fff'}:{}) }}
         >Jiné</button>
 </div>
-      {/* Profilová fotka */}
+
       <label style={{ display: 'block', margin: '16px 0 8px' }}>Profilová fotka</label>
       <input type="file" accept="image/*" onChange={onPickPhoto} />
       {photoPreview && (
