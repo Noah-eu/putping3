@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
 import Onboarding from "./components/Onboarding";
+import MapView from "./components/MapView.jsx";
 import mapboxgl from "mapbox-gl";
 
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -1739,6 +1740,7 @@ export default function App() {
 
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
+      {profile && <MapView profile={profile} />}
 
       <div id="chatPanel" className="chat-panel hidden" aria-hidden="true">
         <div className="chat-header">
