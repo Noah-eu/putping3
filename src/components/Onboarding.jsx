@@ -6,7 +6,7 @@ export default function Onboarding({ onDone }) {
 const [coords, setCoords] = useState(null);
 const [name, setName] = useState('');
   const [gender, setGender] = useState(null);
-const [photoPreview, setPhotoPreview] = useState(null);
+const [photoDataUrl, setPhotoDataUrl] = useState(null);
 const [saving, setSaving] = useState(false);
 
 const askLocation = () => {
@@ -19,9 +19,6 @@ navigator.geolocation.getCurrentPosition(
         const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCoords(c);
         setLocAllowed(true);
-        if (typeof saveProfileDebounced === 'function') {
-          saveProfileDebounced(me?.uid, { coords: c, locationAllowed: true });
-        }
 },
 (err) => {
 console.error(err);
@@ -35,7 +32,7 @@ const onPickPhoto = (e) => {
 const file = e.target.files?.[0];
 if (!file) return;
 const reader = new FileReader();
-reader.onload = () => setPhotoPreview(reader.result);
+reader.onload = () => setPhotoDataUrl(reader.result);
 reader.readAsDataURL(file);
 };
 
@@ -48,7 +45,7 @@ setSaving(true);
 const profile = {
 name: name.trim(),
 gender,
-photoDataUrl: photoPreview || null,
+photoDataUrl: photoDataUrl || null,
       locationAllowed: locAllowed,
 coords,
       color,
@@ -116,10 +113,10 @@ return (
 </div>
       <label style={{ display: 'block', margin: '16px 0 8px' }}>Profilová fotka</label>
       <input type="file" accept="image/*" onChange={onPickPhoto} />
-      {photoPreview && (
+      {photoDataUrl && (
         <div style={{ marginTop: 8 }}>
           <img
-            src={photoPreview}
+            src={photoDataUrl}
             alt="preview"
             style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12 }}
           />
@@ -143,4 +140,3 @@ return (
     </div>
 );
 }
-
