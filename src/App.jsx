@@ -2150,14 +2150,14 @@ export default function App() {
         </div>
       )}
 
-      {showIntro && (
+      {!profile && showIntro && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
           style={{ backgroundImage: "url(/splash.jpg)" }}
         />
       )}
 
-      {step>0 && (
+      {!profile && step>0 && (
         <div className="onboard">
           <div className="onboard-card">
             {step===1 && (
