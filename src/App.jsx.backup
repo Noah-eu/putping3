@@ -1,6 +1,5 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
-import Onboarding from "./components/Onboarding";
 import mapboxgl from "mapbox-gl";
 
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -167,13 +166,6 @@ const saveProfileDebounced = debounce(saveProfile, 500);
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
-  const [profile, setProfile] = useState(null);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('pp_profile');
-      if (raw) setProfile(JSON.parse(raw));
-    } catch {}
-  }, []);
   const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL}
   const [users, setUsers] = useState({});
@@ -764,7 +756,6 @@ export default function App() {
   }, [me, users]);
 
   useEffect(() => {
-    if (!profile) return;
     if (!me || !locationConsent) return;
     if (!("geolocation" in navigator)) return;
     const meRef = ref(db, `users/${me.uid}`);
@@ -772,6 +763,556 @@ export default function App() {
 
     const updatePos = (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
+@@
+-import React, { useEffect, useRef, useState } from "react";
++import React, { useEffect, useRef, useState } from "react";
++import Onboarding from "./components/Onboarding";
+@@
+-export default function App() {
+-  const [map, setMap] = useState(null);
+-  const [me, setMe] = useState(null); // {uid, name, photoURL}
+-  const [users, setUsers] = useState({});
+-  const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
+-  const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
+-  const [fabOpen, setFabOpen] = useState(false);
+-  const [showChatList, setShowChatList] = useState(false);
+-  const [showGallery, setShowGallery] = useState(false);
+-  const [deleteIdx, setDeleteIdx] = useState(null);
+-  const [showIntro, setShowIntro] = useState(true);
+-  const [fadeIntro, setFadeIntro] = useState(false);
+-  const recomputeStep = () => {
+-    const consented = localStorage.getItem('pp_consent_v1') === '1';
+-    const finished  = localStorage.getItem('pp_onboard_v1') === '1';
+-    const loggedIn  = !!auth.currentUser;
+-    if (finished) return 0;          // onboarding dokončen
+-    if (!consented) return 1;        // nejdřív souhlas
+-    if (!loggedIn) return 2;         // pak přihlášení
+-    return 3;                        // potom nastavení profilu
+-  };
+-  const [step, setStep] = useState(recomputeStep);
+-  const finishOnboard = () => {
+-    localStorage.setItem('pp_onboard_v1', '1');
+-    setStep(0);
+-  };
++export default function App() {
++  const [profile, setProfile] = useState(null);
++  useEffect(() => {
++    try {
++      const raw = localStorage.getItem('pp_profile');
++      if (raw) setProfile(JSON.parse(raw));
++    } catch {}
++  }, []);
++  const [map, setMap] = useState(null);
++  const [me, setMe] = useState(null); // {uid, name, photoURL}
++  const [users, setUsers] = useState({});
++  const [pairPings, setPairPings] = useState({}); // pairId -> {uid: time}
++  const [chatPairs, setChatPairs] = useState({}); // pairId -> true if chat allowed
++  const [fabOpen, setFabOpen] = useState(false);
++  const [showChatList, setShowChatList] = useState(false);
++  const [showGallery, setShowGallery] = useState(false);
++  const [deleteIdx, setDeleteIdx] = useState(null);
++  const [showIntro, setShowIntro] = useState(true);
++  const [fadeIntro, setFadeIntro] = useState(false);
++  const recomputeStep = () => {
++    const consented = localStorage.getItem('pp_consent_v1') === '1';
++    const finished  = localStorage.getItem('pp_onboard_v1') === '1';
++    const loggedIn  = !!auth.currentUser;
++    if (finished) return 0;          // onboarding dokončen
++    if (!consented) return 1;        // nejdřív souhlas
++    if (!loggedIn) return 2;         // pak přihlášení
++    return 3;                        // potom nastavení profilu
++  };
++  const [step, setStep] = useState(recomputeStep);
++  const finishOnboard = () => {
++    localStorage.setItem('pp_onboard_v1', '1');
++    setStep(0);
++  };
+@@
+-  useEffect(() => {
+-    if (!me || !locationConsent) return;
+-    if (!("geolocation" in navigator)) return;
+-    const meRef = ref(db, `users/${me.uid}`);
+-    const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
+-
+-    const updatePos = (pos) => {
+-      const { latitude, longitude, accuracy } = pos.coords;
+-      console.log('My coords', latitude, longitude, 'accuracy', accuracy);
+-      // Ignore obviously wrong positions with extremely low accuracy (>10 km)
+-      if (accuracy && accuracy > 10_000) {
+-        console.warn("Ignoring low-accuracy position", accuracy);
+-        update(meRef, {
+-          lastActive: Date.now(),
+-          online: true,
+-        });
+-        return;
+-      }
+-      localStorage.setItem('lastLat', String(latitude));
+-      localStorage.setItem('lastLng', String(longitude));
+-      update(meRef, {
+-        lat: latitude,
+-        lng: longitude,
+-        lastActive: Date.now(),
+-        online: true,
+-      });
+-    };
+-    const handleErr = (err) => {
+-      console.warn("Geolocation error", err);
+-      update(meRef, {
+-        lat: null,
+-        lng: null,
+-        lastActive: Date.now(),
+-        online: false,
+-      });
+-    };
+-
+-    // iOS may not trigger watchPosition immediately; request current position once
+-    navigator.geolocation.getCurrentPosition(updatePos, handleErr, opts);
+-    const id = navigator.geolocation.watchPosition(updatePos, handleErr, opts);
+-
+-    return () => navigator.geolocation.clearWatch(id);
+-  }, [me, locationConsent]);
++  useEffect(() => {
++    if (!profile) return;
++    if (!me || !locationConsent) return;
++    if (!("geolocation" in navigator)) return;
++    const meRef = ref(db, `users/${me.uid}`);
++    const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 };
++
++    const updatePos = (pos) => {
++      const { latitude, longitude, accuracy } = pos.coords;
++      // console.log('My coords', latitude, longitude, 'accuracy', accuracy);
++      // Ignore obviously wrong positions with extremely low accuracy (>10 km)
++      if (accuracy && accuracy > 10_000) {
++        console.warn("Ignoring low-accuracy position", accuracy);
++        update(meRef, {
++          lastActive: Date.now(),
++          online: true,
++        });
++        return;
++      }
++      localStorage.setItem('lastLat', String(latitude));
++      localStorage.setItem('lastLng', String(longitude));
++      update(meRef, {
++        lat: latitude,
++        lng: longitude,
++        lastActive: Date.now(),
++        online: true,
++      });
++    };
++    const handleErr = (err) => {
++      console.warn("Geolocation error", err);
++      update(meRef, {
++        lat: null,
++        lng: null,
++        lastActive: Date.now(),
++        online: false,
++      });
++    };
++
++    // iOS may not trigger watchPosition immediately; request current position once
++    navigator.geolocation.getCurrentPosition(updatePos, handleErr, opts);
++    const id = navigator.geolocation.watchPosition(updatePos, handleErr, opts);
++
++    return () => navigator.geolocation.clearWatch(id);
++  }, [me, locationConsent, profile]);
+@@
+-  /* ───────────────────────────── Init mapy ──────────────────────────────── */
+-
+-  useEffect(() => {
+-    if (map || !me) return;
+-
+-    let m;
+-    (async () => {
+-      // Start at last known position from DB if available, otherwise Prague
+-      let center = [14.42076, 50.08804];
+-      try {
+-        const snap = await get(ref(db, `users/${me.uid}`));
+-        const u = snap.val();
+-        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
+-          center = [u.lng, u.lat];
+-        }
+-      } catch (err) {
+-        console.warn("Failed to load last position", err);
+-      }
+-      m = new mapboxgl.Map({
+-        container: "map",
+-        style: "mapbox://styles/mapbox/streets-v12",
+-        center,
+-        zoom: 13,
+-      });
+-      setMap(m);
+-    })();
+-
+-    return () => m && m.remove();
+-  }, [me]);
++  /* ───────────────────────────── Init mapy ──────────────────────────────── */
++
++  useEffect(() => {
++    if (!profile) return;
++    if (map || !me) return;
++
++    let m;
++    (async () => {
++      // Start at last known position from DB if available, otherwise Prague
++      let center = [14.42076, 50.08804];
++      try {
++        const snap = await get(ref(db, `users/${me.uid}`));
++        const u = snap.val();
++        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
++          center = [u.lng, u.lat];
++        }
++      } catch (err) {
++        console.warn("Failed to load last position", err);
++      }
++      m = new mapboxgl.Map({
++        container: "map",
++        style: "mapbox://styles/mapbox/streets-v12",
++        center,
++        zoom: 13,
++      });
++      setMap(m);
++    })();
++
++    return () => m && m.remove();
++  }, [me, profile]);
+@@
+-  /* ───────────────────── Sledování /users a kreslení ───────────────────── */
+-
+-  useEffect(() => {
+-    if (!map || !me) return;
+-
+-    const usersRef = ref(db, "users");
+-    const unsub = onValue(usersRef, (snap) => {
+-      const data = snap.val() || {};
+-      // Firebase RTDB may return arrays as objects; ensure photos are arrays
+-      Object.values(data).forEach((u) => {
+-        if (u && u.photos && !Array.isArray(u.photos)) {
+-          u.photos = Object.values(u.photos);
+-        }
+-      });
+-      const viewerUid = auth.currentUser?.uid || me?.uid || null;
+-
+-      // Odeber cizí dev-boty dříve, než je uložíme do stavu
+-      Object.keys(data).forEach((uid) => {
+-        const u = data[uid];
+-        if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
+-          delete data[uid];
+-        }
+-      });
+-
+-      setUsers(data);
+-
+-      // aktualizace / přidání markerů
+-      Object.entries(data).forEach(([uid, u]) => {
+-        // u = data daného uživatele, uid = jeho UID
+-        const isMe = viewerUid && uid === viewerUid;
+-        const isDevBot = !!u?.isDevBot;
+-
+-        // HIDE rule: jakýkoli dev-bot, který není explicitně můj, se n_renderuje
+-        const hideDevBot = isDevBot && (!viewerUid || u?.privateTo !== viewerUid);
+-        if (hideDevBot) {
+-          if (markers.current[uid]) {
+-            markers.current[uid].remove();
+-            delete markers.current[uid];
+-          }
+-          return; // nepokračuj renderem markeru bota
+-        }
+-        const isOnline =
+-          u.online &&
+-          u.lastActive &&
+-          Date.now() - u.lastActive < ONLINE_TTL_MS;
+-        if (!isMe && (!isOnline || !u.lat || !u.lng)) {
+-          // remove & return
+-          if (markers.current[uid]) {
+-            markers.current[uid].remove();
+-            delete markers.current[uid];
+-          }
+-          return;
+-        }
+-
+-        // Když ještě nemám polohu, vytvoř dočasný marker v centru mapy
+-        if (!markers.current[uid] && isMe && (!u.lat || !u.lng)) {
+-          const c = map.getCenter();
+-          u = { ...u, lat: c.lat, lng: c.lng }; // jen lokálně pro render
+-        }
+-
+-        const highlight = markerHighlightsRef.current[uid];
+-        const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
+-        const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
+-        const draggable = false;
+-
+-        if (!markers.current[uid]) {
+-          const wrapper = document.createElement("div");
+-          wrapper.className = "marker-wrapper";
+-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+-          const ring = document.createElement('div');
+-          ring.className = 'marker-ring';
+-          wrapper.appendChild(ring);
+-          const avatar = document.createElement("div");
+-          avatar.className = "marker-avatar";
+-          const selIdx =
+-            markerPhotoIdxRef.current?.[uid] ?? 0;
+-
+-          setMarkerAppearance(
+-            avatar,
+-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+-              (Array.isArray(u.photos) && u.photos[0]) ||
+-              u.photoURL,
+-            baseColor,
+-            highlight,
+-            getGenderRing(u)
+-          );
+-          wrapper.appendChild(avatar);
+-
+-          const bubble = getBubbleContent({
+-            uid,
+-            name: u.name || "Anonym",
+-            photos: u.photos,
+-            photoURL: u.photoURL,
+-          });
+-          wrapper.appendChild(bubble);
+-
+-          avatar.addEventListener("click", (e) => {
+-            e.stopPropagation();
+-            toggleBubble(uid);
+-          });
+-
+-          const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
+-            .setLngLat([u.lng, u.lat])
+-            .addTo(map);
+-
+-          markers.current[uid] = mk;
+-        } else {
+-          const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
+-          if (shouldUpdate) {
+-            markers.current[uid].setLngLat([u.lng, u.lat]);
+-          }
+-
+-          const wrapper = markers.current[uid].getElement();
+-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
+-          if (!wrapper.querySelector('.marker-ring')) {
+-            const ring = document.createElement('div');
+-            ring.className = 'marker-ring';
+-            wrapper.prepend(ring);
+-          }
+-          const avatar = wrapper.querySelector(".marker-avatar");
+-          const selIdx =
+-            markerPhotoIdxRef.current?.[uid] ?? 0;
+-
+-          setMarkerAppearance(
+-            avatar,
+-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
+-              (Array.isArray(u.photos) && u.photos[0]) ||
+-              u.photoURL,
+-            baseColor,
+-            highlight,
+-            getGenderRing(u)
+-          );
+-
+-          const oldBubble = wrapper.querySelector(".marker-bubble");
+-          const scrollLeft =
+-            oldBubble?.querySelector(".bubble-gallery")?.scrollLeft || 0;
+-          const newBubble = getBubbleContent({
+-            uid,
+-            name: u.name || "Anonym",
+-            photos: u.photos,
+-            photoURL: u.photoURL,
+-          });
+-          wrapper.replaceChild(newBubble, oldBubble);
+-          const newGallery = newBubble.querySelector(".bubble-gallery");
+-          if (newGallery) newGallery.scrollLeft = scrollLeft;
+-          if (wrapper.classList.contains("active")) {
+-            wireBubbleButtons(uid);
+-          }
+-        }
+-      });
+-
+-      // odmazat marker, když uživatel zmizel z DB
+-      Object.keys(markers.current).forEach((uid) => {
+-        if (!data[uid]) {
+-          if (openBubble.current === uid) openBubble.current = null;
+-          markers.current[uid].remove();
+-          delete markers.current[uid];
+-        }
+-      });
+-    });
+-
+-    return () => unsub();
+-  }, [map, me]);
++  /* ───────────────────── Sledování /users a kreslení ───────────────────── */
++  useEffect(() => {
++    if (!profile) return;
++    if (!map || !me) return;
++
++    const usersRef = ref(db, "users");
++    const unsub = onValue(usersRef, (snap) => {
++      const data = snap.val() || {};
++      // Firebase RTDB may return arrays as objects; ensure photos are arrays
++      Object.values(data).forEach((u) => {
++        if (u && u.photos && !Array.isArray(u.photos)) {
++          u.photos = Object.values(u.photos);
++        }
++      });
++      const viewerUid = auth.currentUser?.uid || me?.uid || null;
++
++      // Odeber cizí dev-boty dříve, než je uložíme do stavu
++      Object.keys(data).forEach((uid) => {
++        const u = data[uid];
++        if (u?.isDevBot && (!viewerUid || u?.privateTo !== viewerUid)) {
++          delete data[uid];
++        }
++      });
++
++      setUsers(data);
++
++      // aktualizace / přidání markerů
++      Object.entries(data).forEach(([uid, u]) => {
++        // ... (unchanged marker update logic)
++        // (rest of this block is unchanged)
++        // (not repeated here for brevity)
++        // --- rest remains as in the original ---
++        // Copy-paste the unchanged block here!
++        // For the real code, just leave as it was
++        const isMe = viewerUid && uid === viewerUid;
++        const isDevBot = !!u?.isDevBot;
++        const hideDevBot = isDevBot && (!viewerUid || u?.privateTo !== viewerUid);
++        if (hideDevBot) {
++          if (markers.current[uid]) {
++            markers.current[uid].remove();
++            delete markers.current[uid];
++          }
++          return;
++        }
++        const isOnline =
++          u.online &&
++          u.lastActive &&
++          Date.now() - u.lastActive < ONLINE_TTL_MS;
++        if (!isMe && (!isOnline || !u.lat || !u.lng)) {
++          if (markers.current[uid]) {
++            markers.current[uid].remove();
++            delete markers.current[uid];
++          }
++          return;
++        }
++        if (!markers.current[uid] && isMe && (!u.lat || !u.lng)) {
++          const c = map.getCenter();
++          u = { ...u, lat: c.lat, lng: c.lng };
++        }
++        const highlight = markerHighlightsRef.current[uid];
++        const hasPhoto = !!((u.photos && u.photos[0]) || u.photoURL);
++        const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
++        const draggable = false;
++        if (!markers.current[uid]) {
++          const wrapper = document.createElement("div");
++          wrapper.className = "marker-wrapper";
++          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
++          const ring = document.createElement('div');
++          ring.className = 'marker-ring';
++          wrapper.appendChild(ring);
++          const avatar = document.createElement("div");
++          avatar.className = "marker-avatar";
++          const selIdx = markerPhotoIdxRef.current?.[uid] ?? 0;
++          setMarkerAppearance(
++            avatar,
++            (Array.isArray(u.photos) && u.photos[selIdx]) ||
++              (Array.isArray(u.photos) && u.photos[0]) ||
++              u.photoURL,
++            baseColor,
++            highlight,
++            getGenderRing(u)
++          );
++          wrapper.appendChild(avatar);
++          const bubble = getBubbleContent({
++            uid,
++            name: u.name || "Anonym",
++            photos: u.photos,
++            photoURL: u.photoURL,
++          });
++          wrapper.appendChild(bubble);
++          avatar.addEventListener("click", (e) => {
++            e.stopPropagation();
++            toggleBubble(uid);
++          });
++          const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
++            .setLngLat([u.lng, u.lat])
++            .addTo(map);
++          markers.current[uid] = mk;
++        } else {
++          const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
++          if (shouldUpdate) {
++            markers.current[uid].setLngLat([u.lng, u.lat]);
++          }
++          const wrapper = markers.current[uid].getElement();
++          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
++          if (!wrapper.querySelector('.marker-ring')) {
++            const ring = document.createElement('div');
++            ring.className = 'marker-ring';
++            wrapper.prepend(ring);
++          }
++          const avatar = wrapper.querySelector(".marker-avatar");
++          const selIdx = markerPhotoIdxRef.current?.[uid] ?? 0;
++          setMarkerAppearance(
++            avatar,
++            (Array.isArray(u.photos) && u.photos[selIdx]) ||
++              (Array.isArray(u.photos) && u.photos[0]) ||
++              u.photoURL,
++            baseColor,
++            highlight,
++            getGenderRing(u)
++          );
++          const oldBubble = wrapper.querySelector(".marker-bubble");
++          const scrollLeft =
++            oldBubble?.querySelector(".bubble-gallery")?.scrollLeft || 0;
++          const newBubble = getBubbleContent({
++            uid,
++            name: u.name || "Anonym",
++            photos: u.photos,
++            photoURL: u.photoURL,
++          });
++          wrapper.replaceChild(newBubble, oldBubble);
++          const newGallery = newBubble.querySelector(".bubble-gallery");
++          if (newGallery) newGallery.scrollLeft = scrollLeft;
++          if (wrapper.classList.contains("active")) {
++            wireBubbleButtons(uid);
++          }
++        }
++      });
++      Object.keys(markers.current).forEach((uid) => {
++        if (!data[uid]) {
++          if (openBubble.current === uid) openBubble.current = null;
++          markers.current[uid].remove();
++          delete markers.current[uid];
++        }
++      });
++    });
++    return () => unsub();
++  }, [map, me, profile]);
+@@
+-  /* ──────────────────────────────── Render UI ───────────────────────────── */
+-
+-  return (
+-    <div>
++  /* ──────────────────────────────── Render UI ───────────────────────────── */
++
++  return (
++    <div>
+@@
++      { !profile && (
++        <div style={{
++          position:'fixed', inset:0, zIndex:9999,
++          background:'rgba(0,0,0,0.5)', display:'flex',
++          alignItems:'center', justifyContent:'center'
++        }}>
++          <div style={{ width:'min(560px, 95vw)', maxHeight:'90vh', overflow:'auto',
++            borderRadius:12, background:'#fff', padding:16 }}>
++            <Onboarding onDone={(p) => {
++              localStorage.setItem('pp_profile', JSON.stringify(p));
++              setProfile(p);
++            }} />
++          </div>
++        </div>
++      ) }
+@@
       // Ignore obviously wrong positions with extremely low accuracy (>10 km)
       if (accuracy && accuracy > 10_000) {
         console.warn("Ignoring low-accuracy position", accuracy);
@@ -810,7 +1351,6 @@ export default function App() {
   /* ───────────────────────────── Init mapy ──────────────────────────────── */
 
   useEffect(() => {
-    if (!profile) return;
     if (map || !me) return;
 
     let m;
@@ -841,7 +1381,6 @@ export default function App() {
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
 
   useEffect(() => {
-    if (!profile) return;
     if (!map || !me) return;
 
     const usersRef = ref(db, "users");
@@ -2210,16 +2749,6 @@ export default function App() {
           </div>
         </div>
       )}
-      { !profile && (
-        <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ width:'min(560px, 95vw)', maxHeight:'90vh', overflow:'auto', borderRadius:12, background:'#fff', padding:16 }}>
-            <Onboarding onDone={(p) => {
-              localStorage.setItem('pp_profile', JSON.stringify(p));
-              setProfile(p);
-            }} />
-          </div>
-        </div>
-      ) }
     </div>
   );
 }
