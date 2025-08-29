@@ -73,15 +73,21 @@ export function renderSelfMarker(map: mapboxgl.Map) {
     .setLngLat([p.coords.lng, p.coords.lat])
     .addTo(map);
 
-  el.addEventListener("click", () => openSelfPopup(map, p));
+  // Build pinned popup with the same content as openSelfPopup
+  const popupHtml = `
+    <div class=\"pp-popup\">\n      <div class=\"pp-popup-img\">${p.photoDataUrl ? `<img src=\"${p.photoDataUrl}\" alt=\"${p.name || ""}\"/>` : ""}</div>\n      <div class=\"pp-popup-name\">${p.name || ""}</div>\n    </div>`;
+  const popup = new mapboxgl.Popup({ closeOnClick: false, closeButton: true, maxWidth: "440px", anchor: "top", offset: 25 })
+    .setLngLat([p.coords!.lng, p.coords!.lat])
+    .setHTML(popupHtml);
+  __selfMarker.setPopup(popup);
 
-  // Fly to marker and do a short class-based scale animation on click
-  try {
-    const wrapper = __selfMarker.getElement() as HTMLElement;
-    wrapper.addEventListener("click", () => {
-      try { (el as HTMLElement).classList.add("pp-grow"); } catch {}
-      try { map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true }); } catch {}
-      setTimeout(() => { try { (el as HTMLElement).classList.remove("pp-grow"); } catch {} }, 400);
-    });
-  } catch {}
+  // Single click handler on the custom element
+  const onClick = (e: any) => {
+    try { e?.stopPropagation?.(); } catch {}
+    try { (el as HTMLElement).classList.add("pp-zoom"); } catch {}
+    try { __selfMarker?.togglePopup(); } catch {}
+    try { map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true }); } catch {}
+    try { popup.on("close", () => { try { (el as HTMLElement).classList.remove("pp-zoom"); } catch {} }); } catch {}
+  };
+  el.addEventListener("click", onClick);
 }
