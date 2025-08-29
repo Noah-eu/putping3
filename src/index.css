@@ -12,6 +12,78 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 /* Map container */
 .map { width: 100vw; height: 100vh; }
+/* Marker styles for MapView */
+.pp-marker { width:42px; height:42px; border-radius:50%; overflow:hidden; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.25); background:#444; cursor:pointer; }
+.pp-marker img { width:100%; height:100%; object-fit:cover; display:block; }
+.mapboxgl-popup .pp-popup { display:flex; align-items:center; gap:10px; }
+.mapboxgl-popup .pp-popup img { width:40px; height:40px; border-radius:50%; object-fit:cover; }
+
+/* Teardrop marker and popup gallery */
+.pp-marker-tear{ --pp-color:#444; width:50px; height:68px; position:relative; color:var(--pp-color); cursor:pointer; transition:transform .18s ease; transform-origin: bottom center; }
+.pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
+.mapboxgl-marker .pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
+.pp-marker-tear::after{ content:""; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%) rotate(45deg);
+                        width:20px; height:20px; background:var(--pp-color); border-radius:2px }
+.pp-marker-tear .img-wrap{ width:50px; height:50px; border-radius:50% !important; overflow:hidden;
+                           border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.25); background:var(--pp-color);
+                           display:flex;align-items:center;justify-content:center; }
+.pp-marker-tear .img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.pp-marker-tear .img-wrap .noimg{ font:700 16px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#fff }
+.pp-popup{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:200px}
+.mapboxgl-popup .pp-popup{ display:flex; flex-direction:column; align-items:center; gap:10px; min-width:280px }
+.mapboxgl-popup .pp-popup-img{ width:280px; height:280px; border-radius:16px; overflow:hidden; background:#000 }
+.mapboxgl-popup .pp-popup-img img{width:100%;height:100%;object-fit:cover;display:block}
+.mapboxgl-popup .pp-popup-name{ font-weight:700; margin-top:4px }
+
+/* Hide Mapbox geolocate UI */
+.mapboxgl-user-location-dot,
+.mapboxgl-user-location-dot-marker,
+.mapboxgl-user-location-accuracy-circle { display:none !important; }
+.pp-popup .pp-swipe{position:relative;width:240px;height:240px;overflow:hidden;border-radius:12px;background:#000}
+.pp-popup .pp-swipe img{width:100%;height:100%;object-fit:cover;display:block}
+.pp-popup .pp-name{font-weight:700;margin-top:4px}
+mapboxgl-popup .pp-name{font-weight:700}
+
+/* Pulse highlight on ping */
+.pp-marker-tear.pp-pulse .img-wrap{animation:pp-pulse 1s ease-in-out infinite; transform-origin:center}
+@keyframes pp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+
+/* FAB + simple modals */
+.pp-fab{position:fixed;right:16px;bottom:16px;z-index:2000}
+.pp-fab button{width:56px;height:56px;border-radius:50%;border:0;background:#111;color:#fff;font-size:20px;box-shadow:0 6px 16px rgba(0,0,0,.25);cursor:pointer}
+.pp-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:3000}
+.pp-card{width:min(720px,94vw);max-height:88vh;overflow:auto;background:#fff;border-radius:12px;padding:16px;box-shadow:0 12px 28px rgba(0,0,0,.25)}
+.pp-gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.pp-g-tile{position:relative;border-radius:8px;overflow:hidden;background:#eee;height:110px;display:flex;align-items:center;justify-content:center}
+.pp-g-tile img{width:100%;height:100%;object-fit:cover}
+.pp-g-del{position:absolute;top:6px;right:6px;background:#e53935;color:#fff;border:0;border-radius:999px;width:26px;height:26px;cursor:pointer}
+.pp-g-badge{position:absolute;left:6px;top:6px;background:#111;color:#fff;border-radius:999px;padding:2px 6px;font-size:12px}
+.pp-chat-list .row{padding:10px 8px;border-bottom:1px solid #eee;cursor:pointer}
+.pp-chat-view{display:flex;flex-direction:column;gap:8px}
+.pp-msg{max-width:70%;padding:8px 10px;border-radius:10px}
+.pp-msg.me{align-self:flex-end;background:#111;color:#fff}
+.pp-msg.them{align-self:flex-start;background:#f1f1f1}
+
+/* Onboarding overlay */
+.pp-onb-overlay{position:fixed;inset:0;z-index:9999;background:url('/splash.jpg') center/cover no-repeat;backdrop-filter:blur(1px);display:flex;align-items:center;justify-content:center;padding:16px}
+.pp-onb-card{width:min(560px,92vw);background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:20px 20px 24px}
+.pp-onb-card h2 { margin: 0 0 14px; font-size: 24px; }
+.pp-field { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.pp-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pp-pill { padding: 8px 12px; border-radius: 999px; border: 1px solid #ddd; background: #f6f7f9; cursor: pointer; font-weight: 600; }
+.pp-pill.active { color: #fff; border-color: transparent; }
+.pp-photo { display: flex; align-items: center; gap: 10px; }
+.pp-photo .preview { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.pp-photo .preview img { width: 100%; height: 100%; object-fit: cover; }
+.pp-allow { align-self: flex-end; }
+.pp-allow button { padding: 8px 12px; border-radius: 999px; border: 1px solid #e0e0e0; background: #eef2f5; font-weight: 600; cursor: pointer; }
+.pp-allow button.allowed { background: #2ecc71; color: #fff; border-color: #2ecc71; }
+.pp-primary { margin-top: 16px; width: 100%; padding: 12px 16px; background: #111; color: #fff; border: 0; border-radius: 999px; font-weight: 700; cursor: pointer; }
+.pp-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Intro overlay */
+.pp-intro{position:fixed;inset:0;z-index:99999;background:url('/splash.jpg') center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+.pp-intro-card{width:min(640px,90vw);height:min(380px,60vh);background:transparent;border-radius:16px;box-shadow:none}
 
 /* Intro splash */
 .intro-screen{
@@ -776,3 +848,39 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 .pill{ padding:10px 12px; border-radius:12px; border:1px solid rgba(122,40,69,.25); cursor:pointer; background:#fff; }
 .pill.active{ box-shadow: 0 0 0 2px #fff, 0 0 0 4px #EC4899; border-color: transparent; } /* MUŽ = růžový obdélník */
+/* TEARDROP self marker */
+.pp-marker-tear{
+  --pp-color:#444;
+  position:relative;
+  width:52px; height:70px;         /* celá kapka */
+  color:var(--pp-color);
+  cursor:pointer;
+}
+/* Nový tvar: plná kapka se špičkou dolů (clip-path) */
+.pp-marker-tear{
+  background:var(--pp-color);
+  clip-path: path('M26 0C39.5 0 52 12.5 52 26c0 20-26 44-26 44S0 46 0 26C0 12.5 12.5 0 26 0Z');
+  overflow:hidden;
+  box-shadow:0 0 0 3px #fff, 0 2px 8px rgba(0,0,0,.25);
+  transition: transform .15s ease;
+}
+.pp-marker-tear:active{ transform: scale(1.12); }
+.pp-marker-tear::after{ display:none !important; }
+.pp-marker-tear .img-wrap{
+  position:absolute;
+  top:5px; left:50%; transform:translateX(-50%);
+  width:42px; height:42px;               /* menší kruh uvnitř kapky */
+  border-radius:50% !important;
+  overflow:hidden;
+  background:#fff;                        /* tenká bílá linka kolem fotky */
+  box-shadow:0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.2);
+  display:flex; align-items:center; justify-content:center;
+}
+.pp-marker-tear .img-wrap img{ width:100%; height:100%; object-fit:cover; display:block }
+.pp-marker-tear .img-wrap .noimg{ font:700 16px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#444 }
+
+/* Větší popup s náhledem */
+.mapboxgl-popup .pp-popup{ display:flex; flex-direction:column; align-items:center; gap:10px; min-width:280px }
+.mapboxgl-popup .pp-popup-img{ width:280px; height:280px; border-radius:16px; overflow:hidden; background:#000 }
+.mapboxgl-popup .pp-popup-img img{ width:100%; height:100%; object-fit:cover; display:block }
+.mapboxgl-popup .pp-popup-name{ font-weight:700; margin-top:4px }

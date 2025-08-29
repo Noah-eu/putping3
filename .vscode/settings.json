@@ -1,0 +1,13 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 800,   // klidně uprav
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        // ignoruj změny v node_modules a dist
+        "match": "^(?!node_modules/|dist/).*",
+        "cmd": "git add -A && (git diff --cached --quiet || (git commit -m \"auto: $(date +'%F %T') [$(git rev-parse --abbrev-ref HEAD)]\" && git pull --rebase --autostash && git push))"
+      }
+    ]
+  }
+}
