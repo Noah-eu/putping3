@@ -1285,7 +1285,12 @@ mapboxgl-popup .pp-name{font-weight:700}
   transform: scale(5);
   z-index: 9999;
 }
-
+/* pro jistotu ukazováček a hladší animace */
+.pp-tear { cursor: pointer; }
+.pp-tear,
+.pp-tear.is-zoom {
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1);
+}
 /* (volitelně) mírná animace pro příjemnější dojem */
 .pp-tear,
 .pp-tear.is-zoom {
