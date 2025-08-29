@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { upsertSelfMarker } from '../lib/selfMarker';
+import { openProfileCard, closeProfileCard } from '../lib/profileCardPortal.jsx';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -21,6 +22,7 @@ export default function MapView({ profile }){
     });
     mapRef.current = m;
     m.once('load', () => setMapReady(true));
+    m.on('click', () => closeProfileCard());
     return () => { m.remove(); mapRef.current = null; };
   }, []);
 
@@ -38,6 +40,7 @@ export default function MapView({ profile }){
       onClick: () => {
         const z = Math.max(map.getZoom(), 15);
         map.flyTo({ center: [profile.coords.lng, profile.coords.lat], zoom: Math.max(z, 16), essential: true });
+        openProfileCard(profile);
       }
     });
   }, [mapReady, profile]);

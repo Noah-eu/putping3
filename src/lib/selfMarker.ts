@@ -16,25 +16,13 @@ let _marker: mapboxgl.Marker | null = null;
 
 export function buildUserMarkerEl({ name, photoDataUrl, gender = 'muz', color }: { name?: string; photoDataUrl?: string | null; gender?: string; color?: string; }): HTMLElement {
   const el = document.createElement('div');
-  el.className = 'pp-pin';
   const g = gender || 'muz';
-  const c = color || (g === 'zena' ? '#66a3ff' : g === 'jine' ? '#44c776' : '#ff66b3');
-  el.style.setProperty('--pin', c);
-
+  el.className = `pp-marker ${g}`;
+  if (color) el.style.setProperty('--pp-color', color);
   el.innerHTML = `
-    <div class="pp-pin__tear">
-      <div class="pp-pin__photoWrap">
-        <img class="pp-pin__photo" src="${photoDataUrl || ''}" alt="" />
-      </div>
-    </div>
-    <div class="pp-pin__panel">
-      <div class="pp-pin__panelHead">
-        <img class="pp-pin__panelAvatar" src="${photoDataUrl || ''}" alt="" />
-      </div>
-      <div class="pp-pin__panelName">${name || ''}</div>
-      <button class="pp-pin__pingBtn" type="button">Ping</button>
-    </div>
-  `;
+  <div class="pp-drop">
+    <div class="pp-avatar"><img alt="avatar" src="${photoDataUrl || ''}"/></div>
+  </div>`;
   return el;
 }
 
@@ -45,34 +33,10 @@ export function upsertSelfMarker(opts: SelfMarkerOpts) {
   if (!_marker) {
     const root = buildUserMarkerEl({ name: opts.name, photoDataUrl: photoUrl || undefined, gender: opts.gender, color });
 
-    // Click → toggle zoom class + optional map zoom callback
+    // Click → delegate to caller for flyTo + ProfileCard
     root.addEventListener("click", (e) => {
       e.stopPropagation();
-      // flyTo; open panel after move ends
       onClick?.();
-      const open = () => { try { root.classList.add('is-open'); } catch {} opts.map.off('moveend', open); };
-      opts.map.on('moveend', open);
-    });
-
-    // close on map click when clicking outside the pin
-    const onMapClick = (ev: any) => {
-      const target = ev?.originalEvent?.target as Node | null;
-      if (!target) return;
-      if (!(root.contains(target))) {
-        try { root.classList.remove('is-open'); } catch {}
-      }
-    };
-    opts.map.on('click', onMapClick);
-
-    // ESC closes
-    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { try { root.classList.remove('is-open'); } catch {} } };
-    window.addEventListener('keydown', onKey);
-
-    // Ping button hook
-    const btn = root.querySelector('.pp-pin__pingBtn') as HTMLButtonElement | null;
-    if (btn) btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      try { const w: any = window as any; if (typeof w.ppPing === 'function') w.ppPing({ name: opts.name, lng, lat }); else alert('Ping!'); } catch { alert('Ping!'); }
     });
 
     _marker = new mapboxgl.Marker({ element: root, anchor: "bottom" })
