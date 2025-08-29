@@ -18,6 +18,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const db = getDatabase(app);
+import { ref } from "firebase/database";
+try {
+  const dbRoot = ref(db, "/").toString();
+  console.log("[PutPing] RTDB root:", dbRoot);
+} catch (e) {
+  console.warn("[PutPing] RTDB root check failed:", e);
+}
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 export const storage = getStorage(app);
