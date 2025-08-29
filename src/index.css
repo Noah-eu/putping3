@@ -983,7 +983,8 @@ mapboxgl-popup .pp-name{font-weight:700}
   position: absolute; left: 50%; top: 0; transform: translateX(-50%);
   width: 44px; height: 44px; border-radius: 22px;
   background: var(--pp-color, #ff66a3);
-  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  /* remove dark oval under marker */
+  box-shadow: none;
 }
 .pp-marker .pp-drop::after { /* špička kapky */
   content: ""; position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%);
@@ -991,9 +992,13 @@ mapboxgl-popup .pp-name{font-weight:700}
   border-color: var(--pp-color, #ff66a3) transparent transparent transparent;
 }
 .pp-marker .pp-avatar {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 30px; height: 30px; border-radius: 50%; background:#fff; padding: 2px;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.85);
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+  width: 30px; height: 30px; border-radius: 50%;
+  /* only thin 4px black circular ring */
+  border: 4px solid #111;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 .pp-marker .pp-avatar img {
   display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
