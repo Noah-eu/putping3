@@ -977,6 +977,43 @@ mapboxgl-popup .pp-name{font-weight:700}
   will-change: transform;
 }
 
+/* ---------- Marker: teardrop + kruhový avatar ---------- */
+.pp-marker { position: relative; width: 44px; height: 56px; pointer-events: auto; }
+.pp-marker .pp-drop {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  width: 44px; height: 44px; border-radius: 22px;
+  background: var(--pp-color, #ff66a3);
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+}
+.pp-marker .pp-drop::after { /* špička kapky */
+  content: ""; position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%);
+  border-width: 12px 8px 0 8px; border-style: solid;
+  border-color: var(--pp-color, #ff66a3) transparent transparent transparent;
+}
+.pp-marker .pp-avatar {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 30px; height: 30px; border-radius: 50%; background:#fff; padding: 2px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.85);
+}
+.pp-marker .pp-avatar img {
+  display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+}
+/* Barvy dle genderu */
+.pp-marker.muz   { --pp-color: #ff66a3; }
+.pp-marker.zena  { --pp-color: #4da3ff; }
+.pp-marker.jine  { --pp-color: #22c55e; }
+/* Hover mikro-animace (volitelné) */
+.pp-marker:hover .pp-drop { transform: translateX(-50%) scale(1.06); transition: transform .15s ease; }
+
+/* ---------- Profile Card (centrální modal) ---------- */
+.pp-card-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 1000; }
+.pp-card { position: relative; width: min(420px, 92vw); background: #fff; border-radius: 16px; padding: 20px 20px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.25); animation: pp-pop .15s ease; }
+@keyframes pp-pop { from { transform: translateY(6px); opacity: .0; } to { transform: none; opacity: 1; } }
+.pp-card-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+.pp-card-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; display: block; margin: 6px auto 10px; box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--pp-color, #111); }
+.pp-card-name { text-align: center; font-weight: 600; margin-bottom: 12px; }
+.pp-card-btn { display: block; width: 100%; height: 44px; border: 0; border-radius: 10px; background: #111; color: #fff; font-weight: 600; cursor: pointer; }
+
 /* === Small tear marker + large Popup === */
 /* ===== User teardrop pin ===== */
 .pp-pin {
