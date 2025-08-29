@@ -75,18 +75,19 @@ export function renderSelfMarker(map: mapboxgl.Map) {
 
   el.addEventListener("click", () => openSelfPopup(map, p));
 
-  // Fly to marker and do a short scale animation on click
+  // Fly to marker and do a short class-based scale animation on click
   try {
     const elem = __selfMarker.getElement() as HTMLElement;
     elem.addEventListener("click", () => {
       try {
-        map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2 });
+        elem.classList.add("pp-grow");
       } catch {}
       try {
-        const prev = elem.style.transform || "";
-        elem.style.transform = "scale(1.5)";
-        setTimeout(() => { elem.style.transform = prev || ""; }, 500);
+        map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true });
       } catch {}
+      setTimeout(() => {
+        try { elem.classList.remove("pp-grow"); } catch {}
+      }, 400);
     });
   } catch {}
 }
