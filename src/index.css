@@ -29,8 +29,8 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   transition: transform .18s ease;
   transform-origin: bottom center;
 }
-.pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
-.mapboxgl-marker .pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
+.pp-marker-tear.pp-zoom{ transform: scale(4) !important; z-index: 3000; }
+.mapboxgl-marker .pp-marker-tear.pp-zoom{ transform: scale(4) !important; z-index: 3000; }
 .pp-marker-tear::after{
   content:"";
   position:absolute;
