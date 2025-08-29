@@ -1266,7 +1266,19 @@ mapboxgl-popup .pp-name{font-weight:700}
 
 /* avatar uvnitř – horní půlka kruhu „kopíruje“ horní půlku pinu */
 .pp-tear .pp-avatar {
-
+  position: absolute;
+  left: 50%;
+  top: 6px;                 /* o chloupek výš pod oblouk */
+  transform: translateX(-50%);
+  width: 28px;              /* bylo 22px → větší fotka */
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  outline: 2px solid #fff;  /* bylo 3px → tenčí kroužek */
+  box-shadow: 0 1px 4px rgba(0,0,0,.18) inset;
+  z-index: 1;
+  pointer-events: none;     /* klik bere kontejner, ale obrázek nebude blokovat */
+}
 
 /* zvětšený stav – 5×, bez změny tvaru */
 .pp-tear.is-zoom {
