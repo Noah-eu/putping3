@@ -19,16 +19,41 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .mapboxgl-popup .pp-popup img { width:40px; height:40px; border-radius:50%; object-fit:cover; }
 
 /* Teardrop marker and popup gallery */
-.pp-marker-tear{ --pp-color:#444; width:50px; height:68px; position:relative; color:var(--pp-color); cursor:pointer; transition:transform .18s ease; transform-origin: bottom center; }
+.pp-marker-tear{
+  --pp-color:#444;
+  position:relative;
+  width:52px; height:70px;
+  color:var(--pp-color);
+  cursor:pointer;
+  z-index: 2;
+  transition: transform .18s ease;
+  transform-origin: bottom center;
+}
 .pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
 .mapboxgl-marker .pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
-.pp-marker-tear::after{ content:""; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%) rotate(45deg);
-                        width:20px; height:20px; background:var(--pp-color); border-radius:2px }
-.pp-marker-tear .img-wrap{ width:50px; height:50px; border-radius:50% !important; overflow:hidden;
-                           border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.25); background:var(--pp-color);
-                           display:flex;align-items:center;justify-content:center; }
+.pp-marker-tear::after{
+  content:"";
+  position:absolute;
+  left:50%; transform:translateX(-50%) rotate(45deg);
+  bottom:-11px;
+  width:22px; height:22px;
+  background:var(--pp-color);
+  border-radius:2px;
+}
+.pp-marker-tear .img-wrap{
+  width:52px; height:52px;
+  border-radius:50% !important;
+  overflow:hidden;
+  border:3px solid #fff;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  background:var(--pp-color);
+  display:flex; align-items:center; justify-content:center;
+}
 .pp-marker-tear .img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
 .pp-marker-tear .img-wrap .noimg{ font:700 16px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#fff }
+.pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
+.mapboxgl-marker .pp-marker-tear.pp-zoom{ transform: scale(3) !important; z-index: 3000; }
+.mapboxgl-marker{ overflow: visible !important; }
 .pp-popup{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:200px}
 .mapboxgl-popup .pp-popup{ display:flex; flex-direction:column; align-items:center; gap:10px; min-width:280px }
 .mapboxgl-popup .pp-popup-img{ width:280px; height:280px; border-radius:16px; overflow:hidden; background:#000 }
