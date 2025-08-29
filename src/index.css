@@ -987,13 +987,13 @@ mapboxgl-popup .pp-name{font-weight:700}
   box-shadow: none;
 }
 .pp-marker .pp-drop::after { /* špička kapky */
-  content: ""; position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%);
-  border-width: 12px 8px 0 8px; border-style: solid;
+  content: ""; position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%);
+  border-width: 14px 10px 0 10px; border-style: solid;
   border-color: var(--pp-color, #ff66a3) transparent transparent transparent;
 }
 .pp-marker .pp-avatar {
-  position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
-  width: 30px; height: 30px; border-radius: 50%;
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
   /* only thin 4px black circular ring */
   border: 4px solid #111;
   background: transparent;
@@ -1109,3 +1109,68 @@ mapboxgl-popup .pp-name{font-weight:700}
 .pp-marker-tear .drop { position:absolute; inset:0; }
 .pp-marker-tear .photo { position:absolute; left:50%; top:38%; width:32px; height:32px; border-radius:50%; transform:translate(-50%,-50%); object-fit:cover; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.25); }
 .pp-marker-tear.pp-zoom { transform:translate(-50%,-90%) scale(1.35); box-shadow:0 6px 16px rgba(0,0,0,.35); }
+/* Teardrop geometry variables */
+.pp-pin{
+  --pp-size: 54px;        /* round head diameter (normal state) */
+  --pp-tip: 16px;         /* triangle height */
+  --pp-ring: 3px;         /* white ring thickness around avatar */
+  --pp-pin: #ff4f93;      /* gender color (overridden inline) */
+
+  position: relative;
+  width: var(--pp-size);
+  height: calc(var(--pp-size) + var(--pp-tip));
+  transform-origin: bottom center;       /* keep the tip anchored when scaling */
+  display: grid;
+  place-items: center;
+  will-change: transform;
+  transition: transform .18s ease;
+  z-index: 2;
+}
+
+/* Colored round head */
+.pp-pin__head{
+  width: var(--pp-size);
+  height: var(--pp-size);
+  background: var(--pp-pin);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0,0,0,.12);
+  box-shadow: 0 6px 18px rgba(0,0,0,.28);
+  position: relative;
+}
+
+/* Sharp tip (down) */
+.pp-pin::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:0;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left: calc(var(--pp-tip) * .62) solid transparent;
+  border-right: calc(var(--pp-tip) * .62) solid transparent;
+  border-top: var(--pp-tip) solid var(--pp-pin);
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,.25));
+  pointer-events: none;
+}
+
+/* Avatar: slightly shifted upward so the top half hugs the head curve */
+.pp-pin__ava{
+  /* inner diameter a little smaller than head to preserve color ring */
+  width: calc(var(--pp-size) - 2*var(--pp-ring) - 8px);
+  height: calc(var(--pp-size) - 2*var(--pp-ring) - 8px);
+  border-radius: 999px;
+  object-fit: cover;
+  border: var(--pp-ring) solid #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.10) inset;
+  transform: translateY(-8%);            /* push up ~8% to copy the top curve */
+}
+
+/* 5× enlarged state */
+.pp-pin.is-open{
+  transform: scale(5);
+}
+
+/* Ensure no legacy rules interfere */
+.pp-grow,.pp-zoom,.pp-marker-tear,.marker-zoom{ all:unset !important; }
