@@ -56,6 +56,33 @@ export default function MapView({ profile }){
       if (img && (profile.photoDataUrl || profile.photoURL)) img.src = profile.photoDataUrl || profile.photoURL;
     }
   }, [mapReady, profile]);
+const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+  .setLngLat([lng, lat])
+  .addTo(map);
+
+// --- klik = zvětšit 5× (toggle) ---
+function toggleZoom(ev) {
+  ev.stopPropagation();                   // ať to neschytá mapa
+  const willZoom = !el.classList.contains('is-zoom');
+  el.classList.toggle('is-zoom', willZoom);
+  if (willZoom) {
+    // přibliž mapu k pinu, ale špička zůstává díky anchor+transform-origin
+    map.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(map.getZoom(), 15),
+      duration: 600
+    });
+  }
+}
+
+// handler jak na kontejner, tak pro jistotu i na “vnitřek”
+el.addEventListener('click', toggleZoom);
+// kdyby někde zůstal pointer-events na avataru, jistíme se i tak:
+const img = el.querySelector('.pp-avatar');
+if (img) img.addEventListener('click', toggleZoom);
+
+// klik do mapy vrátí pin do normálu
+map.on('click', () => el.classList.remove('is-zoom'));
 
   return (
     <div id="map" ref={mapElRef} style={{ width: '100vw', height: '100vh' }} />
