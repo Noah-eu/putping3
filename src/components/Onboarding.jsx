@@ -1,176 +1,113 @@
-import { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-export default function Onboarding({ onDone }) {
-  // Local state per spec
+const GENDER_META = {
+  muz: { label: 'Muž', color: '#ff66b3' },
+  zena: { label: 'Žena', color: '#4da3ff' },
+  jine: { label: 'Jiné', color: '#00c853' },
+};
+
+export default function Onboarding({ onDone }){
+  const [coords, setCoords] = useState(null);
+  const [locLoading, setLocLoading] = useState(false);
   const [name, setName] = useState('');
   const [gender, setGender] = useState(null); // 'muz' | 'zena' | 'jine'
-  const [age, setAge] = useState(null); // number | null
-  const [photoDataUrl, setPhotoDataUrl] = useState(null); // string | null
-  const [locationAllowed, setLocationAllowed] = useState(false);
-  const [coords, setCoords] = useState(null); // { lat, lng } | null
-  const [contactPolicy, setContactPolicy] = useState('vsichni');
-  const [saving, setSaving] = useState(false);
-  const [consent, setConsent] = useState(false);
+  const [age, setAge] = useState('');
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [agree, setAgree] = useState(false);
+  const color = useMemo(()=> gender ? GENDER_META[gender]?.color : '#888', [gender]);
 
-  // Gender color mapping
-  const genderColors = { muz: '#ff66b3', zena: '#3399ff', jine: '#2ecc71' };
-
-  const askLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Tento prohlížeč nepodporuje geolokaci.');
-      return;
-    }
+  function reqLocation(){
+    if (!('geolocation' in navigator)) return;
+    setLocLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCoords(c);
-        setLocationAllowed(true);
+      (pos)=>{
+        setLocLoading(false);
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
-      () => {
-        alert('Povolení polohy se nezdařilo.');
-        setLocationAllowed(false);
+      ()=>{
+        setLocLoading(false);
+        setCoords(null);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  };
+  }
 
-  const onPickPhoto = (e) => {
-    const file = e.target.files?.[0];
+  function onPickPhoto(e){
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setPhotoDataUrl(String(reader.result));
+    reader.onload = () => setPhotoDataUrl(reader.result);
     reader.readAsDataURL(file);
-  };
+  }
 
-  const canContinue = Boolean(name.trim() && gender && coords && consent === true);
-  const activeColor = gender ? genderColors[gender] : '#111';
+  const canContinue = !!coords && !!name.trim() && !!agree;
 
-  const saveProfile = () => {
+  function handleDone(){
     if (!canContinue) return;
-    setSaving(true);
     const profile = {
+      uid: undefined,
       name: name.trim(),
-      gender,
-      color: genderColors[gender],
-      age: Number.isFinite(Number(age)) ? Number(age) : null,
-      photoDataUrl: photoDataUrl ?? null,
-      coords, // { lat, lng }
-      contactPolicy,
-      createdAt: Date.now(),
+      gender: gender || 'muz',
+      color,
+      age: age ? Number(age) : null,
+      photoDataUrl: photoDataUrl || null,
+      coords,
+      contactPolicy: 'vsichni',
     };
-    localStorage.setItem('pp_profile', JSON.stringify(profile));
-    localStorage.setItem('pp_consent', '1');
-    setSaving(false);
-    onDone?.(profile);
-  };
+    onDone && onDone(profile);
+  }
 
   return (
-    <div className="pp-onb-overlay">
-      <div className="pp-onb-card">
-        <h2>Vítej v PutPing</h2>
+    <div style={{position:'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,.35)', zIndex:9999}}>
+      <div className="pp-card" style={{ width: 360, maxWidth: '92vw' }}>
+        <div style={{fontWeight:700, fontSize:18, marginBottom:10, textAlign:'center'}}>Vytvoř si profil</div>
 
-        <div className="pp-field pp-allow">
-          <button
-            type="button"
-            onClick={askLocation}
-            className={locationAllowed ? 'allowed' : ''}
-          >
-            {locationAllowed ? 'Poloha povolena' : 'Povolit polohu'}
+        <div style={{ marginBottom: 12 }}>
+          <button onClick={reqLocation} className="pill" style={{ background: coords ? '#e6ffe6' : '#fff' }}>
+            {locLoading ? 'Zjišťuji polohu…' : (coords ? 'Poloha povolena ✓' : 'Povolit polohu')}
           </button>
         </div>
 
-        <div className="pp-field">
-          <label>Jméno</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Tvoje jméno"
-            className="input"
-          />
+        <label style={{ display:'block', marginBottom:10 }}>
+          Jméno
+          <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:8, marginTop:6}} />
+        </label>
+
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 6 }}>Pohlaví</div>
+          {(['muz','zena','jine']).map(k => (
+            <button key={k} onClick={()=>setGender(k)} className={`pill ${gender===k? 'active':''}`} style={{ background: gender===k ? GENDER_META[k].color : '#fff' }}>
+              {GENDER_META[k].label}
+            </button>
+          ))}
         </div>
 
-        <div className="pp-field">
-          <label>Pohlaví</label>
-          <div className="pp-pills">
-            <button
-              type="button"
-              className={`pp-pill${gender==='muz' ? ' active' : ''}`}
-              onClick={() => setGender('muz')}
-              style={gender==='muz' ? { background: genderColors.muz } : undefined}
-            >Muž</button>
-            <button
-              type="button"
-              className={`pp-pill${gender==='zena' ? ' active' : ''}`}
-              onClick={() => setGender('zena')}
-              style={gender==='zena' ? { background: genderColors.zena } : undefined}
-            >Žena</button>
-            <button
-              type="button"
-              className={`pp-pill${gender==='jine' ? ' active' : ''}`}
-              onClick={() => setGender('jine')}
-              style={gender==='jine' ? { background: genderColors.jine } : undefined}
-            >Jiné</button>
-          </div>
-        </div>
+        <label style={{ display:'block', marginBottom:10 }}>
+          Věk (volitelné)
+          <input type="number" inputMode="numeric" value={age} onChange={e=>setAge(e.target.value)} style={{width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:8, marginTop:6}} />
+        </label>
 
-        <div className="pp-field">
-          <label>Věk (volitelné)</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            placeholder="Věk (volitelné)"
-            className="input"
-            value={age ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              const n = v === '' ? null : Number(v);
-              setAge(Number.isFinite(n) ? n : null);
-            }}
-          />
-        </div>
-
-        <div className="pp-field pp-photo">
-          <label>Profilová fotka</label>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 6 }}>Profilová fotka</div>
           <input type="file" accept="image/*" onChange={onPickPhoto} />
           {photoDataUrl && (
-            <div className="preview">
-              <img src={photoDataUrl} alt="preview" />
+            <div style={{ marginTop:8, textAlign:'center' }}>
+              <img src={photoDataUrl} alt="náhled" style={{ width:72, height:72, objectFit:'cover', borderRadius:'50%', border:'2px solid #fff', boxShadow:'0 2px 6px rgba(0,0,0,.25)' }} />
             </div>
           )}
         </div>
 
-        <div className="pp-field">
-          <label>Kdo mě může kontaktovat</label>
-          <select className="input" value={contactPolicy} onChange={(e)=>setContactPolicy(e.target.value)}>
-            <option value="vsichni">všichni</option>
-            <option value="jen-zeny">jen ženy</option>
-            <option value="jen-muzi">jen muži</option>
-            <option value="vek-plusminus-5">v mém věku ±5</option>
-          </select>
-        </div>
+        <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+          <input type="checkbox" checked={agree} onChange={e=>setAgree(e.target.checked)} /> Souhlasím s podmínkami
+        </label>
 
-        <div className="pp-field">
-          <label>
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              style={{ marginRight: 8 }}
-            />
-            Souhlasím s podmínkami a zásadami ochrany soukromí
-          </label>
+        <div style={{ display:'flex', justifyContent:'flex-end' }}>
+          <button onClick={handleDone} disabled={!canContinue} style={{ opacity: canContinue?1:.6, cursor: canContinue?'pointer':'not-allowed', padding:'10px 14px', border:'1px solid #ddd', borderRadius:8, background:'#fff' }}>
+            Pokračovat
+          </button>
         </div>
-
-        <button
-          type="button"
-          className="pp-primary"
-          style={{ background: activeColor }}
-          disabled={!canContinue || saving}
-          onClick={saveProfile}
-        >
-          {saving ? 'Ukládám…' : 'Pokračovat'}
-        </button>
       </div>
     </div>
   );
 }
+

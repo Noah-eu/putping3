@@ -1,93 +1,68 @@
+//////////////////////////////////////////////////
 import mapboxgl from "mapbox-gl";
 
-export type PPProfile = {
-  name?: string;
-  gender?: "muž" | "žena" | "jine" | string;
-  color?: string | null;
-  photoDataUrl?: string | null;
-  coords?: { lat: number; lng: number } | null;
+export type SelfMarkerOpts = {
+  map: mapboxgl.Map;
+  lng: number;
+  lat: number;
+  photoUrl?: string | null;
+  color?: string; // gender color
+  onClick?: () => void;
 };
 
-let __selfMarker: mapboxgl.Marker | null = null;
+let _marker: mapboxgl.Marker | null = null;
 
-export function getLocalProfile(): PPProfile|null {
-  try { return JSON.parse(localStorage.getItem("pp_profile")||"null"); }
-  catch { return null; }
+export function upsertSelfMarker(opts: SelfMarkerOpts) {
+  const { map, lng, lat, photoUrl, color = "#ff66b3", onClick } = opts;
+
+  // Reuse one instance
+  if (!_marker) {
+    const root = document.createElement("div");
+    root.className = "pp-marker";         // ROOT: DO NOT animate or transform this one
+    root.style.width = "0";
+    root.style.height = "0";
+
+    // Inner wrapper for visual/animation
+    const inner = document.createElement("div");
+    inner.className = "pp-marker__inner";  // animate THIS
+    // HTML of teardrop + avatar
+    inner.innerHTML = `
+      <div class="pp-marker__teardrop" style="--pin:${color}"></div>
+      <div class="pp-marker__avatar">
+        ${photoUrl ? `<img src="${photoUrl}" alt="me" />` : ""}
+      </div>
+    `;
+    root.appendChild(inner);
+
+    // Click → toggle zoom class + optional map zoom callback
+    root.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inner.classList.toggle("is-zoom");
+      onClick?.();
+    });
+
+    _marker = new mapboxgl.Marker({ element: root, anchor: "bottom" })
+      .setLngLat([lng, lat])
+      .addTo(map);
+  } else {
+    _marker.setLngLat([lng, lat]);
+    // update avatar/color if changed
+    const inner = _marker.getElement().querySelector(".pp-marker__inner") as HTMLElement;
+    if (inner) {
+      const pin = inner.querySelector(".pp-marker__teardrop") as HTMLElement | null;
+      if (pin) pin.style.setProperty("--pin", color);
+      const img = inner.querySelector(".pp-marker__avatar img") as HTMLImageElement | null;
+      if (img && photoUrl) img.src = photoUrl;
+    }
+  }
+
+  return _marker!;
 }
 
-function genderColor(p: PPProfile): string {
-  if (p.color) return p.color as string;
-  if (p.gender === "žena") return "#ff66b3";   // růžová
-  if (p.gender === "muž") return "#66b3ff";    // modrá
-  return "#2ecc71";                            // zelená (jiné)
+export function removeSelfMarker() {
+  if (_marker) {
+    _marker.remove();
+    _marker = null;
+  }
 }
-
-function initials(name?: string) {
-  if (!name) return "";
-  const parts = name.trim().split(/\s+/);
-  const s = (parts[0]?.[0]||"") + (parts[1]?.[0]||"");
-  return s.toUpperCase();
-}
-
-export function makeTearElement(p: PPProfile): HTMLDivElement {
-  const el = document.createElement("div");
-  el.id = "pp-self-marker";
-  el.className = "pp-marker-tear";
-  el.style.setProperty("--pp-color", genderColor(p));
-  el.innerHTML =
-    `<div class="img-wrap">${
-        p.photoDataUrl
-          ? `<img src="${p.photoDataUrl}" alt="${p.name||''}"/>`
-          : `<div class="noimg">${initials(p.name)||"ME"}</div>`
-      }</div>`;
-  return el;
-}
-
-export function openSelfPopup(map: mapboxgl.Map, p: PPProfile) {
-  if (!p.coords) return;
-  const html = `
-    <div class="pp-popup">
-      <div class="pp-popup-img">${
-        p.photoDataUrl ? `<img src="${p.photoDataUrl}" alt="${p.name||''}"/>` : ""
-      }</div>
-      <div class="pp-popup-name">${p.name || ""}</div>
-    </div>`;
-  new mapboxgl.Popup({ closeOnClick: true, maxWidth: "440px" })
-    .setLngLat([p.coords!.lng, p.coords!.lat])
-    .setHTML(html)
-    .addTo(map);
-  map.flyTo({ center:[p.coords!.lng, p.coords!.lat], zoom:15, essential:true });
-}
-
-/** Create/refresh the single self marker (teardrop) and attach click popup */
-export function renderSelfMarker(map: mapboxgl.Map) {
-  const p = getLocalProfile();
-  if (!p?.coords) return;
-
-  // kill previous instance/DOM to avoid duplicates
-  try { document.getElementById("pp-self-marker")?.remove(); } catch {}
-  if (__selfMarker) { try { __selfMarker.remove(); } catch {} __selfMarker = null; }
-
-  const el = makeTearElement(p);
-  __selfMarker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
-    .setLngLat([p.coords.lng, p.coords.lat])
-    .addTo(map);
-
-  // Build pinned popup with the same content as openSelfPopup
-  const popupHtml = `
-    <div class=\"pp-popup\">\n      <div class=\"pp-popup-img\">${p.photoDataUrl ? `<img src=\"${p.photoDataUrl}\" alt=\"${p.name || ""}\"/>` : ""}</div>\n      <div class=\"pp-popup-name\">${p.name || ""}</div>\n    </div>`;
-  const popup = new mapboxgl.Popup({ closeOnClick: false, closeButton: true, maxWidth: "440px", anchor: "top", offset: 25 })
-    .setLngLat([p.coords!.lng, p.coords!.lat])
-    .setHTML(popupHtml);
-  __selfMarker.setPopup(popup);
-
-  // Single click handler on the custom element
-  const onClick = (e: any) => {
-    try { e?.stopPropagation?.(); } catch {}
-    try { (el as HTMLElement).classList.add("pp-zoom"); } catch {}
-    try { __selfMarker?.togglePopup(); } catch {}
-    try { map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true }); } catch {}
-    try { popup.on("close", () => { try { (el as HTMLElement).classList.remove("pp-zoom"); } catch {} }); } catch {}
-  };
-  el.addEventListener("click", onClick);
-}
+//////////////////////////////////////////////////
