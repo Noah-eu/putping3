@@ -977,6 +977,17 @@ mapboxgl-popup .pp-name{font-weight:700}
   will-change: transform;
 }
 
+/* === Small tear marker + large Popup === */
+.pp-tear{ width:44px; height:58px; position:relative; pointer-events:auto; }
+.pp-photo{ position:absolute; left:50%; top:14px; width:28px; height:28px; border-radius:50%; transform:translateX(-50%); border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.25); background:#e5e7eb; background-size:cover; background-position:center; }
+.pp-popup{ width:min(360px, 92vw); padding:12px; }
+.pp-popup .pp-pop-media{ width:100%; display:flex; justify-content:center; align-items:center; margin-bottom:8px; }
+.pp-popup .pp-pop-img{ width:280px; height:280px; border-radius:16px; object-fit:cover; display:block; }
+.pp-popup .pp-pop-rail{ display:flex; gap:6px; overflow:auto; max-width:100%; padding-bottom:4px; }
+.pp-popup .pp-pop-rail img{ width:120px; height:120px; object-fit:cover; border-radius:10px; display:block; }
+.pp-popup .pp-pop-name{ font-weight:800; text-align:center; margin:6px 0 10px; }
+.pp-popup .pp-pop-btn{ width:100%; padding:10px 12px; background:#111; color:#fff; border:0; border-radius:10px; font-weight:700; cursor:pointer; }
+
 /* === MVP additions === */
 .pp-splash { position:fixed; inset:0; background:url('/splash.jpg') center/cover no-repeat; z-index:9998; }
 .pp-card { background:rgba(255,255,255,.96); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:20px; }
