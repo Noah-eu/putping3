@@ -978,15 +978,81 @@ mapboxgl-popup .pp-name{font-weight:700}
 }
 
 /* === Small tear marker + large Popup === */
-.pp-tear{ width:44px; height:58px; position:relative; pointer-events:auto; }
-.pp-photo{ position:absolute; left:50%; top:14px; width:28px; height:28px; border-radius:50%; transform:translateX(-50%); border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.25); background:#e5e7eb; background-size:cover; background-position:center; }
-.pp-popup{ width:min(360px, 92vw); padding:12px; }
-.pp-popup .pp-pop-media{ width:100%; display:flex; justify-content:center; align-items:center; margin-bottom:8px; }
-.pp-popup .pp-pop-img{ width:280px; height:280px; border-radius:16px; object-fit:cover; display:block; }
-.pp-popup .pp-pop-rail{ display:flex; gap:6px; overflow:auto; max-width:100%; padding-bottom:4px; }
-.pp-popup .pp-pop-rail img{ width:120px; height:120px; object-fit:cover; border-radius:10px; display:block; }
-.pp-popup .pp-pop-name{ font-weight:800; text-align:center; margin:6px 0 10px; }
-.pp-popup .pp-pop-btn{ width:100%; padding:10px 12px; background:#111; color:#fff; border:0; border-radius:10px; font-weight:700; cursor:pointer; }
+/* ===== User teardrop pin ===== */
+.pp-pin {
+  --pin: #ff66b3;          /* default podle muže */
+  --ring: #111;            /* tenký tmavý prstenec kolem fotky */
+  position: relative;
+  width: 44px;
+  height: 64px;
+  transform: translate(-50%, -100%); /* anchor bottom */
+  will-change: transform;
+  z-index: 1;
+  pointer-events: auto;
+}
+.pp-pin__tear {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  background: var(--pin);
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
+  -webkit-mask:
+    radial-gradient(46px 46px at 50% 36%, #000 98%, transparent 100%) top/100% 82% no-repeat,
+    conic-gradient(from 180deg at 50% 82%, #000 60deg, transparent 0 300deg, #000 0) bottom/22px 18px no-repeat;
+          mask:
+    radial-gradient(46px 46px at 50% 36%, #000 98%, transparent 100%) top/100% 82% no-repeat,
+    conic-gradient(from 180deg at 50% 82%, #000 60deg, transparent 0 300deg, #000 0) bottom/22px 18px no-repeat;
+  border-radius: 28px;
+}
+.pp-pin__photoWrap {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--ring) inset;
+}
+.pp-pin__photo {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.pp-pin.is-open {
+  z-index: 5;
+  transform: translate(-50%, -100%) scale(1.85);
+  transition: transform .25s cubic-bezier(.2,.7,.2,1);
+}
+.pp-pin__panel {
+  position: absolute;
+  left: 50%; bottom: 70px; /* nad pinem */
+  transform: translateX(-50%) scale(0.7);
+  transform-origin: bottom center;
+  min-width: 240px;
+  background: rgba(255,255,255,.96);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.22);
+  padding: 14px 16px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.pp-pin.is-open .pp-pin__panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+}
+.pp-pin__panelHead { display: grid; place-items: center; margin-bottom: 8px; }
+.pp-pin__panelAvatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  object-fit: cover; display: block;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--pin);
+}
+.pp-pin__panelName { text-align: center; font-weight: 600; margin-bottom: 10px; }
+.pp-pin__pingBtn {
+  width: 100%; height: 40px; border-radius: 10px;
+  border: 0; background: #111; color: #fff; font-weight: 600;
+  cursor: pointer;
+}
+.pp-pin__pingBtn:active { transform: translateY(1px); }
 
 /* === MVP additions === */
 .pp-splash { position:fixed; inset:0; background:url('/splash.jpg') center/cover no-repeat; z-index:9998; }

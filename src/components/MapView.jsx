@@ -32,10 +32,12 @@ export default function MapView({ profile }){
       lng: profile.coords.lng,
       lat: profile.coords.lat,
       photoUrl: profile.photoDataUrl || null,
-      color: profile.color || '#ff66b3',
+      color: profile.color || undefined,
+      name: profile.name || '',
+      gender: profile.gender || 'muz',
       onClick: () => {
         const z = Math.max(map.getZoom(), 15);
-        map.easeTo({ center: [profile.coords.lng, profile.coords.lat], zoom: z, duration: 600 });
+        map.flyTo({ center: [profile.coords.lng, profile.coords.lat], zoom: Math.max(z, 16), essential: true });
       }
     });
   }, [mapReady, profile]);
