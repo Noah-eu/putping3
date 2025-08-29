@@ -20,20 +20,30 @@ export function createTeardropMarkerEl(profile: PPProfile): HTMLElement {
   const color = profile.color || genderColor[profile.gender || ''] || '#ff5ea8';
   el.style.setProperty('--pp-color', color);
 
-  // structure
-  const bubble = document.createElement('div');
-  bubble.className = 'pp-marker__bubble';
-
-  const tail = document.createElement('div');
-  tail.className = 'pp-marker__tail';
+  // structure – unified SVG teardrop with outline
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 64 88');
+  svg.setAttribute('width', '44');
+  svg.setAttribute('height', '58');
+  svg.classList.add('pp-tear');
+  // color via currentColor to allow CSS variable
+  (svg as any).style = `color: var(--pp-color)`;
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  // Teardrop path: smooth circle head + pointed tail
+  path.setAttribute('d', 'M32 2 C49 2 62 15 62 32 C62 56 32 86 32 86 C32 86 2 56 2 32 C2 15 15 2 32 2 Z');
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('stroke', '#111');
+  path.setAttribute('stroke-width', '4');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(path);
 
   const img = document.createElement('img');
   img.className = 'pp-marker__avatar';
   if (profile.photoDataUrl) img.src = profile.photoDataUrl;
   img.alt = profile.name || '';
 
-  el.appendChild(bubble);
-  el.appendChild(tail);
+  el.appendChild(svg);
   el.appendChild(img);
 
   // toggle zoom on click

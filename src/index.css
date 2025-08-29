@@ -1239,3 +1239,6 @@ mapboxgl-popup .pp-name{font-weight:700}
 
 /* prevent text selection */
 .pp-marker, .pp-marker * { user-select: none; }
+
+/* unified SVG tear element */
+.pp-tear{ position:absolute; left:50%; top:0; transform:translateX(-50%); width:44px; height:58px; display:block; }
