@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { createTeardropMarkerEl, closeAllTeardrops } from '../lib/createTeardropMarker.ts';
+// ---- helper pro teardrop element --------------------------------
+function buildTearDropEl(photoUrl, color) {
+  const el = document.createElement('div');
+  el.className = 'pp-tear';
+  el.style.setProperty('--pp-color', color);
+  const img = document.createElement('img');
+  img.className = 'pp-avatar';
+  img.alt = 'avatar';
+  img.src = photoUrl || '';
+  el.appendChild(img);
+  return el;
+}
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -22,7 +33,6 @@ export default function MapView({ profile }){
     });
     mapRef.current = m;
     m.once('load', () => setMapReady(true));
-    m.on('click', () => closeAllTeardrops());
     return () => { m.remove(); mapRef.current = null; };
   }, []);
 
@@ -31,23 +41,19 @@ export default function MapView({ profile }){
     const map = mapRef.current;
     const lng = profile.coords.lng;
     const lat = profile.coords.lat;
+    const g = (profile.gender || '').toLowerCase();
+    const color = g === 'žena' || g === 'zena' ? '#ff5aa5' : (g === 'muz' || g === 'muž') ? '#4f8cff' : '#7b61ff';
     if (!selfRef.current){
-      const el = createTeardropMarkerEl({
-        uid: profile.uid,
-        name: profile.name,
-        gender: profile.gender,
-        color: profile.color,
-        photoDataUrl: profile.photoDataUrl,
-      });
+      const el = buildTearDropEl(profile?.photoDataUrl || profile?.photoURL || null, color);
       selfRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([lng, lat])
         .addTo(map);
     } else {
       selfRef.current.setLngLat([lng, lat]);
       const el = selfRef.current.getElement();
-      if (profile.color) el.style.setProperty('--pp-color', profile.color);
-      const img = el.querySelector('.pp-marker__avatar');
-      if (img && profile.photoDataUrl) img.src = profile.photoDataUrl;
+      el.style.setProperty('--pp-color', color);
+      const img = el.querySelector('.pp-avatar');
+      if (img && (profile.photoDataUrl || profile.photoURL)) img.src = profile.photoDataUrl || profile.photoURL;
     }
   }, [mapReady, profile]);
 
