@@ -909,3 +909,6 @@ mapboxgl-popup .pp-name{font-weight:700}
 .mapboxgl-popup .pp-popup-img{ width:280px; height:280px; border-radius:16px; overflow:hidden; background:#000 }
 .mapboxgl-popup .pp-popup-img img{ width:100%; height:100%; object-fit:cover; display:block }
 .mapboxgl-popup .pp-popup-name{ font-weight:700; margin-top:4px }
+/* grow animation via class for click */
+.pp-marker{ transform-origin: 50% 92%; transition: transform .18s ease; }
+.pp-marker.pp-grow{ transform: scale(1.35); }
