@@ -1,5 +1,6 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
+import Onboarding from "./components/Onboarding";
 import mapboxgl from "mapbox-gl";
 
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -20,8 +21,14 @@ import {
 } from "firebase/storage";
 import { db, auth, storage } from "./firebase.js";
 import Sortable from "sortablejs";
+import MapView from "./components/MapView.jsx";
+import Fab from "./components/Fab.jsx";
+import Gallery from "./components/Gallery.jsx";
+import Chats from "./components/Chats.jsx";
 import { spawnDevBot } from './devBot';
+import { renderSelfMarker } from "./lib/selfMarker";
 import { getRedirectResult, signOut } from "firebase/auth";
+import Intro from "./components/Intro";
 
 /* ───────────────────────────────── Mapbox ────────────────────────────────── */
 
@@ -36,6 +43,22 @@ const ONLINE_TTL_MS = 10 * 60_000; // 10 minut
 
 function pairIdOf(a, b) {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
+}
+
+// Načte lokální profil z localStorage (pro self marker)
+function getLocalProfile() {
+  try {
+    return JSON.parse(localStorage.getItem('pp_profile') || 'null');
+  } catch {
+    return null;
+  }
+}
+function getGallery() {
+  try {
+    return JSON.parse(localStorage.getItem('pp_gallery') || '[]');
+  } catch {
+    return [];
+  }
 }
 
 function remapPairId(pid, oldUid, newUid) {
@@ -166,6 +189,15 @@ const saveProfileDebounced = debounce(saveProfile, 500);
 /* ─────────────────────────────── Komponenta ─────────────────────────────── */
 
 export default function App() {
+  // Onboarding overlay profile (local-only)
+  const [profile, setProfile] = useState(null);
+  const [introDone, setIntroDone] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pp_profile');
+      if (raw) setProfile(JSON.parse(raw));
+    } catch {}
+  }, []);
   const [map, setMap] = useState(null);
   const [me, setMe] = useState(null); // {uid, name, photoURL}
   const [users, setUsers] = useState({});
@@ -176,8 +208,12 @@ export default function App() {
   const [showGallery, setShowGallery] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
+  const [showLocalGallery, setShowLocalGallery] = useState(false);
+  const [showLocalChats, setShowLocalChats] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
+  const pairPingsRef = useRef({});
+  const chatPairsRef = useRef({});
   const recomputeStep = () => {
     const consented = localStorage.getItem('pp_consent_v1') === '1';
     const finished  = localStorage.getItem('pp_onboard_v1') === '1';
@@ -207,9 +243,12 @@ export default function App() {
     localStorage.getItem("locationConsent") === "1"
   );
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const hasProfile = !!localStorage.getItem('pp_profile');
 
   // ref pro nejnovější zvýraznění markerů
   const markerHighlightsRef = useRef({});
+  useEffect(() => { pairPingsRef.current = pairPings; }, [pairPings]);
+  useEffect(() => { chatPairsRef.current = chatPairs; }, [chatPairs]);
 
   // chat
   const [openChatWith, setOpenChatWith] = useState(null); // uid protistrany
@@ -234,6 +273,7 @@ export default function App() {
   const markerPhotoIdxRef = useRef({}); // { [uid]: number } – vybraný snímek v bublině + pro avatar
   const openBubble = useRef(null); // uid otevřené bubliny
   const centeredOnMe = useRef(false);
+  const selfMarkerRef = useRef(null);
 
   // zvuk pomocí Web Audio API
   const lastMsgRef = useRef({}); // pairId -> last message id
@@ -624,7 +664,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (localStorage.getItem("soundEnabled") === null) {
+    const consent = localStorage.getItem('pp_consent') === '1';
+    if (!consent && localStorage.getItem("soundEnabled") === null) {
       alert("Zvuk je ve výchozím stavu zapnut. Ikonou 🔇/🔊 jej můžeš přepnout.");
       localStorage.setItem("soundEnabled", "1");
     }
@@ -785,6 +826,84 @@ export default function App() {
     return () => m && m.remove();
   }, [me]);
 
+  // Hide Mapbox Geolocate control if present
+  useEffect(() => {
+    if (!map) return;
+    try {
+      if (window.__ppGeoCtrl) { map.removeControl(window.__ppGeoCtrl); window.__ppGeoCtrl = null; }
+    } catch {}
+  }, [map]);
+
+  // Force single self marker (teardrop)
+  useEffect(() => {
+    if (!map) return;
+    const run = () => renderSelfMarker(map);
+    if (!map.__ppSelfReady) {
+      map.__ppSelfReady = true;
+      if (map.loaded()) run(); else map.once('load', run);
+    }
+  }, [map]);
+
+  // Self marker from localStorage profile after map is ready
+  useEffect(() => {
+    if (!map) return;
+    const onLoad = () => {
+      const p = getLocalProfile();
+      if (p?.coords?.lat && p?.coords?.lng) {
+        // prevent duplicates
+        if (selfMarkerRef.current) {
+          try { selfMarkerRef.current.remove(); } catch {}
+          selfMarkerRef.current = null;
+        }
+        const el = document.createElement('div');
+        el.className = 'pp-marker-tear';
+        el.style.setProperty('--pp-color', p.color || '#444');
+        el.innerHTML = `<div class="img-wrap">${p.photoDataUrl ? `<img src="${p.photoDataUrl}" alt="${p.name || 'me'}" />` : ''}</div>`;
+        const mk = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([p.coords.lng, p.coords.lat])
+          .addTo(map);
+        selfMarkerRef.current = mk;
+        el.addEventListener('click', () => {
+          el.classList.add('pp-zoom');
+          const imgs = [p.photoDataUrl, ...getGallery()].filter(Boolean);
+          const first = imgs[0] || '';
+          const html = `
+            <div class="pp-popup">
+              <div class="pp-swipe">
+                <img class="pp-swipe-img" src="${first}" alt="" />
+                <button class="pp-prev" type="button">‹</button>
+                <button class="pp-next" type="button">›</button>
+              </div>
+              <div class="pp-name">${p.name || ''}</div>
+            </div>`;
+          const popup = new mapboxgl.Popup()
+            .setLngLat([p.coords.lng, p.coords.lat])
+            .setHTML(html)
+            .addTo(map);
+          try { popup.on('close', () => el.classList.remove('pp-zoom')); } catch {}
+          try {
+            const root = popup.getElement();
+            const imgEl = root.querySelector('.pp-swipe-img');
+            const prev = root.querySelector('.pp-prev');
+            const next = root.querySelector('.pp-next');
+            let idx = 0;
+            const show = () => { if (imgEl && imgs[idx]) imgEl.src = imgs[idx]; };
+            prev?.addEventListener('click', (e) => { e.stopPropagation(); idx = (idx - 1 + imgs.length) % imgs.length; show(); });
+            next?.addEventListener('click', (e) => { e.stopPropagation(); idx = (idx + 1) % imgs.length; show(); });
+          } catch {}
+        });
+      }
+    };
+    map.on('load', onLoad);
+    return () => {
+      try { map.off('load', onLoad); } catch {}
+      if (selfMarkerRef.current) {
+        try { selfMarkerRef.current.remove(); } catch {}
+        selfMarkerRef.current = null;
+      }
+    };
+  }, [map]);
+
   /* ───────────────────── Sledování /users a kreslení ───────────────────── */
 
   useEffect(() => {
@@ -850,90 +969,80 @@ export default function App() {
         const baseColor = hasPhoto ? (isMe ? "red" : "#147af3") : "black";
         const draggable = false;
 
+        const color = getGenderRing(u) || '#444';
+        const selIdx = markerPhotoIdxRef.current?.[uid] ?? 0;
+        const photoSrc = (Array.isArray(u.photos) && (u.photos[selIdx] || u.photos[0])) || u.photoURL || '';
         if (!markers.current[uid]) {
-          const wrapper = document.createElement("div");
-          wrapper.className = "marker-wrapper";
-          wrapper.style.transformOrigin = "bottom center";
-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
-          const ring = document.createElement('div');
-          ring.className = 'marker-ring';
-          wrapper.appendChild(ring);
-          const avatar = document.createElement("div");
-          avatar.className = "marker-avatar";
-          const selIdx =
-            markerPhotoIdxRef.current?.[uid] ?? 0;
-
-          setMarkerAppearance(
-            avatar,
-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
-              (Array.isArray(u.photos) && u.photos[0]) ||
-              u.photoURL,
-            baseColor,
-            highlight,
-            getGenderRing(u)
-          );
-          wrapper.appendChild(avatar);
-
-          const bubble = getBubbleContent({
-            uid,
-            name: u.name || "Anonym",
-            photos: u.photos,
-            photoURL: u.photoURL,
-          });
-          wrapper.appendChild(bubble);
-
-          avatar.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleBubble(uid);
-          });
-
-          const mk = new mapboxgl.Marker({ element: wrapper, draggable, anchor: "bottom" })
+          const el = document.createElement('div');
+          el.className = 'pp-marker-tear';
+          el.style.setProperty('--pp-color', color);
+          el.innerHTML = `<div class="img-wrap">${photoSrc ? `<img src="${photoSrc}" alt="${(u.name||'Uživatel')}" />` : ''}</div>`;
+          const mk = new mapboxgl.Marker({ element: el, draggable: false, anchor: 'bottom' })
             .setLngLat([u.lng, u.lat])
             .addTo(map);
-
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try { el.classList.add('pp-zoom'); } catch {}
+            const meUid = auth.currentUser?.uid || me?.uid || null;
+            const pid = getPairId(meUid, uid);
+            const pp = pairPingsRef.current[pid] || {};
+            const canChat = !!(chatPairsRef.current[pid] || (pp[meUid] && pp[uid]));
+            const allowed = canPing(users[meUid] || {}, u || {});
+            const btn = allowed ? `<button id="btnAct_${uid}" class="btn">${canChat ? 'Chat' : 'Ping'}</button>` : `<button class="btn" disabled title="Ping nedostupný">Ping</button>`;
+            const html = `<div class="pp-popup"><div class="pp-name">${u.name || 'Uživatel'}</div>${meUid && meUid!==uid ? `<div style="margin-top:8px">${btn}</div>` : ''}</div>`;
+            const popup = new mapboxgl.Popup()
+              .setLngLat([u.lng, u.lat])
+              .setHTML(html)
+              .addTo(map);
+            try { popup.on('close', () => el.classList.remove('pp-zoom')); } catch {}
+            try {
+              if (meUid && meUid!==uid && allowed) {
+                const root = popup.getElement();
+                const b = root.querySelector(`#btnAct_${uid}`);
+                if (b) {
+                  b.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const pid2 = getPairId(meUid, uid);
+                    const pp2 = pairPingsRef.current[pid2] || {};
+                    const canChat2 = !!(chatPairsRef.current[pid2] || (pp2[meUid] && pp2[uid]));
+                    if (canChat2) {
+                      openChat(uid);
+                    } else {
+                      sendPing(uid);
+                      b.textContent = 'Chat';
+                    }
+                  });
+                }
+              }
+            } catch {}
+          });
           markers.current[uid] = mk;
         } else {
           const shouldUpdate = (isOnline || isMe) && u.lat && u.lng;
           if (shouldUpdate) {
             markers.current[uid].setLngLat([u.lng, u.lat]);
           }
-
-          const wrapper = markers.current[uid].getElement();
-          wrapper.style.setProperty('--ring-color', getGenderRing(u) || 'transparent');
-          if (!wrapper.querySelector('.marker-ring')) {
-            const ring = document.createElement('div');
-            ring.className = 'marker-ring';
-            wrapper.prepend(ring);
+          const el = markers.current[uid].getElement();
+          el.style.setProperty('--pp-color', color);
+          const wrap = el.querySelector('.img-wrap');
+          if (wrap) {
+            if (photoSrc) {
+              if (!wrap.querySelector('img')) {
+                const img = document.createElement('img');
+                img.src = photoSrc; img.alt = u.name || 'Uživatel';
+                wrap.innerHTML = '';
+                wrap.appendChild(img);
+              } else {
+                const img = wrap.querySelector('img');
+                if (img && img.src !== photoSrc) img.src = photoSrc;
+              }
+            } else {
+              wrap.innerHTML = '';
+            }
           }
-          const avatar = wrapper.querySelector(".marker-avatar");
-          const selIdx =
-            markerPhotoIdxRef.current?.[uid] ?? 0;
-
-          setMarkerAppearance(
-            avatar,
-            (Array.isArray(u.photos) && u.photos[selIdx]) ||
-              (Array.isArray(u.photos) && u.photos[0]) ||
-              u.photoURL,
-            baseColor,
-            highlight,
-            getGenderRing(u)
-          );
-
-          const oldBubble = wrapper.querySelector(".marker-bubble");
-          const scrollLeft =
-            oldBubble?.querySelector(".bubble-gallery")?.scrollLeft || 0;
-          const newBubble = getBubbleContent({
-            uid,
-            name: u.name || "Anonym",
-            photos: u.photos,
-            photoURL: u.photoURL,
-          });
-          wrapper.replaceChild(newBubble, oldBubble);
-          const newGallery = newBubble.querySelector(".bubble-gallery");
-          if (newGallery) newGallery.scrollLeft = scrollLeft;
-          if (wrapper.classList.contains("active")) {
-            wireBubbleButtons(uid);
-          }
+          // pulse highlight on ping
+          if (markerHighlightsRef.current[uid]) el.classList.add('pp-pulse');
+          else el.classList.remove('pp-pulse');
         }
       });
 
@@ -1584,9 +1693,13 @@ export default function App() {
 
   /* ──────────────────────────────── Render UI ───────────────────────────── */
 
+  if (!introDone) {
+    return <Intro onDone={() => setIntroDone(true)} />;
+  }
+
   return (
     <div>
-      {isIOS && !locationConsent && (
+      {false && (
         <div className="consent-modal">
           <div className="consent-modal__content">
             <h2>Souhlas se sdílením polohy</h2>
@@ -1686,6 +1799,12 @@ export default function App() {
 
       {/* Mapa */}
       <div id="map" style={{ width: "100vw", height: "100vh" }} />
+      {profile && <MapView profile={profile} />}
+      {profile && (
+        <Fab onOpenGallery={() => setShowLocalGallery(true)} onOpenChats={() => setShowLocalChats(true)} />
+      )}
+      {showLocalGallery && <Gallery onClose={() => setShowLocalGallery(false)} />}
+      {showLocalChats && <Chats onClose={() => setShowLocalChats(false)} />}
 
       <div id="chatPanel" className="chat-panel hidden" aria-hidden="true">
         <div className="chat-header">
@@ -2105,14 +2224,14 @@ export default function App() {
         </div>
       )}
 
-      {showIntro && (
+      {false && (
         <div
           className={`intro-screen ${fadeIntro ? "intro-screen--hidden" : ""}`}
           style={{ backgroundImage: "url(/splash.jpg)" }}
         />
       )}
 
-      {step>0 && (
+      {false && (
         <div className="onboard">
           <div className="onboard-card">
             {step===1 && (
@@ -2144,6 +2263,10 @@ export default function App() {
           </div>
         </div>
       )}
+
+      { !profile && (
+        <Onboarding onDone={(p)=>{ localStorage.setItem('pp_profile', JSON.stringify(p)); setProfile(p); }} />
+      ) }
     </div>
   );
 }

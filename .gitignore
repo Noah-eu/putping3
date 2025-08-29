@@ -1,2 +1,18 @@
 node_modules/
 dist/
+
+# build/output & tools
+dist/
+.vscode/*
+!.vscode/settings.json
+
+# local env & privátní věci
+.env
+.env.*
+.firebase
+.vercel
+firebase-debug.log
+
+# OS a IDE drobnosti
+.DS_Store
+Thumbs.db
