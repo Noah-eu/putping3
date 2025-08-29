@@ -913,3 +913,76 @@ mapboxgl-popup .pp-name{font-weight:700}
 .pp-marker{ transform-origin: 50% 92%; transition: transform .18s ease; }
 .pp-marker.pp-grow{ transform: scale(1.35); }
 .pp-marker-tear.pp-grow{ transform: scale(1.35); }
+
+/* Root element passed to Mapbox – do NOT transform this */
+.pp-marker {
+  pointer-events: auto;
+  /* Mapbox sets translate on this node; keep it clean */
+}
+
+/* Visual wrapper – animate this instead */
+.pp-marker__inner {
+  position: relative;
+  width: 44px;
+  height: 64px; /* teardrop height */
+  transform-origin: bottom center;
+  transition: transform .22s ease;
+  will-change: transform;
+}
+
+/* Zoomed (popup-like) state */
+.pp-marker__inner.is-zoom {
+  transform: scale(1.65);
+}
+
+/* Teardrop (CSS only) */
+.pp-marker__teardrop {
+  --pin: #ff66b3;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 26px;
+  height: 36px;
+  transform: translateX(-50%);
+  background: var(--pin);
+  border-radius: 13px 13px 13px 0;
+  rotate: 45deg;
+  box-shadow: 0 6px 14px rgba(0,0,0,.25);
+}
+
+/* Avatar circle sits on the teardrop */
+.pp-marker__avatar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #111;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  overflow: hidden;
+}
+.pp-marker__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Avoid layout shifts while animating */
+.mapboxgl-marker {
+  will-change: transform;
+}
+
+/* === MVP additions === */
+.pp-splash { position:fixed; inset:0; background:url('/splash.jpg') center/cover no-repeat; z-index:9998; }
+.pp-card { background:rgba(255,255,255,.96); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:20px; }
+.pill { display:inline-block; padding:7px 14px; border-radius:999px; border:1px solid #ddd; margin-right:8px; cursor:pointer; background:#fff; }
+.pill.active { color:#fff; border-color:transparent; }
+.pp-marker-tear { width:44px; height:60px; position:relative; transform:translate(-50%,-90%); will-change:transform; transition:transform .25s ease, box-shadow .25s ease; }
+.pp-marker-tear .drop { position:absolute; inset:0; }
+.pp-marker-tear .photo { position:absolute; left:50%; top:38%; width:32px; height:32px; border-radius:50%; transform:translate(-50%,-50%); object-fit:cover; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.25); }
+.pp-marker-tear.pp-zoom { transform:translate(-50%,-90%) scale(1.35); box-shadow:0 6px 16px rgba(0,0,0,.35); }
