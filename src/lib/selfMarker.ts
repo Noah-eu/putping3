@@ -77,17 +77,11 @@ export function renderSelfMarker(map: mapboxgl.Map) {
 
   // Fly to marker and do a short class-based scale animation on click
   try {
-    const elem = __selfMarker.getElement() as HTMLElement;
-    elem.addEventListener("click", () => {
-      try {
-        elem.classList.add("pp-grow");
-      } catch {}
-      try {
-        map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true });
-      } catch {}
-      setTimeout(() => {
-        try { elem.classList.remove("pp-grow"); } catch {}
-      }, 400);
+    const wrapper = __selfMarker.getElement() as HTMLElement;
+    wrapper.addEventListener("click", () => {
+      try { (el as HTMLElement).classList.add("pp-grow"); } catch {}
+      try { map.flyTo({ center: [p.coords!.lng, p.coords!.lat], zoom: 15, speed: 1.2, essential: true }); } catch {}
+      setTimeout(() => { try { (el as HTMLElement).classList.remove("pp-grow"); } catch {} }, 400);
     });
   } catch {}
 }
