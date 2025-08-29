@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { upsertSelfMarker } from '../lib/selfMarker';
+import createSelfMarker from '../lib/selfMarker';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -8,6 +8,7 @@ export default function MapView({ profile }){
   const mapRef = useRef(null);
   const mapElRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
+  const selfRef = useRef(null);
 
   const center = profile?.coords ? [profile.coords.lng, profile.coords.lat] : [14.42076, 50.08804];
 
@@ -27,19 +28,23 @@ export default function MapView({ profile }){
   useEffect(() => {
     if (!mapReady || !mapRef.current || !profile?.coords) return;
     const map = mapRef.current;
-    upsertSelfMarker({
-      map,
-      lng: profile.coords.lng,
-      lat: profile.coords.lat,
-      photoUrl: profile.photoDataUrl || null,
-      color: profile.color || undefined,
-      name: profile.name || '',
-      gender: profile.gender || 'muz',
-      onClick: () => {
-        const z = Math.max(map.getZoom(), 15);
-        map.flyTo({ center: [profile.coords.lng, profile.coords.lat], zoom: Math.max(z, 16), essential: true });
-      }
-    });
+    const lng = profile.coords.lng;
+    const lat = profile.coords.lat;
+    if (!selfRef.current){
+      selfRef.current = createSelfMarker({
+        map,
+        lng,
+        lat,
+        color: profile.color || '#ff4f93',
+        photoUrl: profile.photoDataUrl || ''
+      });
+    } else {
+      selfRef.current.setLngLat([lng, lat]);
+      const el = selfRef.current.getElement();
+      if (profile.color) el.style.setProperty('--pp-pin', profile.color);
+      const img = el.querySelector('.pp-pin__ava');
+      if (img && profile.photoDataUrl) img.src = profile.photoDataUrl;
+    }
   }, [mapReady, profile]);
 
   return (
