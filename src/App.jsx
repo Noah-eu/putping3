@@ -26,7 +26,6 @@ import Fab from "./components/Fab.jsx";
 import Gallery from "./components/Gallery.jsx";
 import Chats from "./components/Chats.jsx";
 import { spawnDevBot } from './devBot';
-import { getLocalProfile } from "./lib/selfMarker";
 import { renderSelfMarker } from "./lib/selfMarker";
 import { getRedirectResult, signOut } from "firebase/auth";
 import Intro from "./components/Intro";
