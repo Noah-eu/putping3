@@ -26,6 +26,7 @@ import Fab from "./components/Fab.jsx";
 import Gallery from "./components/Gallery.jsx";
 import Chats from "./components/Chats.jsx";
 import { spawnDevBot } from './devBot';
+import { getLocalProfile } from "./lib/selfMarker";
 import { renderSelfMarker } from "./lib/selfMarker";
 import { getRedirectResult, signOut } from "firebase/auth";
 import Intro from "./components/Intro";
@@ -52,6 +53,14 @@ function getLocalProfile() {
   } catch {
     return null;
   }
+}
+
+// helper to detect current user's marker (self)
+function isSelf(anyObj, fallbackUid) {
+  const local = getLocalProfile();
+  const selfUid = (local && local.uid) || fallbackUid || null;
+  const cand = anyObj?.uid ?? anyObj?.userId ?? anyObj?.id ?? anyObj?.key ?? null;
+  return selfUid && cand && String(cand) === String(selfUid);
 }
 function getGallery() {
   try {
@@ -972,6 +981,10 @@ export default function App() {
         const color = getGenderRing(u) || '#444';
         const selIdx = markerPhotoIdxRef.current?.[uid] ?? 0;
         const photoSrc = (Array.isArray(u.photos) && (u.photos[selIdx] || u.photos[0])) || u.photoURL || '';
+        // self guard — let MapView render the current user's marker
+        if (isSelf({ uid }, me?.uid)) {
+          return; // skip creating/updating self marker here
+        }
         if (!markers.current[uid]) {
           const el = document.createElement('div');
           el.className = 'pp-marker-tear';
