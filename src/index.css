@@ -912,3 +912,4 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* grow animation via class for click */
 .pp-marker{ transform-origin: 50% 92%; transition: transform .18s ease; }
 .pp-marker.pp-grow{ transform: scale(1.35); }
+.pp-marker-tear.pp-grow{ transform: scale(1.35); }
