@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import createSelfMarker from '../lib/selfMarker';
+import { createTeardropMarkerEl, closeAllTeardrops } from '../lib/createTeardropMarker.ts';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -22,6 +22,7 @@ export default function MapView({ profile }){
     });
     mapRef.current = m;
     m.once('load', () => setMapReady(true));
+    m.on('click', () => closeAllTeardrops());
     return () => { m.remove(); mapRef.current = null; };
   }, []);
 
@@ -31,18 +32,21 @@ export default function MapView({ profile }){
     const lng = profile.coords.lng;
     const lat = profile.coords.lat;
     if (!selfRef.current){
-      selfRef.current = createSelfMarker({
-        map,
-        lng,
-        lat,
-        color: profile.color || '#ff4f93',
-        photoUrl: profile.photoDataUrl || ''
+      const el = createTeardropMarkerEl({
+        uid: profile.uid,
+        name: profile.name,
+        gender: profile.gender,
+        color: profile.color,
+        photoDataUrl: profile.photoDataUrl,
       });
+      selfRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map);
     } else {
       selfRef.current.setLngLat([lng, lat]);
       const el = selfRef.current.getElement();
-      if (profile.color) el.style.setProperty('--pp-pin', profile.color);
-      const img = el.querySelector('.pp-pin__ava');
+      if (profile.color) el.style.setProperty('--pp-color', profile.color);
+      const img = el.querySelector('.pp-marker__avatar');
       if (img && profile.photoDataUrl) img.src = profile.photoDataUrl;
     }
   }, [mapReady, profile]);

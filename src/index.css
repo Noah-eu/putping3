@@ -1174,3 +1174,68 @@ mapboxgl-popup .pp-name{font-weight:700}
 
 /* Ensure no legacy rules interfere */
 .pp-grow,.pp-zoom,.pp-marker-tear,.marker-zoom{ all:unset !important; }
+/* === PutPing: Teardrop marker === */
+.pp-marker {
+  position: relative;
+  width: 44px;                 /* base size */
+  height: 58px;                /* circle(44) + tail(14) */
+  transform: translate(-50%, -100%); /* anchor by the tip */
+  transform-origin: 50% 100%;  /* SCALE FROM TIP! */
+  z-index: 2;
+  pointer-events: auto;
+}
+
+/* main circle */
+.pp-marker__bubble {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--pp-color, #ff5ea8);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.20);
+}
+
+/* triangle tail (no oval shadow under tip) */
+.pp-marker__tail {
+  position: absolute;
+  left: 50%;
+  top: 36px;                  /* slightly overlaps circle */
+  width: 26px;
+  height: 22px;
+  transform: translateX(-50%);
+  background: var(--pp-color, #ff5ea8);
+  /* clean teardrop tip */
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+
+/* circular avatar – sits high in the bubble */
+.pp-marker__avatar {
+  position: absolute;
+  left: 50%;
+  top: 5px;                   /* push up so top half follows bubble */
+  width: 28px;
+  height: 28px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 3px solid #fff;     /* white ring */
+  object-fit: cover;
+  background: #ddd;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15) inset;
+}
+
+/* zoomed state (5×) – same shape, scales from tip */
+.pp-marker--zoomed {
+  transform: translate(-50%, -100%) scale(5);
+  z-index: 9999;
+  transition: transform 220ms ease;
+}
+
+/* hover micro feedback (no scale jump at small size) */
+.pp-marker:not(.pp-marker--zoomed) .pp-marker__bubble { transition: transform 160ms ease; }
+.pp-marker:not(.pp-marker--zoomed):hover .pp-marker__bubble { transform: translateX(-50%) scale(1.04); }
+
+/* prevent text selection */
+.pp-marker, .pp-marker * { user-select: none; }
