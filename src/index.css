@@ -1289,6 +1289,24 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* zvětšení 5× bez změny tvaru – škáluj jen .pp-inner */
 .pp-tear.is-zoom .pp-inner { transform: scale(5); }
 
+/* jméno nad markerem (zobrazuje se při zvětšení) */
+.pp-tear .pp-name{
+  position:absolute;
+  left:50%;
+  bottom:62px; /* nad 56px pinem */
+  transform:translateX(-50%);
+  background: var(--pp-color);
+  border: 2px solid var(--pp-contrast, #111);
+  color:#fff;
+  padding:2px 8px;
+  border-radius:12px;
+  font-size:10px;
+  font-weight:700;
+  white-space:nowrap;
+  display:none;
+}
+.pp-tear.is-zoom .pp-name{ display:inline-block; }
+
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }
 /* ================================================================ */
