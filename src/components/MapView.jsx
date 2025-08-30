@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { attachPinZoom } from '../lib/pinZoom.ts';
+import { db } from '../firebase.js';
+import { ref as dbref, onValue } from 'firebase/database';
+import { spawnDevBot } from '../devBot.js';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -39,6 +42,8 @@ export default function MapView({ profile }) {
   const mapElRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const selfMarkerRef = useRef(null);
+  const botMarkerRef = useRef(null);
+  const [botUid, setBotUid] = useState(null);
   const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
   const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
   const centeredOnceRef = useRef(false); // zajistí centrování po načtení
@@ -64,6 +69,23 @@ export default function MapView({ profile }) {
       mapRef.current = null;
     };
   }, []); // pouze jednou
+
+  // 1b) Owner-only: spawn kontrolní bot (jen když je povolen v env)
+  useEffect(() => {
+    const wantBot = import.meta.env.VITE_DEV_BOT === '1';
+    const ownerEmail = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('pp_auth')||'null')?.email) || null;
+    const OWNER = (import.meta.env.VITE_OWNER_EMAIL || 'david.eder78@gmail.com').toLowerCase();
+    if (!mapReady || !wantBot) return;
+    if (!ownerEmail || ownerEmail.toLowerCase() !== OWNER) return;
+    if (botUid) return; // už běží
+    (async () => {
+      try {
+        const ownerUid = JSON.parse(localStorage.getItem('pp_auth')||'null')?.uid || undefined;
+        const uid = await spawnDevBot(ownerUid);
+        setBotUid(uid);
+      } catch (e) { console.warn('spawnDevBot failed', e); }
+    })();
+  }, [mapReady, botUid]);
 
   // 2) náš pin (teardrop) + klik = 5× zoom
   useEffect(() => {
@@ -101,6 +123,33 @@ export default function MapView({ profile }) {
       if (label) label.textContent = profile?.name || '';
     }
   }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender, geoPos?.lng, geoPos?.lat]);
+
+  // 2c) Bot marker – jen pro ownera, sleduje /users/{botUid}
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !botUid) return;
+    const map = mapRef.current;
+    const unsub = onValue(dbref(db, `users/${botUid}`), (snap) => {
+      const u = snap.val();
+      if (!u || !Number.isFinite(u.lat) || !Number.isFinite(u.lng)) return;
+      const g = (u.gender || 'muz').toLowerCase();
+      const color = (g === 'muz' || g === 'muž') ? '#ff5aa5' : (g === 'zena' || g === 'žena') ? '#4f8cff' : '#22c55e';
+      if (!botMarkerRef.current) {
+        const el = buildTearDropEl(u.photoURL || null, color, u.name || 'Bot');
+        botMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([u.lng, u.lat])
+          .addTo(map);
+      } else {
+        botMarkerRef.current.setLngLat([u.lng, u.lat]);
+        const el = botMarkerRef.current.getElement();
+        el.style.setProperty('--pp-color', color);
+        const label = el.querySelector('.pp-name');
+        if (label) label.textContent = u.name || 'Bot';
+        const img = el.querySelector('.pp-avatar');
+        if (img && u.photoURL) img.src = u.photoURL;
+      }
+    });
+    return () => unsub();
+  }, [mapReady, botUid]);
 
   // 2b) Po načtení mapy vždy vycentrovat uživatele doprostřed
   useEffect(() => {
