@@ -25,7 +25,8 @@ export default function MapView({ profile }) {
   const mapElRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const selfMarkerRef = useRef(null);
-  const [geoPos, setGeoPos] = useState(null); // {lng,lat} only when accuracy <= 5 m
+  const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
+  const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
 
   const center = profile?.coords
     ? [profile.coords.lng, profile.coords.lat]
@@ -84,17 +85,25 @@ export default function MapView({ profile }) {
     }
   }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender, geoPos?.lng, geoPos?.lat]);
 
-  // 3) Live geolocation (accuracy <= 5 m)
+  // 3) Live geolocation – vyhlazení a zlepšení přesnosti
   useEffect(() => {
     if (!mapReady) return;
     if (!('geolocation' in navigator)) return;
-    const opts = { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 };
+    const opts = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords || {};
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        if (accuracy != null && accuracy > 5) return; // require ~±5 m
-        setGeoPos({ lat: latitude, lng: longitude });
+        // Akceptuj jen rozumné vzorky (<= 25 m) a vyhlaď váženým průměrem
+        if (accuracy != null && accuracy > 25) return;
+        const w = 1 / Math.max(accuracy || 10, 5) ** 2; // menší accuracy => větší váha
+        const buf = geoBufRef.current || [];
+        buf.push({ lat: latitude, lng: longitude, w });
+        if (buf.length > 8) buf.shift();
+        geoBufRef.current = buf;
+        let sumW = 0, sumLat = 0, sumLng = 0;
+        for (const s of buf) { sumW += s.w; sumLat += s.lat * s.w; sumLng += s.lng * s.w; }
+        if (sumW > 0) setGeoPos({ lat: sumLat / sumW, lng: sumLng / sumW });
       },
       () => {},
       opts
