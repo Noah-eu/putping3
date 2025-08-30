@@ -204,7 +204,7 @@ export default function MapView({ profile }) {
           const toUid = botUid; const pid = pairIdOf(fromUid, toUid);
           try {
             if (!botPaired){
-              await set(dbref(db, `pings/${toUid}/${fromUid}`), serverTimestamp());
+              // Zapiš pouze do pairPings – devBot na to reaguje a vyřeší párování
               await set(dbref(db, `pairPings/${pid}/${fromUid}`), serverTimestamp());
               toast('Ping odeslán');
             } else {
@@ -235,7 +235,7 @@ export default function MapView({ profile }) {
   useEffect(() => {
     const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !botUid || !my) return;
     const pid = pairIdOf(my, botUid);
-    const unsub = onValue(dbref(db, `pairs/${pid}`), (snap) => {
+    const unsub = onValue(dbref(db, `pairPings/${pid}/${botUid}`), (snap) => {
       const isPaired = !!snap.val();
       setBotPaired(isPaired);
       const el = botMarkerRef.current?.getElement();
@@ -245,14 +245,15 @@ export default function MapView({ profile }) {
     return () => unsub();
   }, [mapReady, botUid]);
 
-  // 2e) Příchozí pings pro nás – zvuk + toast + nadskakující marker odesílatele
+  // 2e) Příchozí ping od bota – zvuk + toast + nadskakující marker odesílatele
   useEffect(() => {
-    const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !my) return;
-    const unsub = onChildAdded(dbref(db, `pings/${my}`), (snap) => {
-      const fromUid = snap.key; playBeep(); toast('Dostal jsi Ping!');
-      if (fromUid === botUid && botMarkerRef.current){
-        const el = botMarkerRef.current.getElement();
-        el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000);
+    const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !my || !botUid) return;
+    const pid = pairIdOf(my, botUid);
+    let seen = false;
+    const unsub = onValue(dbref(db, `pairPings/${pid}/${botUid}`), (snap) => {
+      const v = snap.val();
+      if (v && !seen){ seen = true; playBeep(); toast('Dostal jsi Ping!');
+        if (botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000); }
       }
     });
     return () => unsub();

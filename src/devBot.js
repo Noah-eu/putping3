@@ -68,6 +68,30 @@ export async function spawnDevBot(ownerUid){
     console.warn('[DevBot] inbox subscribe failed', e?.code || e);
   }
 
+  // Alternativní kanál: sleduj pairPings pro konkrétního ownera (nevyžaduje zápis do pings/)
+  try {
+    if (ownerUid) {
+      const pid = pairIdOf(ownerUid, botUid);
+      let responded = false;
+      onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
+        const from = snap.key;
+        if (from !== ownerUid || responded) return;
+        responded = true;
+        try {
+          await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
+          await set(ref(db2, `pairs/${pid}`), true);
+          await set(ref(db2, `messages/${pid}/${Date.now()}`), {
+            from: botUid,
+            text: "Ahoj, testuju, že to funguje 🙂",
+            time: serverTimestamp(),
+          });
+        } catch (e) { console.warn('[DevBot] pairPings respond failed', e?.code || e); }
+      });
+    }
+  } catch (e) {
+    console.warn('[DevBot] pairPings watch failed', e?.code || e);
+  }
+
   // Keep-alive + malé chvění polohy, ať je vidět že žije
   setInterval(() => {
     const jitter = () => (Math.random()-0.5) * 0.0003; // ~±30 m
