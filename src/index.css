@@ -1298,12 +1298,12 @@ mapboxgl-popup .pp-name{font-weight:700}
   background: transparent;
   border: none;
   color: var(--pp-color);
-  -webkit-text-stroke: 0.6px var(--pp-contrast, #111);
+  -webkit-text-stroke: 1px var(--pp-contrast, #111);
   /* Fallback outline for non-webkit */
-  text-shadow: -0.6px -0.6px 0 var(--pp-contrast, #111),
-               0.6px -0.6px 0 var(--pp-contrast, #111),
-              -0.6px  0.6px 0 var(--pp-contrast, #111),
-               0.6px  0.6px 0 var(--pp-contrast, #111);
+  text-shadow: -1px -1px 0 var(--pp-contrast, #111),
+               1px -1px 0 var(--pp-contrast, #111),
+              -1px  1px 0 var(--pp-contrast, #111),
+               1px  1px 0 var(--pp-contrast, #111);
   padding:0;
   border-radius:0;
   font-size:11px;
