@@ -1240,65 +1240,52 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* prevent text selection */
 .pp-marker, .pp-marker * { user-select: none; }
 
-/* === PutPing: Teardrop marker (single-element) =================== */
-.pp-pin {
-  /* runtime variables */
-  --pp: #ff5aa5;                          /* gender color fallback */
-  --img: url("");                         /* avatar url */
-
+/* === PutPing: Teardrop marker ==================================== */
+.pp-tear {
+  --pp-color: #ff5aa5;              /* fallback, runtime přepíše podle genderu */
   position: relative;
   width: 40px;
-  height: 56px;                           /* 40 × 56 => hezká kapka */
-  transform-origin: 50% 100%;             /* špička pinu = ukotvení */
+  height: 56px;                      /* ~1.4× width pro pěkný tvar */
+  transform-origin: 50% 100%;
   will-change: transform;
-  cursor: pointer;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,.25));
   z-index: 2;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.2));
+  cursor: pointer;
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
 }
 
-/* vlastní tvar kapky přes inline SVG, element je parent */
-.pp-pin > svg.pp-shape {
-  position: absolute;
-  inset: 0;
-  display: block;
-  pointer-events: none;
-}
-
-/* avatar je background stejného elementu (NE img) – drží pozici i při scale */
-.pp-pin::after {
+/* tělo pinu – čistý teardrop; anchor je dole uprostřed */
+.pp-tear::before {
   content: "";
   position: absolute;
+  inset: 0;
+  background: var(--pp-color);
+  /* teardrop pro box 40×56; špička přesně dole uprostřed */
+  clip-path: path("M20 0 C32 0 40 8 40 20 C40 32 27 44 22 50 C21 51 20 53 20 56 C20 53 19 51 18 50 C13 44 0 32 0 20 C0 8 8 0 20 0 Z");
+}
+
+/* avatar – horní polovina kopíruje oblouk teardropu */
+.pp-tear .pp-avatar {
+  position: absolute;
   left: 50%;
-  top: 6px;                               /* jemně pod oblouk */
+  top: 6px;
   transform: translateX(-50%);
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--img) center/cover no-repeat;
+  object-fit: cover;
   outline: 2px solid #fff;
   box-shadow: 0 1px 4px rgba(0,0,0,.18) inset;
-  pointer-events: none;
   z-index: 1;
+  pointer-events: none; /* klik bere kontejner */
 }
 
-/* zvětšení 5× při kliku – tvar zůstává stejný */
-.pp-pin.is-zoom {
-  transform: scale(5);
-  z-index: 9999;
-}
+/* zvětšení 5× bez změny tvaru */
+.pp-tear.is-zoom { transform: scale(5); z-index: 9999; }
 
-.pp-pin,
-.pp-pin.is-zoom {
-  transition: transform 260ms cubic-bezier(.2,.9,.2,1);
-}
+/* jistota: nic starého se neuplatní */
+.pp-marker-tear, .pp-marker-tear * { all: unset; }
 /* ================================================================ */
-
-/* Kill switch starých tříd (odstranění kolizí) */
-.pp-marker, .pp-marker *,
-.pp-marker__bubble, .pp-marker__tail, .pp-marker__avatar,
-.pp-marker--zoomed, .pp-grow, .pp-zoom, .pp-drop, .pp-tip, .pp-oval {
-  all: unset !important;
-}
 /* Kill switch pro modrý pin z Mapbox GeolocateControl */
 .mapboxgl-user-location-dot,
 .mapboxgl-user-location-dot::before,
