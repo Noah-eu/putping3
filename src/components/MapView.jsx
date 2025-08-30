@@ -27,6 +27,7 @@ export default function MapView({ profile }) {
   const selfMarkerRef = useRef(null);
   const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
   const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
+  const centeredOnceRef = useRef(false); // zajistí centrování po načtení
 
   const center = profile?.coords
     ? [profile.coords.lng, profile.coords.lat]
@@ -84,6 +85,19 @@ export default function MapView({ profile }) {
       if (img && pUrl) img.src = pUrl;
     }
   }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender, geoPos?.lng, geoPos?.lat]);
+
+  // 2b) Po načtení mapy vždy vycentrovat uživatele doprostřed
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const lng = (geoPos?.lng ?? profile?.coords?.lng);
+    const lat = (geoPos?.lat ?? profile?.coords?.lat);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    if (centeredOnceRef.current) return;
+    try {
+      mapRef.current.jumpTo({ center: [lng, lat] });
+      centeredOnceRef.current = true;
+    } catch {}
+  }, [mapReady, geoPos?.lng, geoPos?.lat, profile?.coords?.lng, profile?.coords?.lat]);
 
   // 3) Live geolocation – vyhlazení a zlepšení přesnosti
   useEffect(() => {
