@@ -5,10 +5,15 @@ import { attachPinZoom } from '../lib/pinZoom.ts';
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 // helper: teardrop DOM – single element with img inside
-function buildTearDropEl(photoUrl, color) {
+function buildTearDropEl(photoUrl, color, name) {
   const el = document.createElement('div');
   el.className = 'pp-tear';
   el.style.setProperty('--pp-color', color || '#ff5aa5');
+  // kontrastní barva pro rámeček jména (opačná barva genderu)
+  const contrast = (c => {
+    switch((c||'').toLowerCase()){ case '#ff5aa5': return '#4f8cff'; case '#4f8cff': return '#ff5aa5'; case '#7b61ff': return '#22c55e'; default: return '#111'; }
+  })(color);
+  el.style.setProperty('--pp-contrast', contrast);
   const inner = document.createElement('div');
   inner.className = 'pp-inner';
   const img = document.createElement('img');
@@ -16,6 +21,10 @@ function buildTearDropEl(photoUrl, color) {
   img.alt = 'avatar';
   img.src = photoUrl || '';
   inner.appendChild(img);
+  const label = document.createElement('div');
+  label.className = 'pp-name';
+  label.textContent = name || '';
+  inner.appendChild(label);
   el.appendChild(inner);
   return el;
 }
@@ -69,7 +78,7 @@ export default function MapView({ profile }) {
 
     // vytvoř/obnov marker
     if (!selfMarkerRef.current) {
-      const el = buildTearDropEl(profile?.photoDataUrl || profile?.photoURL || null, color);
+      const el = buildTearDropEl(profile?.photoDataUrl || profile?.photoURL || null, color, profile?.name || '');
       attachPinZoom(el, map, [lng, lat]);
 
       selfMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -81,8 +90,12 @@ export default function MapView({ profile }) {
       const el = selfMarkerRef.current.getElement();
       const pUrl = profile?.photoDataUrl || profile?.photoURL || '';
       el.style.setProperty('--pp-color', color);
+      const contrast = ((c)=>{switch((c||'').toLowerCase()){case '#ff5aa5':return '#4f8cff';case '#4f8cff':return '#ff5aa5';case '#7b61ff':return '#22c55e';default:return '#111';}})(color);
+      el.style.setProperty('--pp-contrast', contrast);
       const img = el.querySelector('.pp-avatar');
       if (img && pUrl) img.src = pUrl;
+      const label = el.querySelector('.pp-name');
+      if (label) label.textContent = profile?.name || '';
     }
   }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender, geoPos?.lng, geoPos?.lat]);
 
