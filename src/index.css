@@ -1240,50 +1240,57 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* prevent text selection */
 .pp-marker, .pp-marker * { user-select: none; }
 
-/* === PutPing: Mapbox teardrop pin ================================== */
+/* === PutPing: Teardrop marker (wrapper + inner) ================= */
+
+/* Wrapper – Mapbox na něj zapisuje svůj translate; zde žádný transform! */
 .pp-tear {
-  --pp-color: #ff5aa5;           /* nahradí se inline podle genderu */
-  position: relative;            /* Mapbox řídí pozici wrapperu, ne pinu */
-  left: auto; top: auto;         /* zruší staré absolute pozicování */
+  position: relative;
   width: 40px;
   height: 56px;
-  transform: none;               /* DŮLEŽITÉ: žádné translateX apod. */
-  transform-origin: 50% 100%;    /* špička pinu – kotva */
-  will-change: transform;
+  pointer-events: auto;
   z-index: 2;
+}
+
+/* Vnitřek pinu – ten škálujeme. */
+.pp-tear .pp-pin {
+  --pp-color: #ff5aa5;
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+  transform: scale(1);
+  will-change: transform;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.2));
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
   cursor: pointer;
 }
 
-/* tělo teardropu jedním path – bez “oválku” pod špičkou */
-.pp-tear::before {
+/* Tělo teardropu */
+.pp-tear .pp-pin::before {
   content: "";
   position: absolute;
   inset: 0;
   background: var(--pp-color);
-  /* teardrop pro box 40×56 (kotva dole uprostřed) */
   clip-path: path("M20 0 C32 0 40 8 40 20 C40 32 27 44 22 50 C21 51 20 53 20 56 C20 53 19 51 18 50 C13 44 0 32 0 20 C0 8 8 0 20 0 Z");
 }
 
-/* avatar – horní půlka kruhu “kopíruje” oblouk pinu */
+/* Avatar uvnitř pinu */
 .pp-tear .pp-avatar {
   position: absolute;
   left: 50%;
   top: 6px;
   transform: translateX(-50%);
-  width: 30px;                  /* větší fotka */
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  outline: 2px solid #fff;      /* tenčí kroužek */
+  outline: 2px solid #fff;
   box-shadow: 0 1px 4px rgba(0,0,0,.18) inset;
   z-index: 1;
-  pointer-events: none;         /* klik bere kontejner */
+  pointer-events: none; /* klik bere .pp-pin */
 }
 
-/* klik = zvětšení 5×, tvar se nemění */
-.pp-tear.is-zoom {
+/* Zvětšení – škálujeme jen .pp-pin, ne wrapper! */
+.pp-tear.is-zoom .pp-pin {
   transform: scale(5);
   z-index: 9999;
-  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
 }
