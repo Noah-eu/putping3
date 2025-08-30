@@ -1294,3 +1294,10 @@ mapboxgl-popup .pp-name{font-weight:700}
   transform: scale(5);
   z-index: 9999;
 }
+/* Kill switch pro modrý pin z Mapbox GeolocateControl */
+.mapboxgl-user-location-dot,
+.mapboxgl-user-location-dot::before,
+.mapboxgl-user-location-accuracy-circle,
+.mapboxgl-user-location-accuracy-circle.show {
+  display: none !important;
+}
