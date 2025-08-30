@@ -43,6 +43,7 @@ export default function MapView({ profile }) {
   const [mapReady, setMapReady] = useState(false);
   const selfMarkerRef = useRef(null);
   const botMarkerRef = useRef(null);
+  const botPopupRef = useRef(null);
   const [botUid, setBotUid] = useState(null);
   const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
   const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
@@ -140,9 +141,38 @@ export default function MapView({ profile }) {
       const color = (g === 'muz' || g === 'muž') ? '#ff5aa5' : (g === 'zena' || g === 'žena') ? '#4f8cff' : '#22c55e';
       if (!botMarkerRef.current) {
         const el = buildTearDropEl(u.photoURL || null, color, u.name || 'Bot');
+        // Zobrazuj jméno i bez zoomu a přidej klikací zoom
+        el.classList.add('pp-tear--show-name');
+        try { attachPinZoom(el, map, [u.lng, u.lat]); } catch {}
+
         botMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([u.lng, u.lat])
           .addTo(map);
+
+        // Popup na klik – přiváže se jen jednou
+        const ensurePopup = () => {
+          const wrap = document.createElement('div');
+          wrap.className = 'pp-popup';
+          const imgWrap = document.createElement('div');
+          imgWrap.className = 'pp-popup-img';
+          const img = document.createElement('img');
+          img.src = (u.photoURL || '') + '';
+          img.alt = 'avatar';
+          imgWrap.appendChild(img);
+          const name = document.createElement('div');
+          name.className = 'pp-popup-name';
+          name.textContent = u.name || 'Bot';
+          wrap.appendChild(imgWrap);
+          wrap.appendChild(name);
+          if (!botPopupRef.current) {
+            botPopupRef.current = new mapboxgl.Popup({ closeOnClick: true, offset: 18 });
+          }
+          botPopupRef.current.setDOMContent(wrap).setLngLat([u.lng, u.lat]).addTo(map);
+        };
+        if (!el.dataset.ppPopupBound) {
+          el.addEventListener('click', (e) => { e.stopPropagation(); ensurePopup(); });
+          el.dataset.ppPopupBound = '1';
+        }
       } else {
         botMarkerRef.current.setLngLat([u.lng, u.lat]);
         const el = botMarkerRef.current.getElement();
@@ -151,6 +181,25 @@ export default function MapView({ profile }) {
         if (label) label.textContent = u.name || 'Bot';
         const img = el.querySelector('.pp-avatar');
         if (img && u.photoURL) img.src = u.photoURL;
+        // Pokud je otevřený popup, aktualizuj obsah a pozici
+        if (botPopupRef.current) {
+          try {
+            const wrap = document.createElement('div');
+            wrap.className = 'pp-popup';
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'pp-popup-img';
+            const im = document.createElement('img');
+            im.src = (u.photoURL || '') + '';
+            im.alt = 'avatar';
+            imgWrap.appendChild(im);
+            const name = document.createElement('div');
+            name.className = 'pp-popup-name';
+            name.textContent = u.name || 'Bot';
+            wrap.appendChild(imgWrap);
+            wrap.appendChild(name);
+            botPopupRef.current.setDOMContent(wrap).setLngLat([u.lng, u.lat]);
+          } catch {}
+        }
       }
     });
     return () => unsub();
