@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { attachPinZoom } from '../lib/pinZoom.ts';
 import { db } from '../firebase.js';
-import { ref as dbref, onValue } from 'firebase/database';
+import { ref as dbref, onValue, onChildAdded, set, serverTimestamp } from 'firebase/database';
+import Chats from './Chats.jsx';
 import { spawnDevBot } from '../devBot.js';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -44,9 +45,32 @@ export default function MapView({ profile }) {
   const selfMarkerRef = useRef(null);
   const botMarkerRef = useRef(null);
   const [botUid, setBotUid] = useState(null);
+  const [openChatPid, setOpenChatPid] = useState(null);
+  const [botPaired, setBotPaired] = useState(false);
   const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
   const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
   const centeredOnceRef = useRef(false); // zajistí centrování po načtení
+
+  function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
+  function getAuthInfo(){
+    try { return JSON.parse(localStorage.getItem('pp_auth')||'null'); } catch { return null; }
+  }
+  function playBeep(){
+    try{
+      const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+      const ctx = new Ctx(); const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
+      o.start(); g.gain.setValueAtTime(0.2, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.4); o.stop(ctx.currentTime+0.42);
+    }catch{}
+  }
+  function toast(msg){
+    try{
+      const d = document.createElement('div');
+      d.textContent = msg; d.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 14px;border-radius:999px;z-index:4000;box-shadow:0 6px 16px rgba(0,0,0,.25);font-weight:700';
+      document.body.appendChild(d); setTimeout(()=>{ d.remove(); }, 1600);
+    }catch{}
+  }
 
   const center = profile?.coords
     ? [profile.coords.lng, profile.coords.lat]
@@ -146,6 +170,33 @@ export default function MapView({ profile }) {
         botMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([u.lng, u.lat])
           .addTo(map);
+
+        // Akční tlačítko (Ping/Chat) – viditelné při zvětšení
+        const btn = document.createElement('button');
+        btn.className = 'pp-action';
+        btn.textContent = 'Ping';
+        el.appendChild(btn);
+
+        btn.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          const au = getAuthInfo(); const fromUid = au?.uid; if (!fromUid){ toast('Přihlas se pro Ping'); return; }
+          const toUid = botUid; const pid = pairIdOf(fromUid, toUid);
+          try {
+            if (!botPaired){
+              await set(dbref(db, `pings/${toUid}/${fromUid}`), serverTimestamp());
+              await set(dbref(db, `pairPings/${pid}/${fromUid}`), serverTimestamp());
+              toast('Ping odeslán');
+            } else {
+              // Otevři lokální chat modal
+              try {
+                const arr = JSON.parse(localStorage.getItem('pp_chats')||'[]');
+                if (!arr.find(x=>x.id===pid)) arr.push({ id: pid, name: u.name||'Uživatel', messages: [] });
+                localStorage.setItem('pp_chats', JSON.stringify(arr));
+              } catch{}
+              setOpenChatPid(pid);
+            }
+          } catch(e){ console.warn('Ping write failed', e); toast('Ping se nepodařil'); }
+        });
       } else {
         botMarkerRef.current.setLngLat([u.lng, u.lat]);
         const el = botMarkerRef.current.getElement();
@@ -154,6 +205,33 @@ export default function MapView({ profile }) {
         if (label) label.textContent = u.name || 'Bot';
         const img = el.querySelector('.pp-avatar');
         if (img && u.photoURL) img.src = u.photoURL;
+      }
+    });
+    return () => unsub();
+  }, [mapReady, botUid]);
+
+  // 2d) Sleduj, zda máme s botem pár => přepínej na Chat
+  useEffect(() => {
+    const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !botUid || !my) return;
+    const pid = pairIdOf(my, botUid);
+    const unsub = onValue(dbref(db, `pairs/${pid}`), (snap) => {
+      const isPaired = !!snap.val();
+      setBotPaired(isPaired);
+      const el = botMarkerRef.current?.getElement();
+      const btn = el?.querySelector('.pp-action');
+      if (btn) btn.textContent = isPaired ? 'Chat' : 'Ping';
+    });
+    return () => unsub();
+  }, [mapReady, botUid]);
+
+  // 2e) Příchozí pings pro nás – zvuk + toast + nadskakující marker odesílatele
+  useEffect(() => {
+    const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !my) return;
+    const unsub = onChildAdded(dbref(db, `pings/${my}`), (snap) => {
+      const fromUid = snap.key; playBeep(); toast('Dostal jsi Ping!');
+      if (fromUid === botUid && botMarkerRef.current){
+        const el = botMarkerRef.current.getElement();
+        el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000);
       }
     });
     return () => unsub();
@@ -199,6 +277,9 @@ export default function MapView({ profile }) {
   }, [mapReady]);
 
   return (
-    <div ref={mapElRef} style={{ position: 'absolute', inset: 0 }} />
+    <>
+      <div ref={mapElRef} style={{ position: 'absolute', inset: 0 }} />
+      {openChatPid && <Chats onClose={() => setOpenChatPid(null)} />}
+    </>
   );
 }
