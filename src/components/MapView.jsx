@@ -141,8 +141,7 @@ export default function MapView({ profile }) {
       const color = (g === 'muz' || g === 'muž') ? '#ff5aa5' : (g === 'zena' || g === 'žena') ? '#4f8cff' : '#22c55e';
       if (!botMarkerRef.current) {
         const el = buildTearDropEl(u.photoURL || null, color, u.name || 'Bot');
-        // Zobrazuj jméno i bez zoomu a přidej klikací zoom
-        el.classList.add('pp-tear--show-name');
+        // Stejné chování jako u uživatelů: jméno až při zoomu
         try { attachPinZoom(el, map, [u.lng, u.lat]); } catch {}
 
         botMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })

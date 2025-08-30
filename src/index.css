@@ -1326,8 +1326,7 @@ mapboxgl-popup .pp-name{font-weight:700}
   width: calc(40px * 5);     /* šířka jako zvětšený pin */
   line-height: 1;
 }
-/* Bot: jméno trvale nad markerem (přidaná třída v JS) */
-.pp-tear.pp-tear--show-name .pp-name{ display:inline-block; }
+/* Bot i uživatelé: stejné chování; jméno se ukáže až při .is-zoom */
 
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }
