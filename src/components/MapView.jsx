@@ -72,20 +72,22 @@ export default function MapView({ profile }) {
 
   // 1b) Owner-only: spawn kontrolní bot (jen když je povolen v env)
   useEffect(() => {
-    const wantBot = import.meta.env.VITE_DEV_BOT === '1';
-    const ownerEmail = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('pp_auth')||'null')?.email) || null;
-    const OWNER = (import.meta.env.VITE_OWNER_EMAIL || 'david.eder78@gmail.com').toLowerCase();
+    const flag = String(import.meta.env.VITE_DEV_BOT || '').toLowerCase();
+    const wantBot = flag === '1' || flag === 'true' || flag === 'yes';
+    const local = typeof localStorage !== 'undefined' ? localStorage.getItem('pp_auth') : null;
+    let ownerEmail = null, ownerUid = undefined;
+    try { const p = JSON.parse(local || 'null'); ownerEmail = p?.email || null; ownerUid = p?.uid || undefined; } catch {}
+    const OWNER = String(import.meta.env.VITE_OWNER_EMAIL || 'david.eder78@gmail.com').trim().toLowerCase();
     if (!mapReady || !wantBot) return;
-    if (!ownerEmail || ownerEmail.toLowerCase() !== OWNER) return;
+    if (!ownerEmail || ownerEmail.trim().toLowerCase() !== OWNER) return;
     if (botUid) return; // už běží
     (async () => {
       try {
-        const ownerUid = JSON.parse(localStorage.getItem('pp_auth')||'null')?.uid || undefined;
         const uid = await spawnDevBot(ownerUid);
         setBotUid(uid);
       } catch (e) { console.warn('spawnDevBot failed', e); }
     })();
-  }, [mapReady, botUid]);
+  }, [mapReady, botUid, profile?.auth?.email]);
 
   // 2) náš pin (teardrop) + klik = 5× zoom
   useEffect(() => {
