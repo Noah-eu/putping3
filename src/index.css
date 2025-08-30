@@ -1240,27 +1240,33 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* prevent text selection */
 .pp-marker, .pp-marker * { user-select: none; }
 
-/* === PutPing: Teardrop marker ==================================== */
+/* === PutPing: Teardrop marker (wrapper + inner scale) ============= */
 .pp-tear {
   --pp-color: #ff5aa5;              /* fallback, runtime přepíše podle genderu */
   position: relative;
   width: 40px;
   height: 56px;                      /* ~1.4× width pro pěkný tvar */
-  transform-origin: 50% 100%;
-  will-change: transform;
   z-index: 2;
+}
+
+/* vnitřní vrstva, kterou škálujeme (Mapbox dává transform na wrapper) */
+.pp-tear .pp-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+  transform: scale(1);
+  will-change: transform;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.2));
   cursor: pointer;
   transition: transform 240ms cubic-bezier(.2,.8,.2,1);
 }
 
 /* tělo pinu – čistý teardrop; anchor je dole uprostřed */
-.pp-tear::before {
+.pp-tear .pp-inner::before {
   content: "";
   position: absolute;
   inset: 0;
   background: var(--pp-color);
-  /* teardrop pro box 40×56; špička přesně dole uprostřed */
   clip-path: path("M20 0 C32 0 40 8 40 20 C40 32 27 44 22 50 C21 51 20 53 20 56 C20 53 19 51 18 50 C13 44 0 32 0 20 C0 8 8 0 20 0 Z");
 }
 
@@ -1280,8 +1286,8 @@ mapboxgl-popup .pp-name{font-weight:700}
   pointer-events: none; /* klik bere kontejner */
 }
 
-/* zvětšení 5× bez změny tvaru */
-.pp-tear.is-zoom { transform: scale(5); z-index: 9999; }
+/* zvětšení 5× bez změny tvaru – škáluj jen .pp-inner */
+.pp-tear.is-zoom .pp-inner { transform: scale(5); }
 
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }

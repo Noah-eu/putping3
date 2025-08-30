@@ -9,11 +9,14 @@ function buildTearDropEl(photoUrl, color) {
   const el = document.createElement('div');
   el.className = 'pp-tear';
   el.style.setProperty('--pp-color', color || '#ff5aa5');
+  const inner = document.createElement('div');
+  inner.className = 'pp-inner';
   const img = document.createElement('img');
   img.className = 'pp-avatar';
   img.alt = 'avatar';
   img.src = photoUrl || '';
-  el.appendChild(img);
+  inner.appendChild(img);
+  el.appendChild(inner);
   return el;
 }
 
