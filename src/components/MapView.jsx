@@ -3,18 +3,16 @@ import mapboxgl from 'mapbox-gl';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// Build a single-element teardrop marker with inline SVG and background avatar
-function buildPinEl(photoUrl, color) {
+// helper: teardrop DOM – single element with img inside
+function buildTearDropEl(photoUrl, color) {
   const el = document.createElement('div');
-  el.className = 'pp-pin';
-  el.style.setProperty('--pp', color || '#ff5aa5');
-  el.style.setProperty('--img', `url("${photoUrl || ''}")`);
-  el.innerHTML = `
-    <svg class="pp-shape" viewBox="0 0 40 56" width="40" height="56" aria-hidden="true">
-      <!-- teardrop path; bottom tip aligns with anchor bottom center -->
-      <path d="M20 0 C32 0 40 8 40 20 C40 32 27 44 22 50 C21 51 20 53 20 56 C20 53 19 51 18 50 C13 44 0 32 0 20 C0 8 8 0 20 0 Z" fill="var(--pp)"/>
-    </svg>
-  `;
+  el.className = 'pp-tear';
+  el.style.setProperty('--pp-color', color || '#ff5aa5');
+  const img = document.createElement('img');
+  img.className = 'pp-avatar';
+  img.alt = 'avatar';
+  img.src = photoUrl || '';
+  el.appendChild(img);
   return el;
 }
 
@@ -63,7 +61,7 @@ export default function MapView({ profile }) {
 
     // vytvoř/obnov marker
     if (!selfMarkerRef.current) {
-      const el = buildPinEl(profile?.photoDataUrl || profile?.photoURL || null, color);
+      const el = buildTearDropEl(profile?.photoDataUrl || profile?.photoURL || null, color);
 
       // klik = toggle zvětšení 5×
       const toggleZoom = (ev) => {
@@ -89,8 +87,9 @@ export default function MapView({ profile }) {
       selfMarkerRef.current.setLngLat([lng, lat]);
       const el = selfMarkerRef.current.getElement();
       const pUrl = profile?.photoDataUrl || profile?.photoURL || '';
-      el.style.setProperty('--pp', color);
-      el.style.setProperty('--img', `url("${pUrl}")`);
+      el.style.setProperty('--pp-color', color);
+      const img = el.querySelector('.pp-avatar');
+      if (img && pUrl) img.src = pUrl;
     }
   }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender]);
 
