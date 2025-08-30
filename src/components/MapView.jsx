@@ -34,7 +34,8 @@ export default function MapView({ profile }) {
       container: mapElRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center,
-      zoom: profile?.coords ? 13 : 11,
+      // výrazně přiblížená mapa ~1 km čtvereční
+      zoom: profile?.coords ? 16.5 : 14,
     });
     mapRef.current = m;
     m.once('load', () => setMapReady(true));

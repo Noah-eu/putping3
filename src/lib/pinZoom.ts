@@ -20,9 +20,7 @@ export function attachPinZoom(
     document.querySelectorAll('.pp-tear.is-zoom').forEach((n) => n.classList.remove('is-zoom'));
     if (!el.classList.contains('is-zoom')) {
       el.classList.add('is-zoom');
-      try {
-        map.easeTo({ center: lngLat as any, zoom: Math.max(map.getZoom(), 15), duration: 600 });
-      } catch {}
+      // Do not change map zoom on pin click; only enlarge the pin.
     }
   };
 
