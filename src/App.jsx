@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Onboarding from './components/Onboarding.jsx';
 import MapView from './components/MapView.jsx';
+import ToolsFab from './components/ToolsFab.jsx';
 import { ensureUid, getLocalProfile, saveLocalProfile } from './lib/profile.js';
 
 export default function App(){
@@ -29,10 +30,13 @@ export default function App(){
         needsOnboarding ? (
           <Onboarding onDone={handleDone} />
         ) : (
-          <MapView
-            profile={profile}
-            onProfileChange={(p)=>{ saveLocalProfile(p); setProfile(p); }}
-          />
+          <>
+            <MapView
+              profile={profile}
+              onProfileChange={(p)=>{ saveLocalProfile(p); setProfile(p); }}
+            />
+            <ToolsFab />
+          </>
         )
       ) : null}
     </div>
