@@ -12,9 +12,9 @@ function buildTearDropEl(photoUrl, color, name) {
   // kontrastní barva pro rámeček jména (opačná barva genderu)
   const contrast = (c => {
     switch((c||'').toLowerCase()){
-      case '#ff5aa5': return 'rgba(79,140,255,.55)';   // modrá s alfa
-      case '#4f8cff': return 'rgba(255,90,165,.55)';   // růžová s alfa
-      case '#7b61ff': return 'rgba(34,197,94,.55)';    // zelená s alfa
+      case '#ff5aa5': return 'rgba(79,140,255,.55)';   // růžová -> modrá
+      case '#4f8cff': return 'rgba(255,90,165,.55)';   // modrá -> růžová
+      case '#22c55e': return 'rgba(123,97,255,.55)';   // zelená -> fialová
       default:        return 'rgba(17,17,17,.5)';
     }
   })(color);
@@ -75,11 +75,9 @@ export default function MapView({ profile }) {
 
     const g = (profile.gender || '').toLowerCase();
     const color =
-      g === 'žena' || g === 'zena'
-        ? '#ff5aa5'
-        : g === 'muž' || g === 'muz'
-        ? '#4f8cff'
-        : '#7b61ff';
+      (g === 'muz' || g === 'muž') ? '#ff5aa5' :
+      (g === 'zena' || g === 'žena') ? '#4f8cff' :
+      '#22c55e';
 
     // vytvoř/obnov marker
     if (!selfMarkerRef.current) {
@@ -95,7 +93,7 @@ export default function MapView({ profile }) {
       const el = selfMarkerRef.current.getElement();
       const pUrl = profile?.photoDataUrl || profile?.photoURL || '';
       el.style.setProperty('--pp-color', color);
-      const contrast = ((c)=>{switch((c||'').toLowerCase()){case '#ff5aa5':return 'rgba(79,140,255,.55)';case '#4f8cff':return 'rgba(255,90,165,.55)';case '#7b61ff':return 'rgba(34,197,94,.55)';default:return 'rgba(17,17,17,.5)';}})(color);
+      const contrast = ((c)=>{switch((c||'').toLowerCase()){case '#ff5aa5':return 'rgba(79,140,255,.55)';case '#4f8cff':return 'rgba(255,90,165,.55)';case '#22c55e':return 'rgba(123,97,255,.55)';default:return 'rgba(17,17,17,.5)';}})(color);
       el.style.setProperty('--pp-contrast', contrast);
       const img = el.querySelector('.pp-avatar');
       if (img && pUrl) img.src = pUrl;
