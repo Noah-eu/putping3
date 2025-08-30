@@ -12,6 +12,9 @@ export function attachPinZoom(
   lngLat: [number, number]
 ) {
   let lastPinClickAt = 0;
+  const PIN_CLICK_GUARD_MS = 350;
+
+  const onPointerDown = () => { lastPinClickAt = Date.now(); };
 
   const onClick = (ev: Event) => {
     ev.stopPropagation();
@@ -26,17 +29,19 @@ export function attachPinZoom(
 
   const onMapClick = () => {
     // Ignore the immediate map click that may follow a pin click
-    if (Date.now() - lastPinClickAt < 180) return;
+    if (Date.now() - lastPinClickAt < PIN_CLICK_GUARD_MS) return;
     el.classList.remove('is-zoom');
   };
   const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') el.classList.remove('is-zoom'); };
 
+  el.addEventListener('pointerdown', onPointerDown, { passive: true });
   el.addEventListener('click', onClick);
   map.on('click', onMapClick);
   window.addEventListener('keydown', onEsc);
 
   // return cleanup
   return () => {
+    el.removeEventListener('pointerdown', onPointerDown);
     el.removeEventListener('click', onClick);
     try { map.off('click', onMapClick); } catch {}
     window.removeEventListener('keydown', onEsc);
