@@ -1327,6 +1327,28 @@ mapboxgl-popup .pp-name{font-weight:700}
   width: calc(40px * 5);     /* šířka jako zvětšený pin */
   line-height: 1;
 }
+
+/* Akční pilulka (Ping/Chat) ve špičce pinu – zobrazí se až při zoomu */
+.pp-tear .pp-action{
+  position:absolute;
+  left:50%;
+  bottom:2px; /* ve špičce */
+  transform:translateX(-50%) scale(0.92);
+  padding:6px 12px;
+  border-radius:999px;
+  border:0;
+  background: var(--pp-contrast, rgba(17,17,17,.2));
+  color:#111;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  display:none;
+}
+.pp-tear.is-zoom .pp-action{ display:inline-block; }
+
+/* Animace – příjemce uvidí nadskakování odesílatele */
+@keyframes pp-bounceY{ 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } }
+.pp-tear.is-ping .pp-inner{ animation: pp-bounceY 0.8s ease-in-out infinite; }
 /* Bot i uživatelé: stejné chování; jméno se ukáže až při .is-zoom */
 
 /* jistota: nic starého se neuplatní */
