@@ -11,7 +11,12 @@ function buildTearDropEl(photoUrl, color, name) {
   el.style.setProperty('--pp-color', color || '#ff5aa5');
   // kontrastní barva pro rámeček jména (opačná barva genderu)
   const contrast = (c => {
-    switch((c||'').toLowerCase()){ case '#ff5aa5': return '#4f8cff'; case '#4f8cff': return '#ff5aa5'; case '#7b61ff': return '#22c55e'; default: return '#111'; }
+    switch((c||'').toLowerCase()){
+      case '#ff5aa5': return 'rgba(79,140,255,.55)';   // modrá s alfa
+      case '#4f8cff': return 'rgba(255,90,165,.55)';   // růžová s alfa
+      case '#7b61ff': return 'rgba(34,197,94,.55)';    // zelená s alfa
+      default:        return 'rgba(17,17,17,.5)';
+    }
   })(color);
   el.style.setProperty('--pp-contrast', contrast);
   const inner = document.createElement('div');
@@ -90,7 +95,7 @@ export default function MapView({ profile }) {
       const el = selfMarkerRef.current.getElement();
       const pUrl = profile?.photoDataUrl || profile?.photoURL || '';
       el.style.setProperty('--pp-color', color);
-      const contrast = ((c)=>{switch((c||'').toLowerCase()){case '#ff5aa5':return '#4f8cff';case '#4f8cff':return '#ff5aa5';case '#7b61ff':return '#22c55e';default:return '#111';}})(color);
+      const contrast = ((c)=>{switch((c||'').toLowerCase()){case '#ff5aa5':return 'rgba(79,140,255,.55)';case '#4f8cff':return 'rgba(255,90,165,.55)';case '#7b61ff':return 'rgba(34,197,94,.55)';default:return 'rgba(17,17,17,.5)';}})(color);
       el.style.setProperty('--pp-contrast', contrast);
       const img = el.querySelector('.pp-avatar');
       if (img && pUrl) img.src = pUrl;
