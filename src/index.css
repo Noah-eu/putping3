@@ -1240,49 +1240,50 @@ mapboxgl-popup .pp-name{font-weight:700}
 /* prevent text selection */
 .pp-marker, .pp-marker * { user-select: none; }
 
-/* unified SVG tear element */
-.pp-tear{ position:absolute; left:50%; top:0; transform:translateX(-50%); width:44px; height:58px; display:block; }
-/* === PutPing: Teardrop marker ==================================== */
+/* === PutPing: Mapbox teardrop pin ================================== */
 .pp-tear {
-  --pp-color: #ff5aa5;              /* fallback, nahradí se inline podle genderu */
-  position: relative;
-  width: 40px;                      /* základní velikost pinu */
-  height: 56px;                     /* ~1.4 × width pro pěkný tvar */
-  transform-origin: 50% 100%;       /* dno pinu = ukotvení na mapě */
+  --pp-color: #ff5aa5;           /* nahradí se inline podle genderu */
+  position: relative;            /* Mapbox řídí pozici wrapperu, ne pinu */
+  left: auto; top: auto;         /* zruší staré absolute pozicování */
+  width: 40px;
+  height: 56px;
+  transform: none;               /* DŮLEŽITÉ: žádné translateX apod. */
+  transform-origin: 50% 100%;    /* špička pinu – kotva */
   will-change: transform;
   z-index: 2;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.2));
   cursor: pointer;
-  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
 }
 
-/* tělo pinu */
+/* tělo teardropu jedním path – bez “oválku” pod špičkou */
 .pp-tear::before {
   content: "";
   position: absolute;
   inset: 0;
   background: var(--pp-color);
+  /* teardrop pro box 40×56 (kotva dole uprostřed) */
   clip-path: path("M20 0 C32 0 40 8 40 20 C40 32 27 44 22 50 C21 51 20 53 20 56 C20 53 19 51 18 50 C13 44 0 32 0 20 C0 8 8 0 20 0 Z");
 }
 
-/* avatar */
+/* avatar – horní půlka kruhu “kopíruje” oblouk pinu */
 .pp-tear .pp-avatar {
   position: absolute;
   left: 50%;
   top: 6px;
   transform: translateX(-50%);
-  width: 28px;
-  height: 28px;
+  width: 30px;                  /* větší fotka */
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
-  outline: 2px solid #fff;
+  outline: 2px solid #fff;      /* tenčí kroužek */
   box-shadow: 0 1px 4px rgba(0,0,0,.18) inset;
   z-index: 1;
-  pointer-events: none;
+  pointer-events: none;         /* klik bere kontejner */
 }
 
-/* zvětšení */
+/* klik = zvětšení 5×, tvar se nemění */
 .pp-tear.is-zoom {
   transform: scale(5);
   z-index: 9999;
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
 }
