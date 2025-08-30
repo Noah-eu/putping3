@@ -14,6 +14,20 @@ function buildTearDropEl(photoUrl, color, map, lng, lat) {
   el.appendChild(img);
 
   // --- klik = zvětšit 5× (toggle) ---
+function toggleZoom(ev) {
+  ev.stopPropagation();
+  const willZoom = !el.classList.contains('is-zoom');
+  document.querySelectorAll('.pp-tear.is-zoom')
+    .forEach(n => n.classList.remove('is-zoom')); // zavři ostatní
+  if (willZoom) {
+    el.classList.add('is-zoom');   // >>> tady
+    map.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(map.getZoom(), 15),
+      duration: 600
+    });
+  }
+}
 
 
   el.addEventListener('click', toggleZoom);
