@@ -3,18 +3,25 @@ import mapboxgl from 'mapbox-gl';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// postaví DOM element pinu (teardrop + avatar)
+// helper: teardrop DOM (wrapper + inner pin)
 function buildTearDropEl(photoUrl, color) {
-  const el = document.createElement('div');
-  el.className = 'pp-tear';
-  el.style.setProperty('--pp-color', color || '#ff5aa5');
+  // wrapper – jde do mapbox Marker.element
+  const wrapper = document.createElement('div');
+  wrapper.className = 'pp-tear';
+
+  // inner – ten se bude škálovat
+  const pin = document.createElement('div');
+  pin.className = 'pp-pin';
+  pin.style.setProperty('--pp-color', color || '#ff5aa5');
 
   const img = document.createElement('img');
   img.className = 'pp-avatar';
   img.alt = 'avatar';
   if (photoUrl) img.src = photoUrl;
-  el.appendChild(img);
-  return el;
+  pin.appendChild(img);
+
+  wrapper.appendChild(pin);
+  return wrapper;
 }
 
 export default function MapView({ profile }) {
@@ -78,8 +85,8 @@ export default function MapView({ profile }) {
         }
       };
       el.addEventListener('click', toggleZoom);
-      const img = el.querySelector('.pp-avatar');
-      if (img) img.addEventListener('click', toggleZoom);
+      const imgEl = el.querySelector('.pp-avatar');
+      if (imgEl) imgEl.addEventListener('click', toggleZoom);
       map.on('click', () => el.classList.remove('is-zoom'));
 
       selfMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
