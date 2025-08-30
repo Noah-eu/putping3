@@ -78,6 +78,8 @@ export default function MapView({ profile }) {
     let ownerEmail = null, ownerUid = undefined;
     try { const p = JSON.parse(local || 'null'); ownerEmail = p?.email || null; ownerUid = p?.uid || undefined; } catch {}
     const OWNER = String(import.meta.env.VITE_OWNER_EMAIL || 'david.eder78@gmail.com').trim().toLowerCase();
+    // Debug log to understand gating conditions
+    try { console.log('[DevBot] gate', { wantBot, ownerEmail, OWNER, hasUid: !!ownerUid, botUid }); } catch {}
     if (!mapReady || !wantBot) return;
     if (!ownerEmail || ownerEmail.trim().toLowerCase() !== OWNER) return;
     if (botUid) return; // už běží
@@ -85,7 +87,8 @@ export default function MapView({ profile }) {
       try {
         const uid = await spawnDevBot(ownerUid);
         setBotUid(uid);
-      } catch (e) { console.warn('spawnDevBot failed', e); }
+        try { console.log('[DevBot] spawned', { uid }); } catch {}
+      } catch (e) { console.warn('spawnDevBot failed', e?.code || e); }
     })();
   }, [mapReady, botUid, profile?.auth?.email]);
 
