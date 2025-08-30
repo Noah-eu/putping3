@@ -70,13 +70,16 @@ export async function spawnDevBot(ownerUid){
 
   // Alternativní kanál: sleduj pairPings pro konkrétního ownera (nevyžaduje zápis do pings/)
   try {
-    if (ownerUid) {
-      const pid = pairIdOf(ownerUid, botUid);
-      let responded = false;
+    // Sleduj vlastní pairId pro kohokoli (nezávisle na ownerUid)
+    const usersSnap = await get(ref(db2, "users")); // pouze pro nalezení posledně aktivních
+    const maybeUids = Object.keys(usersSnap.val() || {});
+    // Nastav lightweight listener na všechny naše pairId, které mohou vzniknout – fallback když nejsou rules pro root
+    for (const uid of maybeUids) {
+      if (!uid || uid === botUid) continue;
+      const pid = pairIdOf(uid, botUid);
       onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
         const from = snap.key;
-        if (from !== ownerUid || responded) return;
-        responded = true;
+        if (!from || from === botUid) return;
         try {
           await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
           await set(ref(db2, `pairs/${pid}`), true);
