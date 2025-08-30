@@ -29,8 +29,8 @@ function buildTearDropEl(photoUrl, color, name) {
   const label = document.createElement('div');
   label.className = 'pp-name';
   label.textContent = name || '';
-  inner.appendChild(label);
   el.appendChild(inner);
+  el.appendChild(label); // umísti jméno mimo .pp-inner, aby se neskalovalo 5×
   return el;
 }
 

@@ -1308,13 +1308,15 @@ mapboxgl-popup .pp-name{font-weight:700}
     0   1.2px 1.2px var(--pp-contrast, rgba(17,17,17,.5));
   padding:0;
   border-radius:0;
-  font-size:11px;
+  font-size:11.5px;
   font-weight:900;
   white-space:nowrap;
   z-index: 2;
   display:none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
-.pp-tear.is-zoom .pp-name{ display:inline-block; }
+.pp-tear.is-zoom .pp-name{ display:inline-block; font-size:13px; }
 
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }
