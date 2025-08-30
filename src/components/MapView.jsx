@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { attachPinZoom } from '../lib/pinZoom.ts';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -62,22 +63,7 @@ export default function MapView({ profile }) {
     // vytvoř/obnov marker
     if (!selfMarkerRef.current) {
       const el = buildTearDropEl(profile?.photoDataUrl || profile?.photoURL || null, color);
-
-      // klik = toggle zvětšení 5×
-      const toggleZoom = (ev) => {
-        ev.stopPropagation();
-        const willZoom = !el.classList.contains('is-zoom');
-        el.classList.toggle('is-zoom', willZoom);
-        if (willZoom) {
-          map.easeTo({
-            center: [lng, lat],
-            zoom: Math.max(map.getZoom(), 15),
-            duration: 600,
-          });
-        }
-      };
-      el.addEventListener('click', toggleZoom);
-      map.on('click', () => el.classList.remove('is-zoom'));
+      attachPinZoom(el, map, [lng, lat]);
 
       selfMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([lng, lat])
