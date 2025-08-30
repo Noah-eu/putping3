@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { attachPinZoom } from '../lib/pinZoom.ts';
-import { db } from '../firebase.js';
+import { db, auth } from '../firebase.js';
 import { ref as dbref, onValue, onChildAdded, set, serverTimestamp } from 'firebase/database';
+import { signInAnonymously } from 'firebase/auth';
 import Chats from './Chats.jsx';
 import { spawnDevBot } from '../devBot.js';
 
@@ -23,6 +24,15 @@ function buildTearDropEl(photoUrl, color, name) {
     }
   })(color);
   el.style.setProperty('--pp-contrast', contrast);
+  const contrastSolid = (c => {
+    switch((c||'').toLowerCase()){
+      case '#ff5aa5': return '#4f8cff';   // růžová -> modrá
+      case '#4f8cff': return '#ff5aa5';   // modrá -> růžová
+      case '#22c55e': return '#7b61ff';   // zelená -> fialová
+      default:        return '#e5e7eb';
+    }
+  })(color);
+  el.style.setProperty('--pp-contrast-bg', contrastSolid);
   const inner = document.createElement('div');
   inner.className = 'pp-inner';
   const img = document.createElement('img');
@@ -53,7 +63,15 @@ export default function MapView({ profile }) {
 
   function pairIdOf(a,b){ return a<b ? `${a}_${b}` : `${b}_${a}`; }
   function getAuthInfo(){
-    try { return JSON.parse(localStorage.getItem('pp_auth')||'null'); } catch { return null; }
+    try { return { uid: auth?.currentUser?.uid || null, email: auth?.currentUser?.email || null }; } catch { return null; }
+  }
+  async function ensureAuthUid(){
+    try{
+      if (auth?.currentUser?.uid) return auth.currentUser.uid;
+      const cred = await signInAnonymously(auth);
+      try { localStorage.setItem('pp_auth', JSON.stringify({ uid: cred.user?.uid || null, email: cred.user?.email || null })); } catch {}
+      return cred.user?.uid || null;
+    }catch(e){ console.warn('ensureAuthUid failed', e); return null; }
   }
   function playBeep(){
     try{
@@ -115,6 +133,9 @@ export default function MapView({ profile }) {
       } catch (e) { console.warn('spawnDevBot failed', e?.code || e); }
     })();
   }, [mapReady, botUid, profile?.auth?.email]);
+
+  // Ujisti se, že máme alespoň anonymní přihlášení pro RTDB zápisy (Pingy)
+  useEffect(() => { ensureAuthUid(); }, []);
 
   // 2) náš pin (teardrop) + klik = 5× zoom
   useEffect(() => {
@@ -179,7 +200,7 @@ export default function MapView({ profile }) {
 
         btn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
-          const au = getAuthInfo(); const fromUid = au?.uid; if (!fromUid){ toast('Přihlas se pro Ping'); return; }
+          const fromUid = await ensureAuthUid(); if (!fromUid){ toast('Přihlas se pro Ping'); return; }
           const toUid = botUid; const pid = pairIdOf(fromUid, toUid);
           try {
             if (!botPaired){
