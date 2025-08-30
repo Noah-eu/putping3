@@ -1316,7 +1316,12 @@ mapboxgl-popup .pp-name{font-weight:700}
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
-.pp-tear.is-zoom .pp-name{ display:inline-block; font-size:13px; }
+.pp-tear.is-zoom .pp-name{
+  display:inline-block;
+  font-size:13px;
+  /* posuň jméno nad zvětšený pin (56px * scale + margin) */
+  bottom: calc(56px * 5 + 8px);
+}
 
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }
