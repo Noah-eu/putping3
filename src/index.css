@@ -1332,14 +1332,15 @@ mapboxgl-popup .pp-name{font-weight:700}
 .pp-tear .pp-action{
   position:absolute;
   left:50%;
-  bottom:2px; /* ve špičce */
-  transform:translateX(-50%) scale(0.92);
-  padding:6px 12px;
+  bottom:6px; /* ve špičce pod fotkou */
+  transform:translateX(-50%);
+  padding:8px 16px;
   border-radius:999px;
   border:0;
-  background: var(--pp-contrast, rgba(17,17,17,.2));
-  color:#111;
-  font-weight:800;
+  background: var(--pp-contrast-bg, #e5e7eb);
+  color:#111; /* písmena černě */
+  font-weight:900;
+  font-size:14px;
   cursor:pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,.15);
   display:none;
