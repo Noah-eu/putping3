@@ -1315,12 +1315,15 @@ mapboxgl-popup .pp-name{font-weight:700}
   display:none;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
+  width: 40px;               /* stejné jako pin v normální velikosti */
+  text-align: center;
 }
 .pp-tear.is-zoom .pp-name{
   display:inline-block;
-  font-size:13px;
+  font-size:20px;            /* výraznější při 5× pinu */
   /* posuň jméno nad zvětšený pin (56px * scale + margin) */
   bottom: calc(56px * 5 + 8px);
+  width: calc(40px * 5);     /* šířka jako zvětšený pin */
 }
 
 /* jistota: nic starého se neuplatní */
