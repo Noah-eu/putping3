@@ -25,6 +25,7 @@ export default function MapView({ profile }) {
   const mapElRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const selfMarkerRef = useRef(null);
+  const [geoPos, setGeoPos] = useState(null); // {lng,lat} only when accuracy <= 5 m
 
   const center = profile?.coords
     ? [profile.coords.lng, profile.coords.lat]
@@ -53,8 +54,8 @@ export default function MapView({ profile }) {
     if (!mapReady || !mapRef.current || !profile?.coords) return;
     const map = mapRef.current;
 
-    const lng = profile.coords.lng;
-    const lat = profile.coords.lat;
+    const lng = (geoPos?.lng ?? profile.coords.lng);
+    const lat = (geoPos?.lat ?? profile.coords.lat);
 
     const g = (profile.gender || '').toLowerCase();
     const color =
@@ -81,7 +82,25 @@ export default function MapView({ profile }) {
       const img = el.querySelector('.pp-avatar');
       if (img && pUrl) img.src = pUrl;
     }
-  }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender]);
+  }, [mapReady, profile?.coords?.lng, profile?.coords?.lat, profile?.photoDataUrl, profile?.photoURL, profile?.gender, geoPos?.lng, geoPos?.lat]);
+
+  // 3) Live geolocation (accuracy <= 5 m)
+  useEffect(() => {
+    if (!mapReady) return;
+    if (!('geolocation' in navigator)) return;
+    const opts = { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 };
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords || {};
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        if (accuracy != null && accuracy > 5) return; // require ~±5 m
+        setGeoPos({ lat: latitude, lng: longitude });
+      },
+      () => {},
+      opts
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [mapReady]);
 
   return (
     <div ref={mapElRef} style={{ position: 'absolute', inset: 0 }} />
