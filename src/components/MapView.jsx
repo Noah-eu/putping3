@@ -69,7 +69,7 @@ export default function MapView({ profile }) {
     try{
       if (auth?.currentUser?.uid) return auth.currentUser.uid;
       const cred = await signInAnonymously(auth);
-      try { localStorage.setItem('pp_auth', JSON.stringify({ uid: cred.user?.uid || null, email: cred.user?.email || null })); } catch {}
+      // neukládej nic do pp_auth, ať nepřepíšeme owner email
       return cred.user?.uid || null;
     }catch(e){ console.warn('ensureAuthUid failed', e); return null; }
   }
@@ -204,8 +204,14 @@ export default function MapView({ profile }) {
           const toUid = botUid; const pid = pairIdOf(fromUid, toUid);
           try {
             if (!botPaired){
-              // Zapiš pouze do pairPings – devBot na to reaguje a vyřeší párování
-              await set(dbref(db, `pairPings/${pid}/${fromUid}`), serverTimestamp());
+              // Zkus oba kanály: pings/ i pairPings/. Stačí když projde jeden.
+              const writes = [
+                set(dbref(db, `pings/${toUid}/${fromUid}`), serverTimestamp()),
+                set(dbref(db, `pairPings/${pid}/${fromUid}`), serverTimestamp()),
+              ];
+              const res = await Promise.allSettled(writes);
+              const ok = res.some(r => r.status === 'fulfilled');
+              if (!ok) throw new Error('all_writes_failed');
               toast('Ping odeslán');
             } else {
               // Otevři lokální chat modal
