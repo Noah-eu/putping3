@@ -1312,7 +1312,7 @@ mapboxgl-popup .pp-name{font-weight:700}
   font-weight:900;
   white-space:nowrap;
   z-index: 2;
-  display:none;
+  display:none; /* default: u běžných pinů se ukáže až při .is-zoom */
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
   width: 40px;               /* stejné jako pin v normální velikosti */
@@ -1326,6 +1326,8 @@ mapboxgl-popup .pp-name{font-weight:700}
   width: calc(40px * 5);     /* šířka jako zvětšený pin */
   line-height: 1;
 }
+/* Bot: jméno trvale nad markerem (přidaná třída v JS) */
+.pp-tear.pp-tear--show-name .pp-name{ display:inline-block; }
 
 /* jistota: nic starého se neuplatní */
 .pp-marker-tear, .pp-marker-tear * { all: unset; }
