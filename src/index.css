@@ -1332,7 +1332,7 @@ mapboxgl-popup .pp-name{font-weight:700}
 .pp-tear .pp-action{
   position:absolute;
   left:50%;
-  bottom:6px; /* ve špičce pod fotkou */
+  top:40px; /* pod 28px fotkou (6px od shora) */
   transform:translateX(-50%);
   padding:8px 16px;
   border-radius:999px;
