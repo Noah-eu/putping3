@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { auth } from '../firebase.js';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const GENDER_META = {
   muz: { label: 'Muž', color: '#ff66b3' },
@@ -14,6 +16,7 @@ export default function Onboarding({ onDone }){
   const [age, setAge] = useState('');
   const [photoDataUrl, setPhotoDataUrl] = useState(null);
   const [agree, setAgree] = useState(false);
+  const [authInfo, setAuthInfo] = useState(null);
   const color = useMemo(()=> gender ? GENDER_META[gender]?.color : '#888', [gender]);
 
   function reqLocation(){
@@ -40,6 +43,20 @@ export default function Onboarding({ onDone }){
     reader.readAsDataURL(file);
   }
 
+  async function signInGoogle(){
+    try {
+      const provider = new GoogleAuthProvider();
+      const res = await signInWithPopup(auth, provider);
+      const u = res.user;
+      const info = { uid: u?.uid||null, email: u?.email||null, displayName: u?.displayName||null, photoURL: u?.photoURL||null };
+      setAuthInfo(info);
+      try { localStorage.setItem('pp_auth', JSON.stringify(info)); } catch {}
+      if (!name && info.displayName) setName(info.displayName);
+      if (!photoDataUrl && info.photoURL) setPhotoDataUrl(info.photoURL);
+      alert('✅ Přihlášen Googlem');
+    } catch(e){ console.error(e); alert('Přihlášení Googlem se nezdařilo.'); }
+  }
+
   const canContinue = !!coords && !!name.trim() && !!agree;
 
   function handleDone(){
@@ -54,6 +71,7 @@ export default function Onboarding({ onDone }){
       coords,
       contactPolicy: 'vsichni',
     };
+    if (authInfo) profile.auth = { uid: authInfo.uid, email: authInfo.email };
     onDone && onDone(profile);
   }
 
@@ -66,6 +84,15 @@ export default function Onboarding({ onDone }){
           <button onClick={reqLocation} className="pill" style={{ background: coords ? '#e6ffe6' : '#fff' }}>
             {locLoading ? 'Zjišťuji polohu…' : (coords ? 'Poloha povolena ✓' : 'Povolit polohu')}
           </button>
+        </div>
+
+        <div style={{ marginBottom: 12, display:'flex', gap:8, alignItems:'center' }}>
+          <button onClick={signInGoogle} className="pill" style={{ background: authInfo ? '#e6f4ff' : '#fff' }}>
+            {authInfo ? 'Přihlášen Googlem ✓' : 'Přihlásit se Googlem (volitelné)'}
+          </button>
+          {authInfo?.email && (
+            <span style={{ fontSize:12, color:'#555' }}>{authInfo.email}</span>
+          )}
         </div>
 
         <label style={{ display:'block', marginBottom:10 }}>
@@ -110,4 +137,3 @@ export default function Onboarding({ onDone }){
     </div>
   );
 }
-
