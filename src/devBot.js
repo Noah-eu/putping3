@@ -58,6 +58,9 @@ export async function spawnDevBot(ownerUid){
       const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
       if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
 
+      // Pošli i přímý ping zpět, aby klient příjemce spolehlivě viděl událost
+      try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
+
       await set(ref(db2, `messages/${pid}/${Date.now()}`), {
         from: botUid,
         text: "Ahoj, testuju, že to funguje 🙂",
@@ -80,6 +83,7 @@ export async function spawnDevBot(ownerUid){
           await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
           await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
           await set(ref(db2, `pairs/${pid}`), true);
+          try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
           await set(ref(db2, `messages/${pid}/${Date.now()}`), {
             from: botUid,
             text: "Ahoj, testuju, že to funguje 🙂",
@@ -105,6 +109,7 @@ export async function spawnDevBot(ownerUid){
             await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
             await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
             await set(ref(db2, `pairs/${pid}`), true);
+            try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
             await set(ref(db2, `messages/${pid}/${Date.now()}`), {
               from: botUid,
               text: "Ahoj, testuju, že to funguje 🙂",

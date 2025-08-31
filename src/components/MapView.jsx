@@ -244,7 +244,7 @@ export default function MapView({ profile }) {
   useEffect(() => {
     const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !botUid || !my) return;
     const pid = pairIdOf(my, botUid);
-    const unsub = onValue(dbref(db, `pairPings/${pid}/${botUid}`), (snap) => {
+    const unsub = onValue(dbref(db, `pairs/${pid}`), (snap) => {
       const isPaired = !!snap.val();
       setBotPaired(isPaired);
       const el = botMarkerRef.current?.getElement();
