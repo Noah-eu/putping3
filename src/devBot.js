@@ -53,6 +53,7 @@ export async function spawnDevBot(ownerUid){
     onChildAdded(inboxRef, async (snap) => {
       const fromUid = snap.key;
       const pid = pairIdOf(fromUid, botUid);
+      try { console.log('[DevBot] got ping via pings/', { fromUid, pid }); } catch {}
 
       await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
       const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
@@ -66,6 +67,7 @@ export async function spawnDevBot(ownerUid){
         text: "Ahoj, testuju, že to funguje 🙂",
         time: serverTimestamp(),
       });
+      try { console.log('[DevBot] responded', { to: fromUid, pid }); } catch {}
     });
   } catch (e) {
     console.warn('[DevBot] inbox subscribe failed', e?.code || e);
@@ -78,6 +80,7 @@ export async function spawnDevBot(ownerUid){
       onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
         const from = snap.key;
         if (!from || from === botUid) return;
+        try { console.log('[DevBot] got ping via pairPings (owner pid)', { from, pid }); } catch {}
         try {
           await set(ref(db2, `pairMembers/${pid}/${from}`), true);
           await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
@@ -89,6 +92,7 @@ export async function spawnDevBot(ownerUid){
             text: "Ahoj, testuju, že to funguje 🙂",
             time: serverTimestamp(),
           });
+          try { console.log('[DevBot] responded owner pid', { to: from, pid }); } catch {}
         } catch (e) { console.warn('[DevBot] pairPings respond (owner) failed', e?.code || e); }
       });
     }
@@ -104,6 +108,7 @@ export async function spawnDevBot(ownerUid){
         onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
           const from = snap.key;
           if (!from || from === botUid) return;
+          try { console.log('[DevBot] got ping via pairPings (fallback)', { from, pid }); } catch {}
           try {
             await set(ref(db2, `pairMembers/${pid}/${from}`), true);
             await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
@@ -115,6 +120,7 @@ export async function spawnDevBot(ownerUid){
               text: "Ahoj, testuju, že to funguje 🙂",
               time: serverTimestamp(),
             });
+            try { console.log('[DevBot] responded fallback', { to: from, pid }); } catch {}
           } catch (e) { console.warn('[DevBot] pairPings respond failed', e?.code || e); }
         });
       }
