@@ -35,6 +35,10 @@ function buildTearDropEl(photoUrl, color, name) {
   el.style.setProperty('--pp-contrast-bg', contrastSolid);
   const inner = document.createElement('div');
   inner.className = 'pp-inner';
+  // pulsující kroužek pro příchozí ping (animuje se nezávisle na zoomu)
+  const ring = document.createElement('div');
+  ring.className = 'pp-ping-ring';
+  inner.appendChild(ring);
   const img = document.createElement('img');
   img.className = 'pp-avatar';
   img.alt = 'avatar';
