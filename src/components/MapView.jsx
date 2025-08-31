@@ -214,6 +214,7 @@ export default function MapView({ profile }) {
               ];
               const res = await Promise.allSettled(writes);
               const ok = res.some(r => r.status === 'fulfilled');
+              try { console.log('[Ping] wrote', { fromUid, toUid, pid, statuses: res.map(r => r.status) }); } catch {}
               if (!ok) throw new Error('all_writes_failed');
               toast('Ping odeslán');
             } else {
