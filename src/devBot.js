@@ -1,4 +1,4 @@
-import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get } from "firebase/database";
+import { getDatabase, ref, set, update, onChildAdded, serverTimestamp, get, push, child } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { initSecondaryApp } from "./firebase.js";
 
@@ -8,6 +8,7 @@ export async function spawnDevBot(ownerUid){
   const app = initSecondaryApp("dev-bot");
   const db2 = getDatabase(app);
   const auth2 = getAuth(app);
+  const startedAt = Date.now();
 
   const cred = await signInAnonymously(auth2);
   const botUid = cred.user.uid;
@@ -47,94 +48,55 @@ export async function spawnDevBot(ownerUid){
   });
   try { console.log('[DevBot] user created', { botUid, lat, lng }); } catch {}
 
-  // Reakce na pingy → spáruj pár a pošli zprávu
-  const inboxRef = ref(db2, `pings/${botUid}`);
+  // New ping handling per spec
   try {
-    onChildAdded(inboxRef, async (snap) => {
+    const handled = new Set();
+    const toMeRef = ref(db2, `pings/${botUid}`);
+    onChildAdded(toMeRef, (snap) => {
       const fromUid = snap.key;
-      const pid = pairIdOf(fromUid, botUid);
-      try { console.log('[DevBot] got ping via pings/', { fromUid, pid }); } catch {}
-
-      try {
-        // Zapiš jen vlastní členství – pravidla nedovolí zapsat cizí UID
-        await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
-
-        // Otisk bota do pairPings a rovnou založ pár (dev-bot páruje ihned)
-        await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-        await set(ref(db2, `pairs/${pid}`), true);
-
-        // Spolehlivá notifikace pro klienta protistrany
-        try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
-
-        // Úvodní zpráva
-        await set(ref(db2, `messages/${pid}/${Date.now()}`), {
-          from: botUid,
-          text: "Ahoj, testuju, že to funguje 🙂",
-          time: serverTimestamp(),
-        });
-        try { console.log('[DevBot] responded', { to: fromUid, pid }); } catch {}
-      } catch (e) {
-        console.warn('[DevBot] pings-branch failed', e?.code || e);
-      }
-    }, (err) => { console.warn('[DevBot] onChildAdded pings/ error', err?.code || err); });
-  } catch (e) {
-    console.warn('[DevBot] inbox subscribe failed', e?.code || e);
-  }
-
-  // Alternativní kanál: sleduj pairPings – nejdříve cíleně pro ownerUid (bez potřeby číst users)
-  try {
-    if (ownerUid) {
-      const pid = pairIdOf(ownerUid, botUid);
-      onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
-        const from = snap.key;
-        if (!from || from === botUid) return;
-        try { console.log('[DevBot] got ping via pairPings (owner pid)', { from, pid }); } catch {}
+      if (!fromUid) return;
+      const fromRef = ref(db2, `pings/${botUid}/${fromUid}`);
+      onChildAdded(fromRef, async (childSnap) => {
         try {
-          await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
-          await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-          await set(ref(db2, `pairs/${pid}`), true);
-          try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
-          await set(ref(db2, `messages/${pid}/${Date.now()}`), {
-            from: botUid,
-            text: "Ahoj, testuju, že to funguje 🙂",
-            time: serverTimestamp(),
-          });
-          try { console.log('[DevBot] responded owner pid', { to: from, pid }); } catch {}
-        } catch (e) { console.warn('[DevBot] pairPings respond (owner) failed', e?.code || e); }
-      }, (err) => { console.warn('[DevBot] onChildAdded pairPings(owner) error', err?.code || err); });
-    }
+          const pid = childSnap.key;
+          if (!pid || handled.has(pid)) return;
+          const val = childSnap.val();
+          // Ignore historical pings prior to bot start
+          const tsVal = (val && typeof val === 'object') ? val.ts : (typeof val === 'number' ? val : null);
+          if (tsVal && typeof tsVal === 'number' && tsVal < startedAt - 1000) return;
+          handled.add(pid);
 
-    // Dále zkus širší fallback: naslouchat na pairPings/{pid} pro existující uživatele
-    // (může selhat, pokud nejsou práva číst /users)
-    try {
-      const usersSnap = await get(ref(db2, "users"));
-      const maybeUids = Object.keys(usersSnap.val() || {});
-      for (const uid of maybeUids) {
-        if (!uid || uid === botUid) continue;
-        const pid = pairIdOf(uid, botUid);
-        onChildAdded(ref(db2, `pairPings/${pid}`), async (snap) => {
-          const from = snap.key;
-          if (!from || from === botUid) return;
-          try { console.log('[DevBot] got ping via pairPings (fallback)', { from, pid }); } catch {}
+          // Reply ping back to sender at a new key
+          const replyRef = push(ref(db2, `pings/${fromUid}/${botUid}`));
+          await set(replyRef, { ts: serverTimestamp(), from: botUid, to: fromUid });
+
+          // Pulse flag so client can animate their marker
+          await set(ref(db2, `pairPings/${fromUid}/${botUid}`), serverTimestamp());
+
+          // Promote to pair if mutual (both sides have at least one child)
           try {
-            await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
-            await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-            await set(ref(db2, `pairs/${pid}`), true);
-            try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
-            await set(ref(db2, `messages/${pid}/${Date.now()}`), {
-              from: botUid,
-              text: "Ahoj, testuju, že to funguje 🙂",
-              time: serverTimestamp(),
-            });
-            try { console.log('[DevBot] responded fallback', { to: from, pid }); } catch {}
-          } catch (e) { console.warn('[DevBot] pairPings respond failed', e?.code || e); }
-        }, (err) => { console.warn('[DevBot] onChildAdded pairPings(fallback) error', err?.code || err); });
-      }
-    } catch (e) {
-      console.warn('[DevBot] users read for pairPings fallback failed', e?.code || e);
-    }
+            const aRef = child(ref(db2, `pings/${fromUid}`), botUid);
+            const bRef = child(ref(db2, `pings/${botUid}`), fromUid);
+            const [a, b] = await Promise.all([get(aRef), get(bRef)]);
+            if (a.exists() && b.exists()) {
+              const pairId = pairIdOf(botUid, fromUid);
+              await update(ref(db2), {
+                [`pairMembers/${pairId}/${botUid}`]: true,
+                [`pairMembers/${pairId}/${fromUid}`]: true,
+                [`pairs/${pairId}/createdAt`]: serverTimestamp(),
+              });
+            }
+          } catch (e) {
+            console.warn('[DevBot] pair promotion check failed', e?.code || e);
+          }
+          try { console.log('[DevBot] replied to ping', { fromUid, pid }); } catch {}
+        } catch (e) {
+          console.warn('[DevBot] reply handler failed', e?.code || e);
+        }
+      }, (err) => console.warn('[DevBot] onChildAdded pings/from error', err?.code || err));
+    }, (err) => console.warn('[DevBot] onChildAdded pings root error', err?.code || err));
   } catch (e) {
-    console.warn('[DevBot] pairPings watch failed', e?.code || e);
+    console.warn('[DevBot] new ping handling failed', e?.code || e);
   }
 
   // Keep-alive + malé chvění polohy, ať je vidět že žije
