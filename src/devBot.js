@@ -56,14 +56,16 @@ export async function spawnDevBot(ownerUid){
       try { console.log('[DevBot] got ping via pings/', { fromUid, pid }); } catch {}
 
       try {
-        // Zapiš členy páru, ať máme práva zapisovat pairs/messages
-        await set(ref(db2, `pairMembers/${pid}/${fromUid}`), true);
+        // Zapiš jen vlastní členství – pravidla nedovolí zapsat cizí UID
         await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
 
-        // Otisk bota do pairPings + případně založ pár
+        // Otisk bota do pairPings + případně založ pár (až když existuje protistrana)
         await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-        const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
-        if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
+        const otherPing = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
+        const otherMember = await get(ref(db2, `pairMembers/${pid}/${fromUid}`));
+        if (otherPing.exists() || otherMember.exists()) {
+          await set(ref(db2, `pairs/${pid}`), true);
+        }
 
         // Spolehlivá notifikace pro klienta protistrany
         try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
@@ -92,10 +94,10 @@ export async function spawnDevBot(ownerUid){
         if (!from || from === botUid) return;
         try { console.log('[DevBot] got ping via pairPings (owner pid)', { from, pid }); } catch {}
         try {
-          await set(ref(db2, `pairMembers/${pid}/${from}`), true);
           await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
           await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-          await set(ref(db2, `pairs/${pid}`), true);
+          const otherMember = await get(ref(db2, `pairMembers/${pid}/${from}`));
+          if (otherMember.exists()) await set(ref(db2, `pairs/${pid}`), true);
           try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
           await set(ref(db2, `messages/${pid}/${Date.now()}`), {
             from: botUid,
@@ -120,10 +122,10 @@ export async function spawnDevBot(ownerUid){
           if (!from || from === botUid) return;
           try { console.log('[DevBot] got ping via pairPings (fallback)', { from, pid }); } catch {}
           try {
-            await set(ref(db2, `pairMembers/${pid}/${from}`), true);
             await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
             await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-            await set(ref(db2, `pairs/${pid}`), true);
+            const otherMember = await get(ref(db2, `pairMembers/${pid}/${from}`));
+            if (otherMember.exists()) await set(ref(db2, `pairs/${pid}`), true);
             try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
             await set(ref(db2, `messages/${pid}/${Date.now()}`), {
               from: botUid,
