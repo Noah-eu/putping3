@@ -1332,7 +1332,8 @@ mapboxgl-popup .pp-name{font-weight:700}
 .pp-tear .pp-action{
   position:absolute;
   left:50%;
-  transform:translateX(-50%);
+  top: 40px; /* 6px top + 28px avatar + 6px mezera */
+  transform: translateX(-50%);
   padding:8px 16px;
   border-radius:999px;
   border:0;
@@ -1343,13 +1344,13 @@ mapboxgl-popup .pp-name{font-weight:700}
   cursor:pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,.15);
   display:none;
+  z-index: 3;
 }
 .pp-tear.is-zoom .pp-action{
   display:inline-block;
-  /* pod fotkou: (6px offset + 28px avatar) * scale(5) + mírná mezera */
-  top: calc((6px + 28px) * 5 + 8px);
-  font-size: 16px;
-  padding: 10px 18px;
+  /* kontrascale: vnitřek je 5×, tlačítko zmenšíme 5× zpět */
+  transform: translateX(-50%) scale(0.2);
+  transform-origin: 50% 0%;
 }
 
 /* Animace – příjemce uvidí nadskakování odesílatele */

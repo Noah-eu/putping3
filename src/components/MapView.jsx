@@ -196,8 +196,9 @@ export default function MapView({ profile }) {
         const btn = document.createElement('button');
         btn.className = 'pp-action';
         btn.textContent = 'Ping';
-        // Připevni na root wrapper (.pp-tear), aby se tlačítko neškálovalo 5×
-        el.appendChild(btn);
+        // Připevni do .pp-inner a v CSS zmenšíme proti 5× zoomu (scale 0.2)
+        const innerEl = el.querySelector('.pp-inner');
+        (innerEl || el).appendChild(btn);
 
         btn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
