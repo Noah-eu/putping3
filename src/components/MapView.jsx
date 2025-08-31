@@ -271,7 +271,9 @@ export default function MapView({ profile }) {
     let seen = false;
     const unsub = onValue(dbref(db, `pairPings/${pid}/${botUid}`), (snap) => {
       const v = snap.val();
-      if (v && !seen){ seen = true; playBeep(); toast('Dostal jsi Ping!');
+      if (v && !seen){
+        seen = true; try { console.log('[Client] pairPings saw bot otisk', { pid }); } catch{}
+        playBeep(); toast('Dostal jsi Ping!');
         if (botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000); }
       }
     });
@@ -283,11 +285,22 @@ export default function MapView({ profile }) {
     const au = getAuthInfo(); const my = au?.uid; if (!mapReady || !my) return;
     const unsub = onChildAdded(dbref(db, `pings/${my}`), (snap) => {
       const fromUid = snap.key; if (!fromUid) return;
+      try { console.log('[Client] got ping via pings/', { fromUid }); } catch{}
       playBeep(); toast('Dostal jsi Ping!');
       if (fromUid === botUid && botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000); }
     });
     return () => unsub();
   }, [mapReady, botUid]);
+
+  // 2g) Fallback: jakmile se pár vytvoří, jednorázově pulsuj (kdyby pings read byl zablokován)
+  useEffect(() => {
+    if (!botPaired || !botMarkerRef.current) return;
+    try { console.log('[Client] pair established – pulse fallback'); } catch{}
+    const el = botMarkerRef.current.getElement();
+    el.classList.add('is-ping');
+    const t = setTimeout(()=> el.classList.remove('is-ping'), 3000);
+    return () => clearTimeout(t);
+  }, [botPaired]);
 
   // 2b) Po načtení mapy vždy vycentrovat uživatele doprostřed
   useEffect(() => {
