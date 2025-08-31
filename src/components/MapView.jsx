@@ -214,7 +214,16 @@ export default function MapView({ profile }) {
               ];
               const res = await Promise.allSettled(writes);
               const ok = res.some(r => r.status === 'fulfilled');
-              try { console.log('[Ping] wrote', { fromUid, toUid, pid, statuses: res.map(r => r.status) }); } catch {}
+              try {
+                console.log('[Ping] wrote', {
+                  fromUid, toUid, pid,
+                  results: res.map((r, i) => ({
+                    target: ['pings->bot','pairPings->me','pairMembers->me'][i],
+                    status: r.status,
+                    reason: r.status === 'rejected' ? (r.reason?.code || String(r.reason)) : 'ok',
+                  }))
+                });
+              } catch {}
               if (!ok) throw new Error('all_writes_failed');
               toast('Ping odeslán');
             } else {
