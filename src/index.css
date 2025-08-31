@@ -1283,7 +1283,7 @@ mapboxgl-popup .pp-name{font-weight:700}
   object-fit: cover;
   outline: 2px solid #fff;
   box-shadow: 0 1px 4px rgba(0,0,0,.18) inset;
-  z-index: 1;
+  z-index: 3; /* nad ping ringem */
   pointer-events: none; /* klik bere kontejner */
 }
 
@@ -1294,8 +1294,9 @@ mapboxgl-popup .pp-name{font-weight:700}
   width:28px; height:28px;
   transform:translateX(-50%);
   border-radius:50%;
-  background: var(--pp-contrast-bg, rgba(255,255,255,.6));
-  z-index: 0;
+  background: var(--pp-contrast-bg, rgba(79,140,255,.6));
+  border: 2px solid #fff;
+  z-index: 2;
   opacity: 0;
   pointer-events: none;
 }
