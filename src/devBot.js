@@ -78,7 +78,7 @@ export async function spawnDevBot(ownerUid){
       } catch (e) {
         console.warn('[DevBot] pings-branch failed', e?.code || e);
       }
-    });
+    }, (err) => { console.warn('[DevBot] onChildAdded pings/ error', err?.code || err); });
   } catch (e) {
     console.warn('[DevBot] inbox subscribe failed', e?.code || e);
   }
@@ -104,7 +104,7 @@ export async function spawnDevBot(ownerUid){
           });
           try { console.log('[DevBot] responded owner pid', { to: from, pid }); } catch {}
         } catch (e) { console.warn('[DevBot] pairPings respond (owner) failed', e?.code || e); }
-      });
+      }, (err) => { console.warn('[DevBot] onChildAdded pairPings(owner) error', err?.code || err); });
     }
 
     // Dále zkus širší fallback: naslouchat na pairPings/{pid} pro existující uživatele
@@ -132,7 +132,7 @@ export async function spawnDevBot(ownerUid){
             });
             try { console.log('[DevBot] responded fallback', { to: from, pid }); } catch {}
           } catch (e) { console.warn('[DevBot] pairPings respond failed', e?.code || e); }
-        });
+        }, (err) => { console.warn('[DevBot] onChildAdded pairPings(fallback) error', err?.code || err); });
       }
     } catch (e) {
       console.warn('[DevBot] users read for pairPings fallback failed', e?.code || e);
