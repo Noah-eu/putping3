@@ -1287,6 +1287,21 @@ mapboxgl-popup .pp-name{font-weight:700}
   pointer-events: none; /* klik bere kontejner */
 }
 
+/* ping ring – vizuální puls (nezávislý na transform konfliktu) */
+.pp-tear .pp-ping-ring{
+  position:absolute;
+  left:50%; top:6px;
+  width:28px; height:28px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background: var(--pp-contrast-bg, rgba(255,255,255,.6));
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes pp-pingRing{ 0%{ opacity:.35; transform:translateX(-50%) scale(1)} 80%{ opacity:0; transform:translateX(-50%) scale(2.3)} 100%{ opacity:0 } }
+.pp-tear.is-ping .pp-ping-ring{ animation: pp-pingRing 1.3s ease-out 2; }
+
 /* zvětšení 5× bez změny tvaru – škáluj jen .pp-inner */
 .pp-tear.is-zoom .pp-inner { transform: scale(5); }
 
@@ -1355,7 +1370,7 @@ mapboxgl-popup .pp-name{font-weight:700}
 
 /* Animace – příjemce uvidí nadskakování odesílatele */
 @keyframes pp-pulseScale{ 0%,100%{ transform: scale(1) } 50%{ transform: scale(1.12) } }
-.pp-tear.is-ping .pp-inner{ animation: pp-pulseScale 1s ease-in-out infinite; }
+/* transform puls jsem nahradil kroužkem (viz .pp-ping-ring) – bez konfliktu se zoomem */
 /* Bot i uživatelé: stejné chování; jméno se ukáže až při .is-zoom */
 
 /* jistota: nic starého se neuplatní */
