@@ -49,6 +49,11 @@ function buildTearDropEl(photoUrl, color, name) {
   label.textContent = name || '';
   el.appendChild(inner);
   el.appendChild(label); // umísti jméno mimo .pp-inner, aby se neskalovalo 5×
+  // badge "Ping!" – není škálovaný, sedí nad pinem
+  const badge = document.createElement('div');
+  badge.className = 'pp-ping-badge';
+  badge.textContent = 'Ping!';
+  el.appendChild(badge);
   return el;
 }
 
@@ -80,7 +85,8 @@ export default function MapView({ profile }) {
   function playBeep(){
     try{
       const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
-      const ctx = new Ctx(); const o = ctx.createOscillator(); const g = ctx.createGain();
+      if (!playBeep.ctx) playBeep.ctx = new Ctx();
+      const ctx = playBeep.ctx; const o = ctx.createOscillator(); const g = ctx.createGain();
       o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
       o.start(); g.gain.setValueAtTime(0.2, ctx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.4); o.stop(ctx.currentTime+0.42);
@@ -140,6 +146,13 @@ export default function MapView({ profile }) {
 
   // Ujisti se, že máme alespoň anonymní přihlášení pro RTDB zápisy (Pingy)
   useEffect(() => { ensureAuthUid(); }, []);
+
+  // Priming AudioContext po prvním uživatelském gestu (kvůli policy)
+  useEffect(() => {
+    const onFirst = () => { try { playBeep(); } catch {}; window.removeEventListener('pointerdown', onFirst); };
+    window.addEventListener('pointerdown', onFirst, { once: true });
+    return () => window.removeEventListener('pointerdown', onFirst);
+  }, []);
 
   // 2) náš pin (teardrop) + klik = 5× zoom
   useEffect(() => {
@@ -278,7 +291,7 @@ export default function MapView({ profile }) {
       if (v && !seen){
         seen = true; try { console.log('[Client] pairPings saw bot otisk', { pid }); } catch{}
         playBeep(); toast('Dostal jsi Ping!');
-        if (botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000); }
+        if (botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); try{ console.log('[Client] show PING visuals'); }catch{} setTimeout(()=> el.classList.remove('is-ping'), 4000); }
       }
     });
     return () => unsub();
@@ -291,7 +304,7 @@ export default function MapView({ profile }) {
       const fromUid = snap.key; if (!fromUid) return;
       try { console.log('[Client] got ping via pings/', { fromUid }); } catch{}
       playBeep(); toast('Dostal jsi Ping!');
-      if (fromUid === botUid && botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); setTimeout(()=> el.classList.remove('is-ping'), 4000); }
+      if (fromUid === botUid && botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); try{ console.log('[Client] show PING visuals (pings path)'); }catch{} setTimeout(()=> el.classList.remove('is-ping'), 4000); }
     });
     return () => unsub();
   }, [mapReady, botUid]);
