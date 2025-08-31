@@ -1354,8 +1354,8 @@ mapboxgl-popup .pp-name{font-weight:700}
 }
 
 /* Animace – příjemce uvidí nadskakování odesílatele */
-@keyframes pp-bounceY{ 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } }
-.pp-tear.is-ping .pp-inner{ animation: pp-bounceY 0.8s ease-in-out infinite; }
+@keyframes pp-pulseScale{ 0%,100%{ transform: scale(1) } 50%{ transform: scale(1.12) } }
+.pp-tear.is-ping .pp-inner{ animation: pp-pulseScale 1s ease-in-out infinite; }
 /* Bot i uživatelé: stejné chování; jméno se ukáže až při .is-zoom */
 
 /* jistota: nic starého se neuplatní */
