@@ -59,13 +59,9 @@ export async function spawnDevBot(ownerUid){
         // Zapiš jen vlastní členství – pravidla nedovolí zapsat cizí UID
         await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
 
-        // Otisk bota do pairPings + případně založ pár (až když existuje protistrana)
+        // Otisk bota do pairPings a rovnou založ pár (dev-bot páruje ihned)
         await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-        const otherPing = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
-        const otherMember = await get(ref(db2, `pairMembers/${pid}/${fromUid}`));
-        if (otherPing.exists() || otherMember.exists()) {
-          await set(ref(db2, `pairs/${pid}`), true);
-        }
+        await set(ref(db2, `pairs/${pid}`), true);
 
         // Spolehlivá notifikace pro klienta protistrany
         try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
@@ -96,8 +92,7 @@ export async function spawnDevBot(ownerUid){
         try {
           await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
           await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-          const otherMember = await get(ref(db2, `pairMembers/${pid}/${from}`));
-          if (otherMember.exists()) await set(ref(db2, `pairs/${pid}`), true);
+          await set(ref(db2, `pairs/${pid}`), true);
           try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
           await set(ref(db2, `messages/${pid}/${Date.now()}`), {
             from: botUid,
@@ -124,8 +119,7 @@ export async function spawnDevBot(ownerUid){
           try {
             await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
             await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-            const otherMember = await get(ref(db2, `pairMembers/${pid}/${from}`));
-            if (otherMember.exists()) await set(ref(db2, `pairs/${pid}`), true);
+            await set(ref(db2, `pairs/${pid}`), true);
             try { await set(ref(db2, `pings/${from}/${botUid}`), serverTimestamp()); } catch {}
             await set(ref(db2, `messages/${pid}/${Date.now()}`), {
               from: botUid,
