@@ -55,19 +55,29 @@ export async function spawnDevBot(ownerUid){
       const pid = pairIdOf(fromUid, botUid);
       try { console.log('[DevBot] got ping via pings/', { fromUid, pid }); } catch {}
 
-      await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
-      const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
-      if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
+      try {
+        // Zapiš členy páru, ať máme práva zapisovat pairs/messages
+        await set(ref(db2, `pairMembers/${pid}/${fromUid}`), true);
+        await set(ref(db2, `pairMembers/${pid}/${botUid}`), true);
 
-      // Pošli i přímý ping zpět, aby klient příjemce spolehlivě viděl událost
-      try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
+        // Otisk bota do pairPings + případně založ pár
+        await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
+        const other = await get(ref(db2, `pairPings/${pid}/${fromUid}`));
+        if (other.exists()) await set(ref(db2, `pairs/${pid}`), true);
 
-      await set(ref(db2, `messages/${pid}/${Date.now()}`), {
-        from: botUid,
-        text: "Ahoj, testuju, že to funguje 🙂",
-        time: serverTimestamp(),
-      });
-      try { console.log('[DevBot] responded', { to: fromUid, pid }); } catch {}
+        // Spolehlivá notifikace pro klienta protistrany
+        try { await set(ref(db2, `pings/${fromUid}/${botUid}`), serverTimestamp()); } catch {}
+
+        // Úvodní zpráva
+        await set(ref(db2, `messages/${pid}/${Date.now()}`), {
+          from: botUid,
+          text: "Ahoj, testuju, že to funguje 🙂",
+          time: serverTimestamp(),
+        });
+        try { console.log('[DevBot] responded', { to: fromUid, pid }); } catch {}
+      } catch (e) {
+        console.warn('[DevBot] pings-branch failed', e?.code || e);
+      }
     });
   } catch (e) {
     console.warn('[DevBot] inbox subscribe failed', e?.code || e);
