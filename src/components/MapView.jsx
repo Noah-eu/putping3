@@ -66,6 +66,9 @@ export default function MapView({ profile }) {
   const [botUid, setBotUid] = useState(null);
   const [openChatPid, setOpenChatPid] = useState(null);
   const [botPaired, setBotPaired] = useState(false);
+  const [iPinged, setIPinged] = useState(false);
+  const iPingedRef = useRef(false);
+  useEffect(() => { iPingedRef.current = iPinged; }, [iPinged]);
   const [geoPos, setGeoPos] = useState(null); // {lng,lat} (averaged)
   const geoBufRef = useRef([]); // posledních N vzorků pro vyhlazení
   const centeredOnceRef = useRef(false); // zajistí centrování po načtení
@@ -242,6 +245,7 @@ export default function MapView({ profile }) {
                 });
               } catch {}
               if (!ok) throw new Error('all_writes_failed');
+              setIPinged(true);
               toast('Ping odeslán');
             } else {
               // Otevři lokální chat modal
@@ -276,7 +280,7 @@ export default function MapView({ profile }) {
       setBotPaired(isPaired);
       const el = botMarkerRef.current?.getElement();
       const btn = el?.querySelector('.pp-action');
-      if (btn) btn.textContent = isPaired ? 'Chat' : 'Ping';
+      if (btn) btn.textContent = (isPaired && iPingedRef.current) ? 'Chat' : 'Ping';
     });
     return () => unsub();
   }, [mapReady, botUid]);
@@ -303,6 +307,8 @@ export default function MapView({ profile }) {
     const unsub = onChildAdded(dbref(db, `pings/${my}`), (snap) => {
       const fromUid = snap.key; if (!fromUid) return;
       try { console.log('[Client] got ping via pings/', { fromUid }); } catch{}
+      // ignoruj nevyžádaný ping (když jsem ještě neposlal svůj)
+      if (fromUid === botUid && !iPingedRef.current) { try{ console.log('[Client] ignore unsolicited bot ping'); }catch{} return; }
       playBeep(); toast('Dostal jsi Ping!');
       if (fromUid === botUid && botMarkerRef.current){ const el = botMarkerRef.current.getElement(); el.classList.add('is-ping'); try{ console.log('[Client] show PING visuals (pings path)'); }catch{} setTimeout(()=> el.classList.remove('is-ping'), 4000); }
     });
@@ -311,7 +317,7 @@ export default function MapView({ profile }) {
 
   // 2g) Fallback: jakmile se pár vytvoří, jednorázově pulsuj (kdyby pings read byl zablokován)
   useEffect(() => {
-    if (!botPaired || !botMarkerRef.current) return;
+    if (!botPaired || !iPingedRef.current || !botMarkerRef.current) return;
     try { console.log('[Client] pair established – pulse fallback'); } catch{}
     const el = botMarkerRef.current.getElement();
     el.classList.add('is-ping');
