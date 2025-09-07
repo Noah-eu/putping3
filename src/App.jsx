@@ -790,6 +790,9 @@ export default function App() {
         lastActive: Date.now(),
         online: true,
       });
+      // keep my marker and map centered on my current location
+      markers.current[me.uid]?.setLngLat([longitude, latitude]);
+      map?.setCenter([longitude, latitude]);
     };
     const handleErr = (err) => {
       console.warn("Geolocation error", err);
@@ -806,7 +809,7 @@ export default function App() {
     const id = navigator.geolocation.watchPosition(updatePos, handleErr, opts);
 
     return () => navigator.geolocation.clearWatch(id);
-  }, [me, locationConsent]);
+  }, [me, locationConsent, map]);
 
   /* ───────────────────────────── Init mapy ──────────────────────────────── */
 
