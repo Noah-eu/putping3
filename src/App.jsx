@@ -941,6 +941,11 @@ export default function App() {
 
           avatar.addEventListener("click", (e) => {
             e.stopPropagation();
+            setMarkerHighlights((prev) => {
+              const copy = { ...prev };
+              delete copy[uid];
+              return copy;
+            });
             toggleBubble(uid);
           });
 
@@ -1450,13 +1455,6 @@ export default function App() {
           new Audio('/ping.mp3').play();
         }
         setMarkerHighlights((prev) => ({ ...prev, [fromUid]: "red" }));
-        setTimeout(() => {
-          setMarkerHighlights((prev) => {
-            const copy = { ...prev };
-            if (copy[fromUid] === "red") delete copy[fromUid];
-            return copy;
-          });
-        }, 5000);
         remove(ref(db, `pings/${me.uid}/${fromUid}`));
       });
     });
