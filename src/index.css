@@ -79,6 +79,15 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
   0%, 100% { transform: scale(1); }
   50% { transform: scale(5); }
 }
+.marker-avatar.bot-pulse {
+  animation: bot-pulse 1s ease-in-out infinite;
+  filter: brightness(0.7);
+}
+
+@keyframes bot-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(2); }
+}
 .marker-bubble {
   position: absolute;
   bottom: 0;

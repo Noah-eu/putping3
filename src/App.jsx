@@ -790,6 +790,13 @@ export default function App() {
         lastActive: Date.now(),
         online: true,
       });
+      setProfile((prev) => {
+        const next = { ...(prev || {}), coords: { lat: latitude, lng: longitude } };
+        try {
+          localStorage.setItem('pp_profile', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       // keep my marker and map centered on my current location
       markers.current[me.uid]?.setLngLat([longitude, latitude]);
       map?.setCenter([longitude, latitude]);
@@ -819,16 +826,22 @@ export default function App() {
 
     let m;
     (async () => {
-      // Start at last known position from DB if available, otherwise Prague
+      // Start at last known position from localStorage or DB if available, otherwise Prague
       let center = [14.42076, 50.08804];
-      try {
-        const snap = await get(ref(db, `users/${me.uid}`));
-        const u = snap.val();
-        if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
-          center = [u.lng, u.lat];
+      const cachedLng = parseFloat(localStorage.getItem('lastLng'));
+      const cachedLat = parseFloat(localStorage.getItem('lastLat'));
+      if (Number.isFinite(cachedLng) && Number.isFinite(cachedLat)) {
+        center = [cachedLng, cachedLat];
+      } else {
+        try {
+          const snap = await get(ref(db, `users/${me.uid}`));
+          const u = snap.val();
+          if (u && Number.isFinite(u.lat) && Number.isFinite(u.lng)) {
+            center = [u.lng, u.lat];
+          }
+        } catch (err) {
+          console.warn("Failed to load last position", err);
         }
-      } catch (err) {
-        console.warn("Failed to load last position", err);
       }
       m = new mapboxgl.Map({
         container: "map",
@@ -929,6 +942,11 @@ export default function App() {
             highlight,
             getGenderRing(u)
           );
+          if (isDevBot) {
+            avatar.classList.add("bot-pulse");
+            avatar.style.boxShadow =
+              "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.4)";
+          }
           wrapper.appendChild(avatar);
 
           const bubble = getBubbleContent({
@@ -980,6 +998,11 @@ export default function App() {
             highlight,
             getGenderRing(u)
           );
+          avatar.classList.toggle("bot-pulse", isDevBot);
+          if (isDevBot) {
+            avatar.style.boxShadow =
+              "0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.4)";
+          }
 
           const oldBubble = wrapper.querySelector(".marker-bubble");
           const scrollLeft =
