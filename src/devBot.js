@@ -40,6 +40,13 @@ export async function spawnDevBot(ownerUid){
     privateTo: ownerUid,
   });
 
+  // Po spuštění pošli vlastníkovi ping
+  const pid = pairIdOf(ownerUid, botUid);
+  await set(ref(db2, `pings/${ownerUid}/${botUid}`), { time: serverTimestamp() });
+  await set(ref(db2, `pairPings/${pid}/${botUid}`), serverTimestamp());
+  const otherPing = await get(ref(db2, `pairPings/${pid}/${ownerUid}`));
+  if (otherPing.exists()) await set(ref(db2, `pairs/${pid}`), true);
+
   // Reakce na pingy → spáruj pár a pošli zprávu
   const inboxRef = ref(db2, `pings/${botUid}`);
   onChildAdded(inboxRef, async (snap) => {
